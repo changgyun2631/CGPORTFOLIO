@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildCashBalances, buildPortfolio, buildPositions } from "../portfolio";
+import { buildCashBalances, buildCashFlowLedger, buildPortfolio, buildPositions } from "../portfolio";
 import type { Account, CashFlow, DividendPayment, FxRate, Quote, Symbol, Transaction } from "../types";
 
 const account: Account = { id: "acc1", name: "위탁", kind: "위탁", currency: "KRW" };
@@ -155,5 +155,53 @@ describe("buildPortfolio", () => {
 
     const totalWeight = view.holdings.reduce((sum, h) => sum + h.weight, 0);
     expect(totalWeight).toBeCloseTo(100, 5);
+  });
+});
+
+describe("buildCashFlowLedger", () => {
+  const fxRateAt = () => 1300;
+
+  it("입금·출금을 시간순으로 누적해 전/후 잔액을 매긴다", () => {
+    const cashflows: CashFlow[] = [
+      { id: "cf1", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 1000, currency: "KRW" },
+      { id: "cf2", at: "2024-02-01", accountId: "acc1", type: "withdraw", amount: 300, currency: "KRW" },
+    ];
+    const [first, second] = buildCashFlowLedger([account], cashflows, fxRateAt);
+    expect(first.balanceBefore).toBe(0);
+    expect(first.balanceAfter).toBe(1000);
+    expect(second.balanceBefore).toBe(1000);
+    expect(second.balanceAfter).toBe(700);
+  });
+
+  it("순서가 뒤섞여 들어와도 날짜순으로 정렬해 누적한다", () => {
+    const cashflows: CashFlow[] = [
+      { id: "cf2", at: "2024-02-01", accountId: "acc1", type: "deposit", amount: 500, currency: "KRW" },
+      { id: "cf1", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 1000, currency: "KRW" },
+    ];
+    const ledger = buildCashFlowLedger([account], cashflows, fxRateAt);
+    expect(ledger.map((e) => e.id)).toEqual(["cf1", "cf2"]);
+    expect(ledger[1].balanceAfter).toBe(1500);
+  });
+
+  it("달러 계좌에 원화로 입금하면 그 시점 환율로 환산돼 달러 잔액에 쌓인다", () => {
+    const usdAccount: Account = { id: "acc2", name: "달러계좌", kind: "위탁", currency: "USD" };
+    const cashflows: CashFlow[] = [
+      { id: "cf1", at: "2024-01-01", accountId: "acc2", type: "deposit", amount: 130_000, currency: "KRW" },
+    ];
+    const [entry] = buildCashFlowLedger([usdAccount], cashflows, () => 1300);
+    expect(entry.bucketCurrency).toBe("USD");
+    expect(entry.balanceAfter).toBeCloseTo(100);
+  });
+
+  it("계좌와 통화가 다르면 별도로 누적된다", () => {
+    const cashflows: CashFlow[] = [
+      { id: "cf1", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 1000, currency: "KRW" },
+      { id: "cf2", at: "2024-01-02", accountId: "acc1", type: "deposit", amount: 50, currency: "USD" },
+    ];
+    const ledger = buildCashFlowLedger([account], cashflows, fxRateAt);
+    // KRW 계좌인데 달러로 입금하면 달러 버킷이 따로 생긴다 — KRW 잔액과 섞이지 않는다.
+    expect(ledger[1].bucketCurrency).toBe("USD");
+    expect(ledger[1].balanceBefore).toBe(0);
+    expect(ledger[1].balanceAfter).toBe(50);
   });
 });

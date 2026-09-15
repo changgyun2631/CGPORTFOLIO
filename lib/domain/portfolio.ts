@@ -369,3 +369,45 @@ export function summarizeAccounts(accounts: Account[], holdings: Holding[]) {
     })
     .sort((a, b) => b.valueKrw - a.valueKrw);
 }
+
+export type CashFlowLedgerEntry = CashFlow & {
+  /** 이 입출금이 실제로 쌓이는 예수금 통화. 달러계좌에 원화로 입금하면 달러로 환산돼 쌓인다 (buildCashBalances와 같은 규칙). */
+  bucketCurrency: Currency;
+  balanceBefore: number;
+  balanceAfter: number;
+};
+
+/**
+ * 입출금 내역에 "이 거래 전/후 잔액"을 붙인다. `CashFlow.balanceAfter`는 표시용으로
+ * 남겨둔 필드일 뿐 계산에 쓰지 않는다 — 원장(cashflows)에서 매번 다시 쌓아야
+ * 값이 어긋나지 않는다 (원칙 1).
+ *
+ * 매수/매도·배당도 예수금을 움직이지만, 여기서는 "입출금" 자체의 전후 잔액만
+ * 본다. 계좌 화면의 입출금 내역 표에 붙이는 용도라 그걸로 충분하다.
+ */
+export function buildCashFlowLedger(
+  accounts: Account[],
+  cashflows: CashFlow[],
+  fxRateAt: (date: string) => number,
+): CashFlowLedgerEntry[] {
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const running = new Map<string, number>();
+  const ordered = [...cashflows].sort((a, b) => a.at.localeCompare(b.at));
+
+  return ordered.flatMap((cf) => {
+    const account = accountById.get(cf.accountId);
+    if (!account) return [];
+
+    const convertToUsd = account.currency === "USD" && cf.currency === "KRW";
+    const bucketCurrency: Currency = convertToUsd ? "USD" : cf.currency;
+    const magnitude = convertToUsd ? cf.amount / fxRateAt(cf.at.slice(0, 10)) : cf.amount;
+    const signed = cf.type === "deposit" ? magnitude : -magnitude;
+
+    const key = `${cf.accountId}::${bucketCurrency}`;
+    const balanceBefore = running.get(key) ?? 0;
+    const balanceAfter = balanceBefore + signed;
+    running.set(key, balanceAfter);
+
+    return [{ ...cf, bucketCurrency, balanceBefore, balanceAfter }];
+  });
+}

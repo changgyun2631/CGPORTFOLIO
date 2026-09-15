@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { MonthlyBars } from "@/components/charts/monthly-bars";
+import { colorFor } from "@/components/dashboard/allocation";
 import { Card, Empty, PageTitle, Section, Stat, WeightBar } from "@/components/ui/primitives";
 import { loadDividendSummary, loadPortfolio } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
@@ -9,8 +10,8 @@ import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "배당" };
 
-export default async function DividendsPage() {
-  const [summary, portfolio] = await Promise.all([loadDividendSummary(), loadPortfolio()]);
+export default async function DividendsPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
+  const [summary, portfolio, params] = await Promise.all([loadDividendSummary(), loadPortfolio(), searchParams]);
 
   if (summary.byYear.length === 0) {
     return (
@@ -20,6 +21,13 @@ export default async function DividendsPage() {
       </div>
     );
   }
+
+  const years = summary.byYear.map((y) => y.year); // byYear는 이미 최신순으로 정렬돼 있다.
+  // 쿼리로 준 연도가 실제로 있으면 그걸 쓰고, 없으면(또는 안 주면) 가장 최근 연도를 기본값으로 한다.
+  const year = params.year && years.includes(params.year) ? params.year : years[0];
+  const selected = summary.byYear.find((y) => y.year === year)!;
+  // 종목마다 달이 바뀌어도 같은 색을 쓰도록, 배당 총액이 큰 순서로 색 순서를 고정해 둔다.
+  const symbolOrder = summary.bySymbol.map((s) => s.symbolId);
 
   const yieldOnValue = portfolio.totals.totalKrw > 0 ? (summary.forecastKrw / portfolio.totals.totalKrw) * 100 : 0;
   const yieldOnCost = portfolio.totals.costKrw > 0 ? (summary.forecastKrw / portfolio.totals.costKrw) * 100 : 0;
@@ -44,13 +52,42 @@ export default async function DividendsPage() {
         />
       </div>
 
-      {summary.byYear.map((year) => (
-        <Section key={year.year} title={`${year.year}년`} description={`합계 ${money(year.totalKrw)}`}>
-          <Card>
-            <MonthlyBars months={monthsOfYear(summary, year.year)} />
-          </Card>
-        </Section>
-      ))}
+      <Section
+        title={`${year}년`}
+        description={`합계 ${money(selected.totalKrw)}`}
+        action={
+          years.length > 1 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {years.map((y) => (
+                <Link
+                  key={y}
+                  href={`/dividends?year=${y}`}
+                  aria-current={y === year ? "page" : undefined}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    y === year ? "bg-accent text-white" : "border border-line text-muted hover:border-line-strong hover:text-text"
+                  }`}
+                >
+                  {y}
+                </Link>
+              ))}
+            </div>
+          ) : undefined
+        }
+      >
+        <Card>
+          <MonthlyBars months={monthsOfYear(summary, year)} symbolOrder={symbolOrder} />
+          {symbolOrder.length > 1 ? (
+            <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px]">
+              {summary.bySymbol.map((line, index) => (
+                <li key={line.symbolId} className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: colorFor(index) }} />
+                  <span className="font-bold tracking-tight">{line.symbolId}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </Card>
+      </Section>
 
       <Section title="종목별 누적" description="지급 이력이 있는 종목만 표시합니다.">
         <Card>

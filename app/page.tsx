@@ -30,7 +30,8 @@ export default async function DashboardPage() {
     loadRecentCashFlows(3),
   ]);
 
-  const { holdings, totals, fx, snapshots, realizedKrw } = portfolio;
+  const { holdings, totals, fx, snapshots, realizedKrw, transactions } = portfolio;
+  const chartTrades = transactions.map((tx) => ({ at: tx.at, side: tx.side }));
   const fxChange = fx.rate - fx.prevRate;
   const fxChangePercent = fx.prevRate > 0 ? (fxChange / fx.prevRate) * 100 : 0;
 
@@ -91,7 +92,7 @@ export default async function DashboardPage() {
         description="점선은 원/달러 환율입니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
       >
         <Card>
-          <ValueChart snapshots={snapshots} />
+          <ValueChart snapshots={snapshots} principalKrw={totals.principalKrw} trades={chartTrades} />
         </Card>
       </Section>
 
@@ -162,7 +163,7 @@ export default async function DashboardPage() {
         <Card>
           {dividends.byYear.length > 0 ? (
             <>
-              <MonthlyBars months={dividendMonths} />
+              <MonthlyBars months={dividendMonths} symbolOrder={dividends.bySymbol.map((line) => line.symbolId)} />
               <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px]">
                 {dividends.bySymbol.slice(0, 6).map((line) => (
                   <li key={line.symbolId} className="flex items-baseline gap-1.5">
