@@ -10,6 +10,7 @@ import { Card, Delta, Empty, PageTitle, Section, Stat, WeightBar } from "@/compo
 import {
   loadAccountSummary,
   loadAssetMap,
+  loadChartTrades,
   loadDividendSummary,
   loadPortfolio,
   loadRecentCashFlows,
@@ -19,8 +20,11 @@ import {
 import { monthsOfYear } from "@/lib/domain/dividends";
 import { money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 
+// cron이 갱신한 시세·스냅샷을 재빌드 없이 매 요청에 반영한다.
+export const dynamic = "force-dynamic";
+
 export default async function DashboardPage() {
-  const [portfolio, sparklines, accounts, assetMap, dividends, trades, cashflows] = await Promise.all([
+  const [portfolio, sparklines, accounts, assetMap, dividends, trades, cashflows, chartTrades] = await Promise.all([
     loadPortfolio(),
     loadSparklines(),
     loadAccountSummary(),
@@ -28,10 +32,10 @@ export default async function DashboardPage() {
     loadDividendSummary(),
     loadRecentTrades(4),
     loadRecentCashFlows(3),
+    loadChartTrades(),
   ]);
 
-  const { holdings, totals, fx, snapshots, realizedKrw, transactions } = portfolio;
-  const chartTrades = transactions.map((tx) => ({ at: tx.at, side: tx.side }));
+  const { holdings, totals, fx, snapshots } = portfolio;
   const fxChange = fx.rate - fx.prevRate;
   const fxChangePercent = fx.prevRate > 0 ? (fxChange / fx.prevRate) * 100 : 0;
 
@@ -68,9 +72,9 @@ export default async function DashboardPage() {
               <dd className="tnum mt-0.5 font-semibold">{money(totals.totalUsd, "USD")}</dd>
             </div>
             <div>
-              <dt className="text-faint">실현 손익</dt>
+              <dt className="text-faint">현재 평가손익</dt>
               <dd className="mt-0.5 font-semibold">
-                <Delta amount={realizedKrw} />
+                <Delta amount={totals.gainKrw} />
               </dd>
             </div>
           </dl>
@@ -89,14 +93,14 @@ export default async function DashboardPage() {
 
       <Section
         title="총 평가금액 및 환율 추이"
-        description="점선은 원/달러 환율입니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
+        description="환율 점선과 매수·매도 타점을 함께 볼 수 있습니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
       >
         <Card>
           <ValueChart snapshots={snapshots} principalKrw={totals.principalKrw} trades={chartTrades} />
         </Card>
       </Section>
 
-      <Section title="핵심 지표" description="원금은 순입금액, 매입금은 현재 보유분의 원가입니다.">
+      <Section title="핵심 지표" description="평가손익은 증권사 현재 원가와 예상 매도수수료를 반영합니다.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat
             label="원금 대비 수익"
@@ -106,11 +110,11 @@ export default async function DashboardPage() {
             sub={`원금 ${money(totals.principalKrw)}`}
           />
           <Stat
-            label="매입 대비 수익"
+            label="현재 평가손익"
             value={moneyBare(totals.gainKrw)}
             tone={totals.gainKrw >= 0 ? "up" : "down"}
             delta={<Delta percent={totals.gainPercent} showAmount={false} />}
-            sub={`매입금 ${money(totals.costKrw)}`}
+            sub={`매입금 ${money(totals.costKrw)} · 예상 수수료 ${money(totals.estimatedExitFeeKrw)}`}
           />
           <Stat
             label="전일 평가손익"

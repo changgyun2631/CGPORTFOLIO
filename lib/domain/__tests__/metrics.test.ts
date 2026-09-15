@@ -69,9 +69,22 @@ describe("filterSnapshots", () => {
     expect(filterSnapshots(snapshots, "all")).toHaveLength(3);
   });
 
-  it("범위 안에 점이 하나도 안 남으면 마지막 두 점을 반환한다", () => {
+  it("1일 범위에 실제 점이 부족하면 마지막 두 관측값을 반환한다", () => {
     const result = filterSnapshots(snapshots, "1d");
-    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result).toEqual(snapshots.slice(-2));
+  });
+
+  it("짧은 달력 구간이 비어도 기간별로 서로 다른 실제 관측값 수를 쓴다", () => {
+    const sparse = [
+      ...Array.from({ length: 40 }, (_, index) =>
+        snap(new Date(Date.UTC(2026, 6, index + 1)).toISOString(), 100 + index),
+      ),
+      snap("2026-09-15T00:00:00.000Z", 150),
+    ];
+
+    expect(filterSnapshots(sparse, "1d")).toHaveLength(2);
+    expect(filterSnapshots(sparse, "7d")).toHaveLength(7);
+    expect(filterSnapshots(sparse, "1m")).toHaveLength(30);
   });
 });
 

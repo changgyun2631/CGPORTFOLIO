@@ -77,7 +77,12 @@ export async function GET(request: Request) {
     // 이 점들이 쌓여서 추이 차트와 MDD가 된다.
     const snapshots = await getSnapshots();
     const refreshed = await recomputeTotal();
-    const point: Snapshot = { at: new Date().toISOString(), totalKrw: refreshed, fxRate: fx.rate };
+    const point: Snapshot = {
+      at: new Date().toISOString(),
+      totalKrw: refreshed.totalKrw,
+      principalKrw: refreshed.principalKrw,
+      fxRate: fx.rate,
+    };
     await writeFile(join(dataDir, "snapshots.json"), `${JSON.stringify([...snapshots, point], null, 2)}\n`, "utf8");
 
     return NextResponse.json({
@@ -85,7 +90,7 @@ export async function GET(request: Request) {
       updated: report.quotes.length,
       missing: report.missing,
       errors: report.errors,
-      totalKrw: refreshed,
+      totalKrw: refreshed.totalKrw,
       fxRate: fx.rate,
       elapsedMs: Date.now() - startedAt,
     });
@@ -99,7 +104,7 @@ export async function GET(request: Request) {
  * store 의 캐시는 요청 단위라 같은 요청 안에서는 이전 값을 들고 있으므로,
  * 여기서는 파일을 직접 읽는 대신 계산에 필요한 값만 다시 조립한다.
  */
-async function recomputeTotal(): Promise<number> {
+async function recomputeTotal(): Promise<{ totalKrw: number; principalKrw: number }> {
   const { readFile } = await import("node:fs/promises");
   const [quotesRaw, fxRaw] = await Promise.all([
     readFile(join(dataDir, "quotes.json"), "utf8"),
@@ -121,5 +126,5 @@ async function recomputeTotal(): Promise<number> {
     const unit = quote?.price ?? holding.price;
     total += holding.shares * unit * (holding.currency === "USD" ? fx.rate : 1);
   }
-  return Math.round(total);
+  return { totalKrw: Math.round(total), principalKrw: portfolio.totals.principalKrw };
 }

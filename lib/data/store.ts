@@ -13,6 +13,7 @@ import type {
   DividendPayment,
   FxRate,
   LookthroughTable,
+  PositionBasis,
   Quote,
   ReportMeta,
   Snapshot,
@@ -56,6 +57,13 @@ export const getSymbols = () => readJson<Symbol[]>("symbols.json");
 export const getTransactions = () => readJson<Transaction[]>("transactions.json");
 export const getCashFlows = () => readJson<CashFlow[]>("cashflows.json");
 export const getDividends = () => readJson<DividendPayment[]>("dividends.json");
+export async function getPositionBasis(): Promise<PositionBasis[]> {
+  try {
+    return await readJson<PositionBasis[]>("position-basis.json");
+  } catch {
+    return [];
+  }
+}
 export const getSnapshots = () => readJson<Snapshot[]>("snapshots.json");
 export const getQuotes = () => readJson<Quote[]>("quotes.json");
 export const getFxQuote = () => readJson<FxRate>("fx-quote.json");

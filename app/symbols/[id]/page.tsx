@@ -7,6 +7,8 @@ import { Card, Delta, Empty, PageTitle, Section, Stat, WeightBar } from "@/compo
 import { loadSymbolDetail } from "@/lib/data/views";
 import { money, percent, price, shares as fmtShares, shortDateTime } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({ params }: PageProps<"/symbols/[id]">): Promise<Metadata> {
   const { id } = await params;
   const detail = await loadSymbolDetail(decodeURIComponent(id));

@@ -58,8 +58,22 @@ export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): Snapsho
   if (!start) return snapshots;
   const startIso = start.toISOString();
   const filtered = snapshots.filter((s) => new Date(s.at).toISOString() >= startIso);
-  // 구간이 너무 짧아 점이 하나도 안 남으면 최소한 마지막 두 점은 보여준다.
-  return filtered.length >= 2 ? filtered : snapshots.slice(-2);
+  if (filtered.length >= 2) return filtered;
+
+  // 실제 일별 기록이 듬성듬성한 구간에서도 기간 버튼끼리 같은 두 점만
+  // 반복하지 않도록, 가짜 날짜를 만들지 않고 마지막 N개 실제 관측값을 쓴다.
+  const fallbackObservations: Partial<Record<RangeKey, number>> = {
+    "1d": 2,
+    "7d": 7,
+    "1m": 30,
+    "3m": 90,
+    "6m": 180,
+    ytd: 260,
+    "1y": 365,
+    "5y": 1_825,
+  };
+  const count = fallbackObservations[range] ?? 2;
+  return snapshots.slice(-Math.min(count, snapshots.length));
 }
 
 export type SeriesStats = {

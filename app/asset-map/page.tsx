@@ -7,6 +7,7 @@ import { loadAssetMap, loadPortfolio } from "@/lib/data/views";
 import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "자산맵" };
+export const dynamic = "force-dynamic";
 
 export default async function AssetMapPage() {
   const [assetMap, portfolio] = await Promise.all([loadAssetMap(), loadPortfolio()]);

@@ -8,6 +8,7 @@ import { buildCashFlowLedger } from "@/lib/domain/portfolio";
 import { money, percent, shares as fmtShares, shortDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "계좌" };
+export const dynamic = "force-dynamic";
 
 export default async function AccountsPage() {
   const [accounts, portfolio] = await Promise.all([loadAccountSummary(), loadPortfolio()]);

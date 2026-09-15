@@ -4,6 +4,7 @@ import type {
   Currency,
   DividendPayment,
   FxRate,
+  PositionBasis,
   Quote,
   Symbol,
   Transaction,
@@ -26,6 +27,9 @@ export type Position = {
   costBasis: number;
   /** 심볼 통화 기준 누적 실현손익 */
   realized: number;
+  /** 증권사 현재잔고에서 가져온 예상 매도수수료율 */
+  estimatedExitFeeRate?: number;
+  basisAt?: string;
 };
 
 export type CashBalance = { accountId: string; currency: Currency; amount: number };
@@ -52,6 +56,8 @@ export type Holding = {
   dayChangePercent: number;
   /** 원화 환산 매입원가 */
   costKrw: number;
+  /** 현재 평가금액을 전량 매도할 때 증권사가 예상하는 수수료 */
+  estimatedExitFeeKrw: number;
   /** 매입 대비 누적 손익(원) */
   totalGainKrw: number;
   totalGainPercent: number;
@@ -72,6 +78,7 @@ export type PortfolioTotals = {
   /** 매입 대비 손익 */
   gainKrw: number;
   gainPercent: number;
+  estimatedExitFeeKrw: number;
   /** 원금(원) — 순입금액. 여기에 배당·실현손익이 쌓여 지금이 된 것이다. */
   principalKrw: number;
   principalGainKrw: number;
@@ -96,6 +103,17 @@ export function buildPositions(transactions: Transaction[]): Position[] {
       ({ symbolId: tx.symbolId, accountId: tx.accountId, shares: 0, averagePrice: 0, costBasis: 0, realized: 0 } satisfies Position);
 
     const fee = tx.fee ?? 0;
+    const action = tx.action ?? "trade";
+
+    if (action === "split") {
+      const ratio = tx.splitRatio ?? 1;
+      if (Number.isFinite(ratio) && ratio > 0 && position.shares > EPSILON) {
+        position.shares *= ratio;
+        position.averagePrice = position.costBasis / position.shares;
+      }
+      byKey.set(key, position);
+      continue;
+    }
 
     if (tx.side === "buy") {
       position.costBasis += tx.shares * tx.price + fee;
@@ -105,7 +123,7 @@ export function buildPositions(transactions: Transaction[]): Position[] {
       // 보유수량보다 많이 팔 수는 없다. 데이터가 어긋나면 보유분까지만 처리한다.
       const sold = Math.min(tx.shares, position.shares);
       const costOut = position.averagePrice * sold;
-      position.realized += sold * tx.price - costOut - fee;
+      if (action === "trade") position.realized += sold * tx.price - costOut - fee;
       position.shares -= sold;
       position.costBasis = Math.max(position.costBasis - costOut, 0);
       if (position.shares <= EPSILON) {
@@ -115,6 +133,42 @@ export function buildPositions(transactions: Transaction[]): Position[] {
       }
     }
 
+    byKey.set(key, position);
+  }
+
+  return [...byKey.values()];
+}
+
+/** 현재 보유분은 증권사 잔고 스냅샷을 기준으로 맞춘다. 과거 원장은 실현손익 이력에만 사용한다. */
+export function applyPositionBasis(positions: Position[], basis: PositionBasis[]): Position[] {
+  if (basis.length === 0) return positions;
+
+  const byKey = new Map(positions.map((position) => [`${position.accountId}::${position.symbolId}`, { ...position }]));
+  const currentKeys = new Set(basis.map((line) => `${line.accountId}::${line.symbolId}`));
+
+  for (const [key, position] of byKey) {
+    if (!currentKeys.has(key)) {
+      position.shares = 0;
+      position.averagePrice = 0;
+      position.costBasis = 0;
+    }
+  }
+
+  for (const line of basis) {
+    const key = `${line.accountId}::${line.symbolId}`;
+    const position = byKey.get(key) ?? {
+      symbolId: line.symbolId,
+      accountId: line.accountId,
+      shares: 0,
+      averagePrice: 0,
+      costBasis: 0,
+      realized: 0,
+    };
+    position.shares = line.shares;
+    position.averagePrice = line.averagePrice;
+    position.costBasis = line.costBasis;
+    position.estimatedExitFeeRate = line.estimatedExitFeeRate ?? 0;
+    position.basisAt = line.at;
     byKey.set(key, position);
   }
 
@@ -157,6 +211,7 @@ export function buildCashBalances(
   }
 
   for (const tx of transactions) {
+    if ((tx.action ?? "trade") !== "trade") continue;
     const symbol = symbolById.get(tx.symbolId);
     if (!symbol) continue;
     const fee = tx.fee ?? 0;
@@ -177,6 +232,9 @@ export type BuildHoldingsInput = {
   transactions: Transaction[];
   cashflows: CashFlow[];
   dividends: DividendPayment[];
+  positionBasis?: PositionBasis[];
+  /** 실제 현금 입출금으로 계산한 현재 원금. 있으면 불완전한 거래원장 합계보다 우선한다. */
+  principalKrw?: number;
   quotes: Quote[];
   fx: FxRate;
   fxRateAt: (date: string) => number;
@@ -192,11 +250,11 @@ export type PortfolioView = {
 };
 
 export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
-  const { accounts, symbols, transactions, cashflows, dividends, quotes, fx, fxRateAt } = input;
+  const { accounts, symbols, transactions, cashflows, dividends, positionBasis = [], quotes, fx, fxRateAt } = input;
 
   const symbolById = new Map(symbols.map((s) => [s.id, s]));
   const quoteById = new Map(quotes.map((q) => [q.symbolId, q]));
-  const positions = buildPositions(transactions);
+  const positions = applyPositionBasis(buildPositions(transactions), positionBasis);
   const cash = buildCashBalances(accounts, symbols, transactions, cashflows, dividends, fxRateAt);
 
   const toKrw = (amount: number, currency: Currency, rate = fx.rate) => (currency === "USD" ? amount * rate : amount);
@@ -216,6 +274,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
     const valueKrw = toKrw(position.shares * price, symbol.currency);
     const prevValueKrw = toKrw(position.shares * prevClose, symbol.currency, fx.prevRate);
     const costKrw = toKrw(position.costBasis, symbol.currency);
+    const estimatedExitFeeKrw = valueKrw * (position.estimatedExitFeeRate ?? 0);
 
     const existing = drafts.get(position.symbolId);
     if (existing) {
@@ -225,6 +284,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
       existing.valueKrw += valueKrw;
       existing.prevValueKrw += prevValueKrw;
       existing.costKrw += costKrw;
+      existing.estimatedExitFeeKrw += estimatedExitFeeKrw;
       existing.byAccount.push({ accountId: position.accountId, shares: position.shares, valueKrw });
     } else {
       drafts.set(position.symbolId, {
@@ -242,6 +302,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
         dayChangeKrw: 0,
         dayChangePercent: 0,
         costKrw,
+        estimatedExitFeeKrw,
         totalGainKrw: 0,
         totalGainPercent: 0,
         byAccount: [{ accountId: position.accountId, shares: position.shares, valueKrw }],
@@ -275,6 +336,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
       dayChangePercent: 0,
       // 예수금은 손익 개념이 없으므로 원가를 평가액과 같게 두어 손익 0으로 만든다.
       costKrw: valueKrw,
+      estimatedExitFeeKrw: 0,
       totalGainKrw: 0,
       totalGainPercent: 0,
       byAccount: cash
@@ -291,7 +353,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
       const dayChangeKrw = draft.valueKrw - draft.prevValueKrw;
       // 등락률은 환율 영향을 뺀 종목 자체의 움직임으로 본다.
       const dayChangePercent = draft.prevClose > 0 ? ((draft.price - draft.prevClose) / draft.prevClose) * 100 : 0;
-      const totalGainKrw = draft.kind === "cash" ? 0 : draft.valueKrw - draft.costKrw;
+      const totalGainKrw = draft.kind === "cash" ? 0 : draft.valueKrw - draft.costKrw - draft.estimatedExitFeeKrw;
       const totalGainPercent = draft.costKrw > 0 && draft.kind !== "cash" ? (totalGainKrw / draft.costKrw) * 100 : 0;
       return {
         ...draft,
@@ -305,11 +367,12 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
     .sort((a, b) => b.valueKrw - a.valueKrw);
 
   /** 원금 = 순입금액. 계좌 통화와 무관하게 입금 당시 원화 금액으로 본다. */
-  const principalKrw = cashflows.reduce((sum, cf) => {
+  const ledgerPrincipalKrw = cashflows.filter((cf) => (cf.kind ?? "external") === "external").reduce((sum, cf) => {
     const signed = cf.type === "deposit" ? cf.amount : -cf.amount;
     const inKrw = cf.currency === "USD" ? signed * fxRateAt(cf.at.slice(0, 10)) : signed;
     return sum + inKrw;
   }, 0);
+  const principalKrw = input.principalKrw ?? ledgerPrincipalKrw;
 
   const realizedKrw = positions.reduce((sum, position) => {
     const symbol = symbolById.get(position.symbolId);
@@ -319,7 +382,8 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
 
   const costKrw = holdings.filter((h) => h.kind !== "cash").reduce((sum, h) => sum + h.costKrw, 0);
   const investedValueKrw = holdings.filter((h) => h.kind !== "cash").reduce((sum, h) => sum + h.valueKrw, 0);
-  const gainKrw = investedValueKrw - costKrw;
+  const estimatedExitFeeKrw = holdings.reduce((sum, h) => sum + h.estimatedExitFeeKrw, 0);
+  const gainKrw = investedValueKrw - costKrw - estimatedExitFeeKrw;
   const dayChangeKrw = totalKrw - prevTotalKrw;
 
   const totals: PortfolioTotals = {
@@ -330,6 +394,7 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
     costKrw,
     gainKrw,
     gainPercent: costKrw > 0 ? (gainKrw / costKrw) * 100 : 0,
+    estimatedExitFeeKrw,
     principalKrw,
     principalGainKrw: totalKrw - principalKrw,
     principalGainPercent: principalKrw > 0 ? ((totalKrw - principalKrw) / principalKrw) * 100 : 0,

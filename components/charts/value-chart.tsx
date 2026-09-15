@@ -17,14 +17,18 @@ const WIDTH = 1000;
 const HEIGHT = 300;
 const PAD = { top: 16, right: 44, bottom: 26, left: 44 };
 
-export type ChartTrade = { at: string; side: "buy" | "sell" };
+export type ChartTrade = {
+  at: string;
+  side: "buy" | "sell";
+  symbolId: string;
+  shares: number;
+};
 
 export function ValueChart({
   snapshots,
   showFx = true,
   /** 원금(순입금액). 주면 원금 대비 수익률 선을 같이 그린다. */
   principalKrw,
-  /** 매매 시점. 주면 지점을 표시하는 토글 버튼이 생긴다. */
   trades = [],
 }: {
   snapshots: Snapshot[];
@@ -32,9 +36,9 @@ export function ValueChart({
   principalKrw?: number;
   trades?: ChartTrade[];
 }) {
-  const [range, setRange] = useState<RangeKey>("3m");
-  const [hover, setHover] = useState<number | null>(null);
+  const [range, setRange] = useState<RangeKey>("1y");
   const [showTrades, setShowTrades] = useState(true);
+  const [hover, setHover] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -74,20 +78,23 @@ export function ValueChart({
       y: PAD.top + innerH - ((s.fxRate - fxMin) / fxSpan) * innerH * 0.55,
     }));
 
-    // 원금이 주어지면 "원금 대비 몇 % 인가"를 별도 선으로 그린다. 기간 동안 원금이
-    // 바뀌었을 수 있다는 건 알지만(입출금), 스냅샷마다 그 시점 원금을 남겨두지
-    // 않으므로 지금 원금을 구간 전체의 기준선으로 쓴다 — 근사치다.
+    // 계좌수익률 원본에 기록된 날짜별 원금을 우선 사용한다. 최근 자동 스냅샷처럼
+    // 날짜별 원금이 없는 점만 현재 순입금 원금을 안전한 대체값으로 쓴다.
     let returnPoints: { x: number; y: number }[] = [];
     let returnMin = 0;
     let returnMax = 0;
-    if (principalKrw && principalKrw > 0) {
-      const returns = series.map((s) => ((s.totalKrw - principalKrw) / principalKrw) * 100);
-      returnMin = Math.min(...returns, 0);
-      returnMax = Math.max(...returns, 0);
+    const returns = series.map((s, i) => {
+      const basis = s.principalKrw ?? principalKrw;
+      return basis && basis > 0 ? { x: xAt(i), value: ((s.totalKrw - basis) / basis) * 100 } : null;
+    }).filter((point): point is { x: number; value: number } => point !== null);
+    if (returns.length > 1) {
+      const values = returns.map((point) => point.value);
+      returnMin = Math.min(...values, 0);
+      returnMax = Math.max(...values, 0);
       const returnSpan = returnMax - returnMin || 1;
-      returnPoints = returns.map((value, i) => ({
-        x: xAt(i),
-        y: PAD.top + innerH - ((value - returnMin) / returnSpan) * innerH,
+      returnPoints = returns.map((point) => ({
+        x: point.x,
+        y: PAD.top + innerH - ((point.value - returnMin) / returnSpan) * innerH,
       }));
     }
 
@@ -114,31 +121,40 @@ export function ValueChart({
   const mddFrom = marker(stats.drawdownFrom);
   const mddTo = marker(stats.drawdownTo);
 
-  // 매매 시점을 구간 안의 스냅샷에 매칭한다. 여러 거래가 같은 날에 몰려도 점 하나로
-  // 합쳐 보여준다 — 겹친 표식이 서로를 가리는 걸 막기 위해서다. 렌더당 한 번뿐이고
-  // 점이 최대 260개라 훅으로 감쌀 만큼 비싸지 않다.
-  const tradeMarkers = (() => {
-    if (!showTrades || trades.length === 0) return [];
-    const start = points[0].snapshot.at;
-    const end = points[points.length - 1].snapshot.at;
-    const inRange = trades.filter((t) => t.at >= start && t.at <= end);
-    const bySnapshot = new Map<string, "buy" | "sell" | "both">();
-    for (const trade of inRange) {
-      // 가장 가까운(같거나 이전) 스냅샷에 붙인다.
-      let closest = points[0];
-      for (const point of points) {
-        if (point.snapshot.at > trade.at) break;
-        closest = point;
-      }
-      const prev = bySnapshot.get(closest.snapshot.at);
-      bySnapshot.set(closest.snapshot.at, prev && prev !== trade.side ? "both" : trade.side);
-    }
-    return [...bySnapshot.entries()]
-      .map(([at, side]) => ({ point: points.find((p) => p.snapshot.at === at)!, side }))
-      .filter((m) => m.point);
-  })();
-
   const active = hover === null ? points[points.length - 1] : points[Math.min(hover, points.length - 1)];
+
+  const tradeMarkers = (() => {
+    if (!showTrades || trades.length === 0 || points.length === 0) return [];
+    const firstMs = Date.parse(points[0].snapshot.at);
+    const lastMs = Date.parse(points[points.length - 1].snapshot.at);
+    const grouped = new Map<number, { buy: number; sell: number; symbols: Set<string> }>();
+
+    for (const trade of trades) {
+      const tradeMs = Date.parse(trade.at);
+      if (!Number.isFinite(tradeMs) || tradeMs < firstMs || tradeMs > lastMs) continue;
+
+      let closestIndex = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+      points.forEach((point, index) => {
+        const distance = Math.abs(Date.parse(point.snapshot.at) - tradeMs);
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+
+      const marker = grouped.get(closestIndex) ?? { buy: 0, sell: 0, symbols: new Set<string>() };
+      marker[trade.side] += 1;
+      marker.symbols.add(trade.symbolId);
+      grouped.set(closestIndex, marker);
+    }
+
+    return [...grouped.entries()].map(([index, marker]) => ({
+      point: points[index],
+      ...marker,
+      side: marker.buy > 0 && marker.sell > 0 ? ("both" as const) : marker.buy > 0 ? ("buy" as const) : ("sell" as const),
+    }));
+  })();
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -169,10 +185,15 @@ export function ValueChart({
           {trades.length > 0 ? (
             <button
               type="button"
-              onClick={() => setShowTrades((v) => !v)}
-              className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
+              onClick={() => setShowTrades((visible) => !visible)}
+              aria-pressed={showTrades}
+              className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                showTrades
+                  ? "border-accent bg-accent-soft text-accent"
+                  : "border-line text-muted hover:border-line-strong hover:text-text"
+              }`}
             >
-              매수/매도 지점 {showTrades ? "숨기기" : "보이기"}
+              매매
             </button>
           ) : null}
           <button
@@ -221,6 +242,16 @@ export function ValueChart({
           })}
 
           <polygon points={area} fill="url(#value-area)" />
+          {tradeMarkers.map((marker) => (
+            <TradeMarker
+              key={marker.point.snapshot.at}
+              point={marker.point}
+              side={marker.side}
+              buy={marker.buy}
+              sell={marker.sell}
+              symbols={[...marker.symbols]}
+            />
+          ))}
           {showFx ? (
             <polyline points={fxLine} fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="4 4" opacity="0.65" />
           ) : null}
@@ -232,10 +263,6 @@ export function ValueChart({
           {peak ? <ChartMarker point={peak} label="고점" tone="up" /> : null}
           {mddFrom && mddFrom !== peak ? <ChartMarker point={mddFrom} label="MDD 시작" tone="down" /> : null}
           {mddTo && mddTo !== peak && mddTo !== mddFrom ? <ChartMarker point={mddTo} label="MDD 저점" tone="down" /> : null}
-
-          {tradeMarkers.map(({ point, side }) => (
-            <TradeMarker key={point.snapshot.at} point={point} side={side} />
-          ))}
 
           <line x1={active.x} y1={PAD.top} x2={active.x} y2={HEIGHT - PAD.bottom} stroke="var(--border-strong)" strokeWidth="1" />
           <circle cx={active.x} cy={active.y} r="4" fill={stroke} stroke="var(--bg)" strokeWidth="2" />
@@ -258,21 +285,27 @@ export function ValueChart({
           {showFx ? <p className="tnum mt-0.5 text-faint">환율 {active.snapshot.fxRate.toFixed(2)}</p> : null}
         </div>
 
-        {returnPoints.length > 0 || showFx ? (
+        {returnPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
           <div className="pointer-events-none absolute right-1 top-1 flex flex-col items-end gap-1 text-[10px] text-muted">
             {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
             {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
+            {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
+            {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
           </div>
         ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
         <MiniStat label="구간 수익" value={moneySigned(stats.changeAmount)} sub={percentSigned(stats.changePercent)} tone={rising ? "up" : "down"} />
-        {principalKrw ? (
+        {(active.snapshot.principalKrw ?? principalKrw) ? (
           <MiniStat
             label="원금 대비"
-            value={percentSigned(((active.snapshot.totalKrw - principalKrw) / principalKrw) * 100)}
-            sub={`원금 ${money(principalKrw)}`}
+            value={percentSigned(
+              ((active.snapshot.totalKrw - (active.snapshot.principalKrw ?? principalKrw ?? 0)) /
+                (active.snapshot.principalKrw ?? principalKrw ?? 1)) *
+                100,
+            )}
+            sub={`원금 ${money(active.snapshot.principalKrw ?? principalKrw)}`}
           />
         ) : (
           <MiniStat
@@ -302,6 +335,39 @@ export function ValueChart({
   );
 }
 
+function TradeMarker({
+  point,
+  side,
+  buy,
+  sell,
+  symbols,
+}: {
+  point: { x: number; y: number };
+  side: "buy" | "sell" | "both";
+  buy: number;
+  sell: number;
+  symbols: string[];
+}) {
+  const color = side === "buy" ? "var(--up)" : side === "sell" ? "var(--down)" : "var(--accent)";
+  const detail = [buy > 0 ? `매수 ${buy}건` : "", sell > 0 ? `매도 ${sell}건` : ""].filter(Boolean).join(" · ");
+  return (
+    <g>
+      <title>{`${detail} · ${symbols.slice(0, 5).join(", ")}${symbols.length > 5 ? ` 외 ${symbols.length - 5}개` : ""}`}</title>
+      <line
+        x1={point.x}
+        y1={PAD.top}
+        x2={point.x}
+        y2={HEIGHT - PAD.bottom}
+        stroke={color}
+        strokeWidth="1.2"
+        strokeDasharray="3 4"
+        opacity="0.42"
+      />
+      <circle cx={point.x} cy={point.y} r="3.5" fill={color} stroke="var(--bg)" strokeWidth="1.5" />
+    </g>
+  );
+}
+
 function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; label: string; tone: "up" | "down" }) {
   const color = tone === "up" ? "var(--up)" : "var(--down)";
   const y = Math.max(point.y - 20, 12);
@@ -314,13 +380,6 @@ function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; 
       </text>
     </g>
   );
-}
-
-/** 매수/매도 지점 표식. 같은 날 둘 다 있으면(both) 중립색 세모로 표시한다. */
-function TradeMarker({ point, side }: { point: { x: number; y: number }; side: "buy" | "sell" | "both" }) {
-  const color = side === "buy" ? "var(--up)" : side === "sell" ? "var(--down)" : "var(--text-faint)";
-  const y = HEIGHT - PAD.bottom + 14;
-  return <polygon points={`${point.x},${y - 5} ${point.x - 4.5},${y + 4} ${point.x + 4.5},${y + 4}`} fill={color} opacity="0.85" />;
 }
 
 function Legend({ color, label, dashed = false, faded = false }: { color: string; label: string; dashed?: boolean; faded?: boolean }) {

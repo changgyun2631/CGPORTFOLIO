@@ -15,6 +15,7 @@ import {
   getFxHistory,
   getFxQuote,
   getLookthrough,
+  getPositionBasis,
   getPriceHistory,
   getQuotes,
   getSnapshots,
@@ -30,19 +31,20 @@ import {
  */
 
 export const loadRaw = cache(async () => {
-  const [accounts, symbols, transactions, cashflows, dividends, quotes, fx, snapshots, lookthrough, fxHistory] = await Promise.all([
+  const [accounts, symbols, transactions, cashflows, dividends, positionBasis, quotes, fx, snapshots, lookthrough, fxHistory] = await Promise.all([
     getAccounts(),
     getSymbols(),
     getTransactions(),
     getCashFlows(),
     getDividends(),
+    getPositionBasis(),
     getQuotes(),
     getFxQuote(),
     getSnapshots(),
     getLookthrough(),
     getFxHistory(),
   ]);
-  return { accounts, symbols, transactions, cashflows, dividends, quotes, fx, snapshots, lookthrough, fxHistory };
+  return { accounts, symbols, transactions, cashflows, dividends, positionBasis, quotes, fx, snapshots, lookthrough, fxHistory };
 });
 
 /** 과거 환율 조회. 없는 날짜는 그 이전 마지막 값을 쓴다. */
@@ -69,6 +71,8 @@ export const loadPortfolio = cache(async () => {
     transactions: raw.transactions,
     cashflows: raw.cashflows,
     dividends: raw.dividends,
+    positionBasis: raw.positionBasis,
+    principalKrw: raw.snapshots.at(-1)?.principalKrw,
     quotes: raw.quotes,
     fx: raw.fx,
     fxRateAt,
@@ -99,6 +103,7 @@ export const loadRecentTrades = cache(async (limit = 6) => {
   const symbolById = new Map(symbols.map((s) => [s.id, s]));
   const accountById = new Map(accounts.map((a) => [a.id, a]));
   return [...transactions]
+    .filter((tx) => (tx.action ?? "trade") === "trade")
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, limit)
     .map((tx) => ({
@@ -108,6 +113,15 @@ export const loadRecentTrades = cache(async (limit = 6) => {
       accountName: accountById.get(tx.accountId)?.name ?? tx.accountId,
       amount: tx.shares * tx.price,
     }));
+});
+
+/** 평가금액 차트의 매수·매도 타점. 이체와 액면분할은 제외한다. */
+export const loadChartTrades = cache(async () => {
+  const { transactions } = await loadPortfolio();
+  return transactions
+    .filter((tx) => (tx.action ?? "trade") === "trade")
+    .sort((a, b) => a.at.localeCompare(b.at))
+    .map(({ at, side, symbolId, shares }) => ({ at, side, symbolId, shares }));
 });
 
 /** 최근 입출금 내역. */
@@ -156,7 +170,7 @@ export const loadSymbolDetail = cache(async (symbolId: string) => {
   const history = await loadPriceHistory(symbolId);
 
   const trades = portfolio.transactions
-    .filter((tx) => tx.symbolId === symbolId)
+    .filter((tx) => tx.symbolId === symbolId && (tx.action ?? "trade") === "trade")
     .sort((a, b) => b.at.localeCompare(a.at))
     .map((tx) => ({ ...tx, accountName: accountById.get(tx.accountId)?.name ?? tx.accountId }));
 

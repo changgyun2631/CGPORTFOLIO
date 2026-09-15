@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildCashBalances, buildCashFlowLedger, buildPortfolio, buildPositions } from "../portfolio";
-import type { Account, CashFlow, DividendPayment, FxRate, Quote, Symbol, Transaction } from "../types";
+import { applyPositionBasis, buildCashBalances, buildCashFlowLedger, buildPortfolio, buildPositions } from "../portfolio";
+import type { Account, CashFlow, DividendPayment, FxRate, PositionBasis, Quote, Symbol, Transaction } from "../types";
 
 const account: Account = { id: "acc1", name: "위탁", kind: "위탁", currency: "KRW" };
 const symbol: Symbol = { id: "QLD", name: "QLD", kind: "etf", currency: "USD", market: "US" };
@@ -59,6 +59,35 @@ describe("buildPositions", () => {
     // 매수원가 1010, 매도대금 1000, 원가차감 1010, 수수료 5 => 실현손익 -15
     expect(position.realized).toBe(-15);
   });
+
+  it("액면분할은 원가와 실현손익을 바꾸지 않고 수량과 평단만 조정한다", () => {
+    const [position] = buildPositions([
+      tx({ id: "1", shares: 10, price: 100 }),
+      tx({ id: "2", action: "split", splitRatio: 2, shares: 20, price: 0 }),
+    ]);
+    expect(position.shares).toBe(20);
+    expect(position.costBasis).toBe(1000);
+    expect(position.averagePrice).toBe(50);
+    expect(position.realized).toBe(0);
+  });
+
+  it("주식 이체출고는 보유원가만 줄이고 실현손익을 만들지 않는다", () => {
+    const [position] = buildPositions([
+      tx({ id: "1", shares: 10, price: 100 }),
+      tx({ id: "2", action: "transfer", side: "sell", shares: 4, price: 150 }),
+    ]);
+    expect(position.shares).toBe(6);
+    expect(position.costBasis).toBe(600);
+    expect(position.realized).toBe(0);
+  });
+
+  it("현재잔고 기준값이 불완전한 과거 원장의 수량과 원가를 대체한다", () => {
+    const basis: PositionBasis[] = [
+      { at: "2024-02-01", accountId: "acc1", symbolId: "QLD", shares: 7, averagePrice: 80, costBasis: 560, estimatedExitFeeRate: 0.002 },
+    ];
+    const positions = applyPositionBasis(buildPositions([tx({ id: "1", shares: 5, price: 100 })]), basis);
+    expect(positions[0]).toMatchObject({ shares: 7, averagePrice: 80, costBasis: 560, estimatedExitFeeRate: 0.002 });
+  });
 });
 
 describe("buildCashBalances", () => {
@@ -86,6 +115,21 @@ describe("buildCashBalances", () => {
     ];
     const balances = buildCashBalances([account], [symbol], [], [], dividends, fxRateAt);
     expect(balances).toEqual([{ accountId: "acc1", currency: "USD", amount: 50 }]);
+  });
+
+  it("액면분할과 주식 이체는 예수금을 움직이지 않는다", () => {
+    const balances = buildCashBalances(
+      [account],
+      [symbol],
+      [
+        tx({ id: "1", action: "split", splitRatio: 2, shares: 20, price: 50 }),
+        tx({ id: "2", action: "transfer", shares: 2, price: 100 }),
+      ],
+      [],
+      [],
+      fxRateAt,
+    );
+    expect(balances).toEqual([]);
   });
 
   it("계좌 통화와 다른 통화의 입금은 그 시점 환율로 환산된다", () => {
@@ -155,6 +199,53 @@ describe("buildPortfolio", () => {
 
     const totalWeight = view.holdings.reduce((sum, h) => sum + h.weight, 0);
     expect(totalWeight).toBeCloseTo(100, 5);
+  });
+
+  it("평가손익에 현재잔고 원가와 예상 매도수수료를 반영한다", () => {
+    const positionBasis: PositionBasis[] = [
+      { at: "2024-01-02", accountId: "acc1", symbolId: "QLD", shares: 10, averagePrice: 80, costBasis: 800, estimatedExitFeeRate: 0.01 },
+    ];
+    const view = buildPortfolio({
+      accounts: [account],
+      symbols: [symbol],
+      transactions: [],
+      cashflows: [],
+      dividends: [],
+      positionBasis,
+      quotes: [{ symbolId: "QLD", price: 100, prevClose: 100, currency: "USD", asOf: "2024-01-02" }],
+      fx,
+      fxRateAt,
+    });
+    expect(view.totals.gainKrw).toBe((1000 - 800 - 10) * 1300);
+    expect(view.totals.estimatedExitFeeKrw).toBe(10 * 1300);
+  });
+
+  it("원금은 외부 입출금만 포함하고 환전·수익·보정은 제외한다", () => {
+    const cashflows: CashFlow[] = [
+      { id: "external", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 1_000_000, currency: "KRW", kind: "external" },
+      { id: "exchange", at: "2024-01-01", accountId: "acc1", type: "withdraw", amount: 100_000, currency: "KRW", kind: "exchange" },
+      { id: "adjustment", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 50_000, currency: "KRW", kind: "adjustment" },
+    ];
+    const view = buildPortfolio({ accounts: [account], symbols: [], transactions: [], cashflows, dividends: [], quotes: [], fx, fxRateAt });
+    expect(view.totals.principalKrw).toBe(1_000_000);
+  });
+
+  it("실제 현금 입출금으로 확정한 원금은 불완전한 거래원장 합계보다 우선한다", () => {
+    const cashflows: CashFlow[] = [
+      { id: "external", at: "2024-01-01", accountId: "acc1", type: "deposit", amount: 1_000_000, currency: "KRW", kind: "external" },
+    ];
+    const view = buildPortfolio({
+      accounts: [account],
+      symbols: [],
+      transactions: [],
+      cashflows,
+      dividends: [],
+      quotes: [],
+      fx,
+      fxRateAt,
+      principalKrw: 750_000,
+    });
+    expect(view.totals.principalKrw).toBe(750_000);
   });
 });
 

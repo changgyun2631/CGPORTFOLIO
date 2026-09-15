@@ -6,6 +6,7 @@ import { loadPortfolio } from "@/lib/data/views";
 import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "종목" };
+export const dynamic = "force-dynamic";
 
 export default async function SymbolsPage() {
   const { holdings, totals } = await loadPortfolio();

@@ -8,6 +8,7 @@ import { loadPortfolio } from "@/lib/data/views";
 import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "투자철학" };
+export const dynamic = "force-dynamic";
 
 /** 원칙 문서에 적어둔 기준을 실제 보유 상태와 맞춰 본다. */
 const LEVERAGE_SYMBOLS = ["QLD", "TQQQ", "418660"];

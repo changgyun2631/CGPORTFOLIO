@@ -23,6 +23,7 @@ function holding(overrides: Partial<Holding>): Holding {
     dayChangeKrw: 0,
     dayChangePercent: 1,
     costKrw: 900_000,
+    estimatedExitFeeKrw: 0,
     totalGainKrw: 100_000,
     totalGainPercent: 11,
     weight: 100,

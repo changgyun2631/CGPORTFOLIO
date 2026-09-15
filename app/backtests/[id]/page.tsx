@@ -8,6 +8,8 @@ import { loadBacktest, loadBacktests, loadPortfolio } from "@/lib/data/views";
 import { analyzeSeries } from "@/lib/domain/metrics";
 import { money, percent, percentSigned, shortDateTime } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
+
 export async function generateStaticParams() {
   const results = await loadBacktests();
   return results.map((result) => ({ id: result.config.id }));

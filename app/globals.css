@@ -20,10 +20,10 @@
   --accent: #4f8cff;
   --accent-soft: #1b2a45;
 
-  --up: #f0616d;
-  --up-soft: #35171d;
-  --down: #3d8bfd;
-  --down-soft: #14243d;
+  --up: #22c55e;
+  --up-soft: #12351f;
+  --down: #ef4444;
+  --down-soft: #3b171b;
   --flat: #8b97ab;
 
   --grid: #1a2130;
@@ -44,10 +44,10 @@
   --accent: #2563eb;
   --accent-soft: #e4edff;
 
-  --up: #d92d3f;
-  --up-soft: #fdeaec;
-  --down: #1d63d8;
-  --down-soft: #e6eefc;
+  --up: #16803d;
+  --up-soft: #e8f7ed;
+  --down: #d92d3f;
+  --down-soft: #fdeaec;
   --flat: #5b6678;
 
   --grid: #e8edf4;
@@ -100,6 +100,37 @@ body {
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";
+}
+
+@keyframes ticker-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.ticker-marquee-track {
+  animation: ticker-marquee 100s linear infinite;
+  will-change: transform;
+}
+
+.ticker-marquee:hover .ticker-marquee-track,
+.ticker-marquee:focus-within .ticker-marquee-track {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker-marquee {
+    overflow-x: auto;
+  }
+  .ticker-marquee-track {
+    animation: none;
+  }
+  .ticker-marquee-copy[aria-hidden="true"] {
+    display: none;
+  }
 }
 
 ::-webkit-scrollbar {

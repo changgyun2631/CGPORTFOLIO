@@ -47,6 +47,7 @@ yarn-error.log*
 /data/transactions.json
 /data/cashflows.json
 /data/dividends.json
+/data/position-basis.json
 /data/calendar.json
 # cron 이 적재하는 시세·스냅샷. 여기에도 내 평가금액이 그대로 담긴다.
 /data/snapshots.json
@@ -54,6 +55,8 @@ yarn-error.log*
 /data/fx-quote.json
 /data/prices.json
 /data/fx.json
+# 가져오기 스크립트의 검토용 출력에도 실제 계좌 데이터가 들어간다.
+/data/out-*.json
 
 # vercel
 .vercel
