@@ -1,9 +1,11 @@
 # 인계서 — CGPORTFOLIO
 
-작성 2026-09-15 · 인계 시점 커밋 `a607595`
+최종 갱신 2026-09-15 · 인계 시점 커밋 `b58eff7`
 
 이 문서는 **지금까지 무엇을 만들었고, 무엇이 검증됐고, 무엇이 아직 검증되지 않았는지**를
-있는 그대로 적는다. 다음 담당자는 이 문서의 "검증되지 않은 것" 절을 가장 먼저 읽을 것.
+있는 그대로 적는다. 다음 담당자는 이 문서의 5절("검증된 것 / 검증되지 않은 것")을
+가장 먼저 읽을 것. **다음에 할 일은 `WORK_ORDER.md`에 있다** — 환경 함정과 실행 방법도
+그 문서 0절에 정리돼 있으니 처음 받았다면 거기부터 읽는 게 빠르다.
 
 ---
 
@@ -12,16 +14,29 @@
 | 항목 | 값 |
 |---|---|
 | 프로젝트 | CGPORTFOLIO — 개인 포트폴리오 대시보드 |
-| 작업 폴더 | `C:\Users\ACC-002\Desktop\cgportfolio` |
+| 작업 폴더 | `C:\Users\ACC-002\Desktop\cgportfolio` (브랜치 `main`) |
 | 저장소 | https://github.com/changgyun2631/CGPORTFOLIO (Public, `main`) |
 | 스택 | Next.js 16 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 |
-| 런타임 의존성 | `next`, `react`, `react-dom`, `server-only` — **이게 전부다** |
-| 규모 | 소스 38개 파일 5,215줄 |
-| 배포 | **없음.** 로컬에서만 돌려봤다 |
+| 런타임 의존성 | `next`, `react`, `react-dom`, `server-only` — **이게 전부다** (개발 의존성에 Vitest 추가됨) |
+| 규모 | 소스 55개 파일 |
+| 데이터 | **실제 사용자 데이터.** 미국주식 위탁계좌 1개 · 28종목 (2026-09-15 입력) |
+| 구동 | **로컬 상시 구동 중.** 포트 3000, Windows 작업 스케줄러가 기동·갱신·백업 자동화 |
+| 배포 | **없음.** 외부 공개 안 함 (인증 미구현이라 공개 전 필수) |
+| 푸시 | **안 함.** `main`이 `origin/main`보다 9커밋 앞서 있다 |
 
-커밋 3개가 전부다.
+커밋 12개. 처음 3개가 초기 구축, 이후 9개가 2026-09-15 작업분이다.
 
 ```
+b58eff7  Align dashboard nav order and card layout structurally with qld.kr
+b3296a0  Document quote-refresh scheduling and a server-stability caveat (P2-1)
+b7e4add  Add periodic quote-refresh scheduling scripts (P2-1)
+450cf14  Document backup automation and main-checkout consolidation
+4d28c70  Exclude nested git worktrees from lint and test scans
+d34e594  Bootstrap real portfolio data, fix Twelve Data rate-limit at scale (P1-2)
+882fd08  Verify /api/cron/refresh execution end-to-end (WORK_ORDER P0-2)
+ef3c3a4  Verify quote providers against real APIs (WORK_ORDER P0-1)
+5549f76  Add Vitest unit tests for the calculation engine
+e89e3c6  Add handoff and work order for the next owner
 a607595  Keep personal financial data out of the repository
 772586c  Rename project to CGPORTFOLIO
 849e00b  Add personal portfolio dashboard
@@ -113,6 +128,26 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 차트는 **전부 SVG 직접 구현**이다. 차트 라이브러리를 쓰지 않는다.
 상호작용이 필요한 `value-chart.tsx`만 클라이언트 컴포넌트고 나머지는 서버 렌더.
 
+### 테스트 (`lib/domain/__tests__/`)
+
+Vitest. 5개 파일 45개 테스트. `npm test`로 실행.
+`portfolio` / `backtest` / `metrics` / `dividends` / `lookthrough` 각각에 대응하며,
+8절의 과거 버그들이 경계 사례 테스트로 고정돼 있다. **계산 로직을 고치면 여기도 같이 고칠 것.**
+
+### 운영 스크립트 (`scripts/`)
+
+| 파일 | 역할 | 실행 |
+|---|---|---|
+| `seed.mjs` | 가상 데이터 한 벌 생성 (처음 클론했을 때) | `node scripts/seed.mjs` |
+| `import-holdings-csv.mjs` | 증권사 "보유종목" CP949 CSV → 부트스트랩 원장 변환 | `node scripts/import-holdings-csv.mjs <csv> --dry-run` |
+| `refresh-quotes.mjs` | `/api/cron/refresh` 호출 + 로그 기록 (스케줄러가 6시간마다 실행) | `node scripts/refresh-quotes.mjs` |
+| `backup-data.mjs` | `data/` → `~/cgportfolio-backups/` 복사, 최근 30개 보관 | `npm run backup` |
+| `start-server.cmd` | `npm start` 배치 래퍼 (스케줄러가 호출) | 스케줄러 전용 |
+
+**⚠ `seed.mjs`를 실수로 돌리지 말 것.** 지금 `data/`에는 실제 데이터가 들어 있다.
+이 스크립트는 `accounts.json`/`symbols.json`이 이미 있으면 덮어쓰지 않지만,
+`prices.json`·`transactions.json`·`snapshots.json` 등은 **가상 값으로 덮어쓴다.**
+
 ---
 
 ## 5. 검증된 것 / 검증되지 않은 것
@@ -144,6 +179,7 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 | **작업 폴더를 메인 체크아웃으로 합침** | 이 작업은 원래 `.claude/worktrees/continue-previous-work-f7f06a`라는 워크트리에서 했다. 실제 데이터가 워크트리 삭제 시 같이 사라지는 걸 막기 위해 브랜치를 `C:\Users\ACC-002\Desktop\cgportfolio`(메인 체크아웃, `main` 브랜치)에 fast-forward 병합하고, gitignore된 실제 데이터 파일 8종(`accounts.json` 등)과 `.env.local`도 그대로 옮겼다. 메인에서 `npm install` 후 `tsc`/`eslint`/`test`/`build` 전부 통과 |
 | **워크트리 중첩 버그** | 위 병합 과정에서 발견: 워크트리가 저장소 안에 있다 보니 메인에서 `eslint .`/`vitest run`을 돌리면 워크트리의 `.next` 빌드 산출물·테스트 파일까지 같이 스캔돼 eslint 683개 오류, vitest 테스트 2배 중복 실행이 났다. `eslint.config.mjs`/`vitest.config.mts`에 `**/.claude/worktrees/**` 제외 규칙을 추가해 고침 |
 | **시세 자동 갱신 스케줄링 (P2-1)** | `scripts/refresh-quotes.mjs` + `scripts/start-server.cmd` 작성, Windows 작업 스케줄러에 "CGPORTFOLIO 서버"(매일 새벽 4시 기동, 실패 시 3회 재시도)·"CGPORTFOLIO 시세 갱신"(6시간마다 `/api/cron/refresh` 호출) 등록. 수동 트리거로 30종목 갱신 성공(30/0/0) 2회 확인, 로그는 `~/cgportfolio-logs/refresh.log` |
+| **무인 자동 실행 실증** | 위 스케줄이 **사람이 개입하지 않은 상태에서 실제로 동작하는 것까지 확인했다.** 2026-09-15 20:00 정각 자동 실행 → `성공: 갱신 30건, 누락 0건, 오류 0건`(평가금액은 로그 파일에만 남고 이 문서에는 적지 않는다 — 저장소가 Public이다). 같은 시각 서버도 5시간 이상 무중단 유지됨. `data/snapshots.json`에 시계열 점이 실제로 누적되는 것도 확인 (P2-1의 완료 조건 "사람이 개입하지 않아도 스냅샷이 쌓인다" 충족) |
 
 ### 검증되지 않음 — 반드시 확인할 것
 
@@ -151,7 +187,8 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 |---|---|
 | **Twelve Data/네이버 값의 육안 대조** | 코드 실행 결과는 확인했으나, 이 환경의 브라우저 도구가 `finance.naver.com` 접근을 차단해 시세 앱과의 육안 대조는 못 했다. 네이버 시세는 그 사이트가 쓰는 실시간 폴링 API를 직접 부른 값이라 원천은 같다 |
 | **배포** | 한 번도 안 해봤다 |
-| **서버 상시구동 안정성** | 테스트 중 "CGPORTFOLIO 서버" 작업으로 띄운 프로세스가 원인 불명으로 한 번 죽었다(`LastTaskResult: 0xC000013A`, Ctrl+C로 종료된 것과 같은 코드). Task Scheduler 이벤트 로그가 이 환경에서 비활성이라(`wevtutil` 조회 결과 없음) 원인을 못 찾았다. 재기동 후에는 5분+ 안정적이었고 갱신도 정상 성공했다. **로그온 트리거(`ONLOGON`)는 이 환경에서 `Access is denied`로 등록 자체가 안 돼서**, 대안으로 "매일 새벽 4시 기동 + 실패 시 재시도 3회"를 썼다 — PC 재부팅 시 다음 새벽 4시까지 서버가 안 뜰 수 있다. 다음 담당자는 며칠 지켜보고, 자주 죽으면 `start-server.cmd`에 무한 재시작 루프(`:loop`/`goto`)를 넣거나 다른 프로세스 매니저(pm2 등) 도입을 고려할 것 |
+| **서버 상시구동 안정성** | 테스트 중 "CGPORTFOLIO 서버" 작업으로 띄운 프로세스가 원인 불명으로 한 번 죽었다(`LastTaskResult: 0xC000013A`, Ctrl+C로 종료된 것과 같은 코드). Task Scheduler 이벤트 로그가 이 환경에서 비활성이라(`wevtutil` 조회 결과 없음) 원인을 못 찾았다. 재기동 후에는 **5시간 이상** 안정적이었고 그 사이 무인 갱신도 성공했다 — 1회성 사건일 가능성도 있다. **로그온 트리거(`ONLOGON`)는 이 환경에서 `Access is denied`로 등록 자체가 안 돼서**, 대안으로 "매일 새벽 4시 기동 + 실패 시 재시도 3회"를 썼다 — PC 재부팅 시 다음 새벽 4시까지 서버가 안 뜰 수 있다. **사용자가 "며칠 서버 안정성부터 지켜보자"고 지시했다(2026-09-15).** 대응 방법은 `WORK_ORDER.md` B-0 참고 |
+| **포트 3200의 정체 불명 dev 서버** | 작업 중 발견. 같은 프로젝트를 `next dev --port 3200`으로 서빙하는 프로세스가 돌고 있는데 이전 담당자가 띄운 것이 아니다. 사용자나 다른 세션의 작업일 수 있어 건드리지 않았다. 두 서버가 같은 `data/`를 공유하므로 3000과 3200 화면이 다르면 이것 때문이다 |
 
 ### 실거래 데이터 상태 (2026-09-15)
 
@@ -169,6 +206,16 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 - 기존 시드에 있던 `418660`/`0015B0`/`490590` 등 국내 ETF는 완전히 삭제했다 (`491620`만
   `leverage-ladder`/`dca-monthly` 데모 백테스트가 참조해서 심볼 정의만 남겨둠, 보유
   거래는 없음). `TQQQ`도 같은 이유로 심볼만 남아 있다
+
+**`snapshots.json` 정리 이력**: 시드가 만든 가상 스냅샷 732개는 실데이터 교체 시 전부
+버렸다(가상 포트폴리오 기준이라 의미가 없다). 이후 rate-limit 디버깅 중 30종목 중
+1종목만 갱신된 채 기록된 가짜 점 2개도 제거했다 — 그대로 두면 차트와
+MDD에 실제로 없었던 -10%가량의 낙폭이 찍힌다. **현재 남은 점은 정상 갱신분 4개뿐이고,
+여기서부터 시계열이 새로 쌓인다.** 앞으로도 실패한 갱신이 스냅샷으로 남으면 같은
+방식으로 판단할 것 (`totalKrw`가 직전 대비 비정상적으로 낮으면 부분 갱신 의심).
+
+**`prices.json`은 여전히 가상 데이터다.** `scripts/seed.mjs`가 만든 난수 시계열이라
+백테스트 숫자는 **의미가 없다**. 실데이터로 바꾸는 건 `WORK_ORDER.md` B-4 참고.
 
 **환경 관련 발견**: 이 작업 환경에서 Browser 도구(`preview_start`)가 띄운 `next dev`
 프로세스는 외부 API(Twelve Data·네이버)로 나가는 `fetch`가 전부 `fetch failed`로
@@ -269,12 +316,34 @@ node scripts/seed.mjs
 
 ## 10. 작업 환경 메모
 
+### 기본
+
 - Windows 11, PowerShell / Git Bash 병행
+- Node v24, npm. `node`는 `C:\Program Files\nodejs\node.exe`
 - GitHub CLI(`gh`) 2.100.0 **설치돼 있으나 로그인 안 됨.** `gh auth login` 필요
 - git 신원은 저장소 단위 설정 (`changgyun2631`). 전역 설정은 비어 있음
 - 기존 관련 프로젝트: `C:\Users\ACC-002\Desktop\web-stock` (별개 프로젝트, 건드리지 말 것.
   단 `.claude/launch.json`에 이 프로젝트 프리뷰 구성 한 줄이 추가돼 있음)
 
+### 실제로 밟은 지뢰들 (`WORK_ORDER.md` 0-4절과 같은 내용)
+
+1. **Avast 안티바이러스가 TLS를 가로챈다.** 외부 HTTPS를 `curl`로 부르면 인증서 폐기
+   검사에서 실패한다 (`CRYPT_E_NO_REVOCATION_CHECK`). `curl --ssl-no-revoke`를 쓸 것.
+   Node의 `fetch`(undici)는 영향 없다.
+2. **Git Bash에서 `node`에 `/tmp/x` 같은 경로를 넘기면 `C:\tmp\x`로 해석된다.**
+   Node 스크립트 인자에는 Windows 절대경로를 넘길 것.
+3. **Git Bash에서 `taskkill /F /PID`는 `taskkill //F //PID`로 써야 한다.**
+4. **Windows 작업 스케줄러에서 `ONLOGON` 트리거는 `Access is denied`로 거부된다.**
+   시간 기반(`DAILY`, `ONCE`+`RepetitionInterval`)은 정상 등록된다.
+5. **`Register-ScheduledTask`에 `[TimeSpan]::MaxValue`를 주면 XML 범위 오류**가 난다.
+   유한값(`New-TimeSpan -Days 3650`)을 쓸 것.
+6. **Task Scheduler 이벤트 로그가 비활성이다.** 작업이 왜 죽었는지 사후 추적이 안 된다.
+   `LastTaskResult` 코드로만 추정해야 한다 (`267009`=실행 중, `0`=성공,
+   `0xC000013A`=Ctrl+C류 종료, `2147946720`=이미 실행 중이라 새 인스턴스 거부).
+7. **에이전트 Browser 도구로 띄운 dev 서버는 외부 API fetch가 전부 막힌다.** 터미널에서
+   직접 `npm run dev`로 띄우면 정상. cron을 검증할 때는 반드시 터미널에서 띄울 것.
+8. **에이전트 Browser 도구는 `finance.naver.com` 접근이 정책상 차단된다.**
+
 ---
 
-다음에 할 일은 `WORK_ORDER.md` 참고.
+다음에 할 일은 **`WORK_ORDER.md`** 참고. 처음 인계받았다면 그 문서 0절부터 읽을 것.
