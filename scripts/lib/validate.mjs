@@ -127,7 +127,7 @@ export function validatePositionBasis(positionBasis, { accountIds, symbolIds }) 
 
 export function validateSnapshots(snapshots) {
   const errors = [];
-  const seenDates = new Set();
+  const seenTimes = new Set();
   let previousTime = -Infinity;
   snapshots.forEach((snap, index) => {
     const label = snap.at ?? `#${index}`;
@@ -136,9 +136,10 @@ export function validateSnapshots(snapshots) {
       return;
     }
     const time = Date.parse(snap.at);
-    const dateKey = snap.at.slice(0, 10);
-    if (seenDates.has(dateKey)) errors.push(`snapshots[${label}]: 날짜 중복 (${dateKey})`);
-    seenDates.add(dateKey);
+    // 시세 갱신 cron이 하루 여러 번 도니 같은 날짜에 스냅샷이 여러 개 있는 건 정상이다.
+    // "중복"은 정확히 같은 시각이 두 번 기록된 경우만 잡는다.
+    if (seenTimes.has(time)) errors.push(`snapshots[${label}]: 같은 시각이 중복 기록됨`);
+    seenTimes.add(time);
     if (time < previousTime) errors.push(`snapshots[${label}]: 정렬이 어긋남 (이전 시점보다 과거)`);
     previousTime = Math.max(previousTime, time);
     if (!isFiniteNumber(snap.totalKrw) || snap.totalKrw < 0) errors.push(`snapshots[${label}]: totalKrw가 유효하지 않음`);
@@ -153,6 +154,12 @@ export function validateSnapshots(snapshots) {
 /**
  * position-basis.json의 기준일이 이미 반영된 거래·입출금보다 과거로 되돌아가면
  * 오래된 CSV를 실수로 최신 기준값에 덮어썼을 가능성이 크다 ("최신 기준일 역행").
+ *
+ * `validateAll`(전체 상태 상시 점검)에는 넣지 않는다 — 이미 정착된 과거 원장
+ * 데이터는 이 조건을 영원히 위반한 채로 남아 있는 게 정상이라(원장이 잔고 CSV
+ * 시점 이후로도 갱신될 수 있음), 매번 실패로 나오면 의미가 없다. 오직
+ * `import-position-basis-csv.mjs --replace` 직전, "새로 들어오는 CSV가 기존
+ * 원장보다 과거인가"를 볼 때만 쓴다.
  */
 export function validateBasisNotRegressing(positionBasis, { transactions, cashflows }) {
   const errors = [];
@@ -183,6 +190,5 @@ export function validateAll({ accounts, symbols, transactions, cashflows, divide
     ...validateDividends(dividends, { accountIds, symbolIds }),
     ...validatePositionBasis(positionBasis, { accountIds, symbolIds }),
     ...validateSnapshots(snapshots),
-    ...validateBasisNotRegressing(positionBasis, { transactions, cashflows }),
   ];
 }
