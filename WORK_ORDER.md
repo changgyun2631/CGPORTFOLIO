@@ -80,6 +80,16 @@ npm run build
    (파이프의 종료코드는 마지막 명령 것). 종료코드를 봐야 하면 파이프 없이 실행하고 `$?`를 볼 것.
 7. **`npm test`/`eslint`를 메인에서 돌릴 때 중첩 워크트리까지 스캔되던 문제**는
    `eslint.config.mjs`/`vitest.config.mts`에 제외 규칙을 넣어 해결됨. 그 규칙 지우지 말 것.
+8. **`.cmd` 배치 파일에 한글 `ECHO` 텍스트를 넣으면 `cmd.exe`가 잘못 해석해 스크립트가
+   죽을 수 있다.** 실제로 `scripts/start-server.cmd`에 한글 로그 메시지(em dash 포함)를
+   넣었다가 `ERROR: Input redirection is not supported, exiting the process
+   immediately.`로 즉시 죽는 걸 겪었다. `REM` 주석의 짧은 한글은 괜찮지만, 파일에
+   `ECHO`로 쓰는 텍스트는 영문 ASCII만 쓸 것. `.cmd` 파일을 고치면 Task Scheduler를
+   거치지 않고 `cmd.exe /c "경로\파일.cmd"`로 먼저 직접 실행해 몇 초 안에 죽지
+   않는지 확인한 뒤 배포할 것.
+9. **`taskkill`로 자식 프로세스만 죽이면 Task Scheduler가 그 작업을 계속 "Running"으로
+   착각해 새 실행을 거부할 수 있다** (`Start-ScheduledTask` 결과가 "이미 실행 중" 코드로
+   계속 나옴). `Stop-ScheduledTask -TaskName "..."`로 먼저 정리한 뒤 다시 시작할 것.
 
 ### 0-5. 시세 API 한도 — 제일 자주 밟는 지뢰
 
@@ -193,30 +203,56 @@ git diff origin/main..main | grep -nE "[0-9]{3},[0-9]{3}|\"shares\":|\"price\":"
 
 ---
 
-### B-0. 서버 안정성 관찰 — 🔴 지금 최우선
+### B-0. 서버 안정성 관찰 — 🟡 재시작 루프 적용, 계속 지켜보는 중
 
 **사용자 지시 (2026-09-15)**: *"P2-2는 나중에, 다음 며칠 서버 안정성부터 지켜보자."*
 → **사용자가 먼저 꺼내기 전에 배포(B-2) 얘기를 먼저 제안하지 말 것.**
 
-**왜**: P2-1 검증 중 `npm start`로 띄운 서버가 **원인 불명으로 한 번 죽었다.**
-종료 코드 `0xC000013A`(= `STATUS_CONTROL_C_EXIT`, Ctrl+C로 종료된 것과 같은 코드)인데,
-아무도 Ctrl+C를 누르지 않았다. Task Scheduler 이벤트 로그가 이 환경에서 비활성이라
-(`wevtutil qe "Microsoft-Windows-TaskScheduler/Operational"` → 결과 없음) 원인을 못 찾았다.
+**경과**: 약 36시간 안에 서버가 **최소 2번** 원인 불명으로 죽었다.
 
-재기동 후에는 **5시간 이상 안정적이었고**, 그 사이 20:00 정각 무인 갱신도 성공했다.
-즉 재현되지 않은 1회성 사건일 수도 있다.
+1. 2026-09-15 저녁, `0xC000013A`(Ctrl+C 종료와 같은 코드)로 1차 사망
+2. 2026-09-16 새벽 02:03(성공한 시세 갱신 직후)~03:46(다음 세션이 다운 발견) 사이 2차 사망
 
-**할 일**
+둘 다 Task Scheduler 이벤트 로그가 이 환경에서 비활성이라(`wevtutil qe
+"Microsoft-Windows-TaskScheduler/Operational"` → 결과 없음) 진짜 원인은 여전히 못
+찾았다. "며칠 지켜보자"고 했지만 하루 반 만에 2번이라 패턴이 뚜렷해서, 2026-09-16에
+가장 가벼운 대응(재시작 루프)을 사용자 승인받고 적용했다.
 
-1. 로그를 본다:
+**적용한 것**: `scripts/start-server.cmd`에 무한 재시작 루프 추가
+(`:loop` → `call npm start` → 10초 대기 → `goto loop`). 죽어도 10초 뒤 자동으로
+다시 뜬다. 재시작 시각은 `C:\Users\ACC-002\cgportfolio-logs\server.log`에 남는다.
+**근본 원인은 여전히 모른다 — 증상만 사라진다.**
+
+**⚠ 적용 중 실제로 겪은 함정 — 이 cmd 파일을 다시 고칠 때 반드시 알아둘 것**:
+처음에 재시작 로그 메시지를 한글로 썼더니(`echo ... 서버 종료됨 — ...` 같은 식으로,
+특히 em dash "—" 포함) `cmd.exe`가 파일을 잘못 해석해 `ERROR: Input redirection is
+not supported, exiting the process immediately.`로 **스크립트 자체가 죽어버렸다.**
+`REM` 주석의 짧은 한글은 문제없이 넘어가지만(기존 2줄짜리 버전이 하루 넘게 잘
+돌았던 이유), `ECHO`로 파일에 쓰는 한글 텍스트, 특히 대시 같은 특수 문장부호는
+`cmd.exe`의 기본 코드페이지와 부딪혀 치명적 오류를 낼 수 있다. **`.cmd` 파일의
+`ECHO`/로그 출력은 영문 ASCII만 쓸 것.** 고치고 나면 Task Scheduler를 거치지 않고
+`cmd.exe /c "경로\start-server.cmd"`로 먼저 직접 실행해 몇 초 안에 죽지 않는지
+확인한 뒤에 배포할 것 — 이번에도 그렇게 해서 잡았다.
+
+**참고 — Task Scheduler가 "이미 실행 중"이라며 거부할 때**: 강제 종료
+(`taskkill`)로 자식 프로세스만 죽이면 Task Scheduler 쪽 상태가 "Running"으로
+유령처럼 남아 새 실행을 계속 거부하는 걸 겪었다. `Stop-ScheduledTask -TaskName
+"..."`로 먼저 정리한 뒤 `Start-ScheduledTask`를 부를 것.
+
+**할 일 — 계속 관찰**
+
+1. 로그를 본다 (시각은 UTC라 +9시간 해서 읽을 것):
 
 ```bash
 cat "C:\Users\ACC-002\cgportfolio-logs\refresh.log"
+cat "C:\Users\ACC-002\cgportfolio-logs\server.log"
 ```
 
 2. 판정 기준:
-   - `성공: 갱신 30건, 누락 0건, 오류 0건` → 정상
-   - `실패: 서버에 연결하지 못했습니다` → **서버가 죽은 것** (이게 관찰 대상)
+   - `refresh.log`에 `성공: 갱신 30건, 누락 0건, 오류 0건` → 정상
+   - `실패: 서버에 연결하지 못했습니다` → 갱신 시도 당시 서버가 죽어 있었던 것
+   - `server.log`에 "server exited, restarting" 줄이 잦으면 재시작 루프가 자주
+     도는 것 — 여전히 불안정하다는 뜻이니 다음 단계(아래) 대응을 고려할 것
    - `누락`이 0이 아님 → 시세 API 쪽 문제 (서버 문제 아님)
 3. 6시간마다 한 줄씩 쌓여야 한다. 하루면 4줄. 줄 자체가 없으면 스케줄러 작업이 안 돈 것:
 
@@ -227,21 +263,18 @@ Get-ScheduledTaskInfo -TaskName "CGPORTFOLIO 시세 갱신" | Select-Object Last
 4. 스냅샷이 실제로 쌓이는지 확인 (이게 이 기능의 존재 이유다):
 
 ```bash
-node -e "const s=require('C:/Users/ACC-002/Desktop/cgportfolio/data/snapshots.json'); console.log(s.length, s[s.length-1])"
+node -e "const fs=require('fs'); const s=JSON.parse(fs.readFileSync('C:\\Users\\ACC-002\\Desktop\\cgportfolio\\data\\snapshots.json','utf8')); console.log(s.length, s[s.length-1])"
 ```
 
-**죽는 게 재현되면 고칠 방법 (난이도 순)**
+**재시작 루프로도 자주 죽으면 다음 단계 (난이도 순)**
 
-- (쉬움) `scripts/start-server.cmd`에 무한 재시작 루프를 넣는다:
-  `:loop` → `call npm start` → `timeout /t 10` → `goto loop`.
-  죽어도 10초 뒤 자동으로 다시 뜬다. 근본 원인은 못 고치지만 증상은 사라진다.
 - (중간) "CGPORTFOLIO 시세 갱신" 작업에 **서버 생존 확인 + 없으면 기동** 로직을 넣는다.
   `refresh-quotes.mjs`가 연결 실패를 감지하면 `Start-ScheduledTask`를 호출하게 하는 식.
 - (제대로) `pm2`나 `nssm`으로 Windows 서비스로 등록한다. 의존성이 늘어나므로
   **사용자 승인을 받고** 할 것 (규칙 A-3).
 
-**완료 조건**: 며칠치 로그에 `실패: 서버에 연결하지 못했습니다`가 없다.
-있었다면 원인을 적고 위 대응 중 하나를 적용한다.
+**완료 조건**: 며칠치 `server.log`에 재시작이 드물다(하루 0~1회 이하). 잦으면
+위 대응 중 하나를 적용한다.
 
 ---
 
