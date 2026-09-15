@@ -50,8 +50,8 @@ export default async function DashboardPage() {
 
       <TickerStrip holdings={holdings} sparklines={sparklines} />
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
-        <Card className="flex flex-col justify-center">
+      <div className="grid grid-cols-1 gap-4">
+        <Card>
           <p className="text-xs font-medium text-muted">총 평가금액</p>
           <p className="tnum mt-2 text-[34px] font-black leading-none tracking-tight sm:text-[42px]">
             {moneyBare(totals.totalKrw)}

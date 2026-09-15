@@ -12,11 +12,11 @@ export const site = {
 export const nav = [
   { href: "/", label: "대시보드" },
   { href: "/asset-map", label: "자산맵" },
+  { href: "/calendar", label: "캘린더" },
+  { href: "/backtests", label: "백테스트" },
+  { href: "/philosophy", label: "투자철학" },
   { href: "/accounts", label: "계좌" },
   { href: "/symbols", label: "종목" },
   { href: "/dividends", label: "배당" },
-  { href: "/backtests", label: "백테스트" },
-  { href: "/calendar", label: "캘린더" },
-  { href: "/philosophy", label: "투자철학" },
   { href: "/reports", label: "리포트" },
 ] as const;
