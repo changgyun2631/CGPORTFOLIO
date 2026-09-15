@@ -1,7 +1,7 @@
 /** 사이트 브랜드와 표시 기본값. 여기만 바꾸면 전역에 반영된다. */
 export const site = {
-  name: "MY PORTFOLIO",
-  shortName: "MYP",
+  name: "CGPORTFOLIO",
+  shortName: "CG",
   description: "보유 자산과 전일 변동을 한 화면에서 확인하는 개인 포트폴리오 대시보드",
   /** 대시보드 상단 티커 스트립과 랭킹의 기준 통화 */
   baseCurrency: "KRW" as const,
