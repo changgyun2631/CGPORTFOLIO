@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateCashFlows, validateTransactions } from "./lib/validate.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = join(root, "data");
 const replace = process.argv.includes("--replace");
@@ -80,6 +82,19 @@ for (const [currency, impact] of nonTradeCashImpact) {
   const nextSigned = oldSigned + impact;
   correction.type = nextSigned >= 0 ? "deposit" : "withdraw";
   correction.amount = Math.abs(nextSigned);
+}
+
+const accounts = JSON.parse(readFileSync(join(dataDir, "accounts.json"), "utf8"));
+const accountIds = new Set(accounts.map((account) => account.id));
+const symbolIds = new Set(symbols.keys());
+const validationErrors = [
+  ...validateTransactions(normalizedTransactions, { accountIds, symbolIds }),
+  ...validateCashFlows(normalizedCashflows, { accountIds }),
+];
+if (validationErrors.length > 0) {
+  console.error(`검증 실패${replace ? " — 반영을 중단합니다" : " (미리보기 파일은 그대로 씁니다)"}:`);
+  for (const error of validationErrors) console.error(`  - ${error}`);
+  if (replace) process.exit(1);
 }
 
 const prefix = replace ? "" : "out-";

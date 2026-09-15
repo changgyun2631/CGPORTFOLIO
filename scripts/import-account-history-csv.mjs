@@ -8,6 +8,8 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateSnapshots } from "./lib/validate.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = join(root, "data");
 const args = process.argv.slice(2);
@@ -113,6 +115,13 @@ const snapshots = [...merged.values()]
     }
     return { ...snapshot, principalKrw: carriedPrincipalKrw };
   });
+const validationErrors = validateSnapshots(snapshots);
+if (validationErrors.length > 0) {
+  console.error(`검증 실패${replace ? " — 반영을 중단합니다" : " (미리보기 파일은 그대로 씁니다)"}:`);
+  for (const error of validationErrors) console.error(`  - ${error}`);
+  if (replace) process.exit(1);
+}
+
 const target = join(dataDir, replace ? "snapshots.json" : "out-snapshots.json");
 writeFileSync(target, `${JSON.stringify(snapshots, null, 2)}\n`);
 console.log(`${totals.size}일의 실제 계좌자산과 현금 입출금을 병합해 총 ${snapshots.length}개 스냅샷을 저장했습니다.`);

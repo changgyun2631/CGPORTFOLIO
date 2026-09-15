@@ -8,6 +8,8 @@ import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { validateBasisNotRegressing, validatePositionBasis } from "./lib/validate.mjs";
+
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = join(root, "data");
 
@@ -75,6 +77,23 @@ const basis = rows.slice(headerIndex + 1)
   .filter((line) => line.shares > 0 && line.costBasis >= 0);
 
 if (basis.length === 0) throw new Error("가져올 보유종목이 없습니다.");
+
+const accounts = JSON.parse(readFileSync(join(dataDir, "accounts.json"), "utf8"));
+const symbols = JSON.parse(readFileSync(join(dataDir, "symbols.json"), "utf8"));
+const accountIds = new Set(accounts.map((account) => account.id));
+const symbolIds = new Set(symbols.map((symbol) => symbol.id));
+const validationErrors = [...validatePositionBasis(basis, { accountIds, symbolIds })];
+if (flags.replace) {
+  const transactions = JSON.parse(readFileSync(join(dataDir, "transactions.json"), "utf8"));
+  const cashflows = JSON.parse(readFileSync(join(dataDir, "cashflows.json"), "utf8"));
+  validationErrors.push(...validateBasisNotRegressing(basis, { transactions, cashflows }));
+}
+if (validationErrors.length > 0) {
+  console.error(`검증 실패${flags.replace ? " — 반영을 중단합니다" : " (미리보기 파일은 그대로 씁니다)"}:`);
+  for (const error of validationErrors) console.error(`  - ${error}`);
+  if (flags.replace) process.exit(1);
+}
+
 const target = join(dataDir, flags.replace ? "position-basis.json" : "out-position-basis.json");
 writeFileSync(target, `${JSON.stringify(basis, null, 2)}\n`);
 console.log(`현재 잔고 기준 ${basis.length}종목을 ${target}에 저장했습니다.`);
