@@ -29,6 +29,7 @@ type RawDatum = {
   closePrice?: string | number;
   compareToPreviousClosePrice?: string | number;
   stockExchangeType?: unknown;
+  marketStatus?: string;
 };
 
 function parseQuote(symbolId: string, datum: RawDatum): Quote {
@@ -41,7 +42,7 @@ function parseQuote(symbolId: string, datum: RawDatum): Quote {
     prevClose: close - change,
     currency: "KRW",
     asOf: new Date().toISOString(),
-    marketState: "closed",
+    marketState: datum.marketStatus === "OPEN" ? "open" : "closed",
   };
 }
 
