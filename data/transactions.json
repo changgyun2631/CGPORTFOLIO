@@ -1,0 +1,2014 @@
+[
+  {
+    "id": "tx-0008",
+    "at": "2024-01-02T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 2897,
+    "price": 20607,
+    "fee": 8954.77
+  },
+  {
+    "id": "tx-0010",
+    "at": "2024-01-02T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 1160,
+    "price": 15434,
+    "fee": 2685.52
+  },
+  {
+    "id": "tx-0012",
+    "at": "2024-01-02T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 1127,
+    "price": 12360,
+    "fee": 2089.46
+  },
+  {
+    "id": "tx-0014",
+    "at": "2024-01-02T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 1022,
+    "price": 11675,
+    "fee": 1789.78
+  },
+  {
+    "id": "tx-0002",
+    "at": "2024-01-02T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 1507,
+    "price": 60.09,
+    "fee": 13.58
+  },
+  {
+    "id": "tx-0004",
+    "at": "2024-01-02T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 227,
+    "price": 26.56,
+    "fee": 0.9
+  },
+  {
+    "id": "tx-0006",
+    "at": "2024-01-02T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "TQQQ",
+    "side": "buy",
+    "shares": 99,
+    "price": 45.43,
+    "fee": 0.67
+  },
+  {
+    "id": "tx-0016",
+    "at": "2024-02-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 41,
+    "price": 54.17,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0018",
+    "at": "2024-02-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 11,
+    "price": 26.39,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0020",
+    "at": "2024-02-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 93,
+    "price": 19149,
+    "fee": 267.13
+  },
+  {
+    "id": "tx-0022",
+    "at": "2024-02-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 38,
+    "price": 15645,
+    "fee": 89.18
+  },
+  {
+    "id": "tx-0024",
+    "at": "2024-02-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 47,
+    "price": 10530,
+    "fee": 74.24
+  },
+  {
+    "id": "tx-0026",
+    "at": "2024-02-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 46,
+    "price": 9705,
+    "fee": 66.96
+  },
+  {
+    "id": "tx-0028",
+    "at": "2024-03-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 39,
+    "price": 57.48,
+    "fee": 0.34
+  },
+  {
+    "id": "tx-0030",
+    "at": "2024-03-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 11,
+    "price": 25.78,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0032",
+    "at": "2024-03-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 87,
+    "price": 20580,
+    "fee": 268.57
+  },
+  {
+    "id": "tx-0034",
+    "at": "2024-03-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 38,
+    "price": 15313,
+    "fee": 87.28
+  },
+  {
+    "id": "tx-0036",
+    "at": "2024-03-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 53,
+    "price": 9310,
+    "fee": 74.01
+  },
+  {
+    "id": "tx-0038",
+    "at": "2024-03-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 53,
+    "price": 8405,
+    "fee": 66.82
+  },
+  {
+    "id": "tx-0040",
+    "at": "2024-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 40,
+    "price": 56.08,
+    "fee": 0.34
+  },
+  {
+    "id": "tx-0042",
+    "at": "2024-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 12,
+    "price": 24.19,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0044",
+    "at": "2024-04-05T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 95,
+    "price": 18817,
+    "fee": 268.14
+  },
+  {
+    "id": "tx-0046",
+    "at": "2024-04-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 38,
+    "price": 15375,
+    "fee": 87.64
+  },
+  {
+    "id": "tx-0048",
+    "at": "2024-04-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 59,
+    "price": 8330,
+    "fee": 73.72
+  },
+  {
+    "id": "tx-0050",
+    "at": "2024-04-12T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 57,
+    "price": 7780,
+    "fee": 66.52
+  },
+  {
+    "id": "tx-0052",
+    "at": "2024-05-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 45,
+    "price": 49.17,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0054",
+    "at": "2024-05-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 12,
+    "price": 24.5,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0056",
+    "at": "2024-05-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 104,
+    "price": 17182,
+    "fee": 268.04
+  },
+  {
+    "id": "tx-0058",
+    "at": "2024-05-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 44,
+    "price": 13435,
+    "fee": 88.67
+  },
+  {
+    "id": "tx-0060",
+    "at": "2024-05-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 69,
+    "price": 7195,
+    "fee": 74.47
+  },
+  {
+    "id": "tx-0062",
+    "at": "2024-05-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 66,
+    "price": 6710,
+    "fee": 66.43
+  },
+  {
+    "id": "tx-0064",
+    "at": "2024-06-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 35,
+    "price": 63.63,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0066",
+    "at": "2024-06-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 11,
+    "price": 26.99,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0068",
+    "at": "2024-06-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 80,
+    "price": 22243,
+    "fee": 266.92
+  },
+  {
+    "id": "tx-0070",
+    "at": "2024-06-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 37,
+    "price": 15798,
+    "fee": 87.68
+  },
+  {
+    "id": "tx-0072",
+    "at": "2024-06-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 73,
+    "price": 6785,
+    "fee": 74.3
+  },
+  {
+    "id": "tx-0074",
+    "at": "2024-06-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 72,
+    "price": 6175,
+    "fee": 66.69
+  },
+  {
+    "id": "tx-0076",
+    "at": "2024-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 35,
+    "price": 64.11,
+    "fee": 0.34
+  },
+  {
+    "id": "tx-0078",
+    "at": "2024-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 11,
+    "price": 26.48,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0080",
+    "at": "2024-07-05T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 73,
+    "price": 24264,
+    "fee": 265.69
+  },
+  {
+    "id": "tx-0082",
+    "at": "2024-07-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 33,
+    "price": 17601,
+    "fee": 87.12
+  },
+  {
+    "id": "tx-0084",
+    "at": "2024-07-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 79,
+    "price": 6295,
+    "fee": 74.6
+  },
+  {
+    "id": "tx-0086",
+    "at": "2024-07-12T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 76,
+    "price": 5815,
+    "fee": 66.29
+  },
+  {
+    "id": "tx-0088",
+    "at": "2024-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 30,
+    "price": 73.22,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0090",
+    "at": "2024-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 10,
+    "price": 27.35,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0092",
+    "at": "2024-08-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 72,
+    "price": 24794,
+    "fee": 267.78
+  },
+  {
+    "id": "tx-0094",
+    "at": "2024-08-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 34,
+    "price": 17386,
+    "fee": 88.67
+  },
+  {
+    "id": "tx-0096",
+    "at": "2024-08-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 89,
+    "price": 5555,
+    "fee": 74.16
+  },
+  {
+    "id": "tx-0098",
+    "at": "2024-08-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 88,
+    "price": 5045,
+    "fee": 66.59
+  },
+  {
+    "id": "tx-0100",
+    "at": "2024-09-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 31,
+    "price": 71.29,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0102",
+    "at": "2024-09-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 10,
+    "price": 27.81,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0104",
+    "at": "2024-09-06T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 71,
+    "price": 24908,
+    "fee": 265.27
+  },
+  {
+    "id": "tx-0106",
+    "at": "2024-09-11T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 34,
+    "price": 17488,
+    "fee": 89.19
+  },
+  {
+    "id": "tx-0108",
+    "at": "2024-09-11T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 100,
+    "price": 4940,
+    "fee": 74.1
+  },
+  {
+    "id": "tx-0110",
+    "at": "2024-09-13T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 99,
+    "price": 4500,
+    "fee": 66.82
+  },
+  {
+    "id": "tx-0112",
+    "at": "2024-10-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 33,
+    "price": 67.4,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0114",
+    "at": "2024-10-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 10,
+    "price": 28.05,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0116",
+    "at": "2024-10-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 72,
+    "price": 24848,
+    "fee": 268.36
+  },
+  {
+    "id": "tx-0118",
+    "at": "2024-10-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 34,
+    "price": 17266,
+    "fee": 88.06
+  },
+  {
+    "id": "tx-0120",
+    "at": "2024-10-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 112,
+    "price": 4405,
+    "fee": 74
+  },
+  {
+    "id": "tx-0122",
+    "at": "2024-10-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 115,
+    "price": 3890,
+    "fee": 67.1
+  },
+  {
+    "id": "tx-0124",
+    "at": "2024-11-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 28,
+    "price": 77.95,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0126",
+    "at": "2024-11-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 10,
+    "price": 27.98,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0128",
+    "at": "2024-11-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 67,
+    "price": 26667,
+    "fee": 268
+  },
+  {
+    "id": "tx-0130",
+    "at": "2024-11-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 29,
+    "price": 19956,
+    "fee": 86.81
+  },
+  {
+    "id": "tx-0132",
+    "at": "2024-11-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 118,
+    "price": 4210,
+    "fee": 74.52
+  },
+  {
+    "id": "tx-0134",
+    "at": "2024-11-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 120,
+    "price": 3710,
+    "fee": 66.78
+  },
+  {
+    "id": "tx-0136",
+    "at": "2024-12-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 24,
+    "price": 92.07,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0138",
+    "at": "2024-12-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 9,
+    "price": 30.43,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0140",
+    "at": "2024-12-06T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 54,
+    "price": 32763,
+    "fee": 265.38
+  },
+  {
+    "id": "tx-0142",
+    "at": "2024-12-11T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 27,
+    "price": 21768,
+    "fee": 88.16
+  },
+  {
+    "id": "tx-0144",
+    "at": "2024-12-11T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 123,
+    "price": 4020,
+    "fee": 74.17
+  },
+  {
+    "id": "tx-0146",
+    "at": "2024-12-13T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 123,
+    "price": 3635,
+    "fee": 67.07
+  },
+  {
+    "id": "tx-0148",
+    "at": "2025-01-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 21,
+    "price": 105.1,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0150",
+    "at": "2025-01-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 9,
+    "price": 31.9,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0152",
+    "at": "2025-01-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 49,
+    "price": 36305,
+    "fee": 266.84
+  },
+  {
+    "id": "tx-0154",
+    "at": "2025-01-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 26,
+    "price": 22406,
+    "fee": 87.38
+  },
+  {
+    "id": "tx-0156",
+    "at": "2025-01-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 130,
+    "price": 3825,
+    "fee": 74.59
+  },
+  {
+    "id": "tx-0158",
+    "at": "2025-01-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 130,
+    "price": 3425,
+    "fee": 66.79
+  },
+  {
+    "id": "tx-0160",
+    "at": "2025-02-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 20,
+    "price": 108.81,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0162",
+    "at": "2025-02-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 9,
+    "price": 32.16,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0164",
+    "at": "2025-02-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 48,
+    "price": 36564,
+    "fee": 263.26
+  },
+  {
+    "id": "tx-0166",
+    "at": "2025-02-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 25,
+    "price": 23437,
+    "fee": 87.89
+  },
+  {
+    "id": "tx-0168",
+    "at": "2025-02-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 143,
+    "price": 3470,
+    "fee": 74.43
+  },
+  {
+    "id": "tx-0170",
+    "at": "2025-02-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 144,
+    "price": 3105,
+    "fee": 67.07
+  },
+  {
+    "id": "tx-0172",
+    "at": "2025-03-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 17,
+    "price": 129.48,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0174",
+    "at": "2025-03-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 9,
+    "price": 31.11,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0176",
+    "at": "2025-03-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 42,
+    "price": 42537,
+    "fee": 267.98
+  },
+  {
+    "id": "tx-0178",
+    "at": "2025-03-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 24,
+    "price": 24233,
+    "fee": 87.24
+  },
+  {
+    "id": "tx-0180",
+    "at": "2025-03-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 154,
+    "price": 3230,
+    "fee": 74.61
+  },
+  {
+    "id": "tx-0182",
+    "at": "2025-03-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 155,
+    "price": 2885,
+    "fee": 67.08
+  },
+  {
+    "id": "tx-0184",
+    "at": "2025-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 17,
+    "price": 125.34,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0186",
+    "at": "2025-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 8,
+    "price": 33.31,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0188",
+    "at": "2025-04-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 40,
+    "price": 44659,
+    "fee": 267.95
+  },
+  {
+    "id": "tx-0190",
+    "at": "2025-04-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 23,
+    "price": 25598,
+    "fee": 88.31
+  },
+  {
+    "id": "tx-0192",
+    "at": "2025-04-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 159,
+    "price": 3110,
+    "fee": 74.17
+  },
+  {
+    "id": "tx-0194",
+    "at": "2025-04-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 162,
+    "price": 2760,
+    "fee": 67.07
+  },
+  {
+    "id": "tx-0196",
+    "at": "2025-05-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 19,
+    "price": 114.45,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0198",
+    "at": "2025-05-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 8,
+    "price": 34.56,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0200",
+    "at": "2025-05-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 45,
+    "price": 39529,
+    "fee": 266.82
+  },
+  {
+    "id": "tx-0202",
+    "at": "2025-05-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 25,
+    "price": 23863,
+    "fee": 89.49
+  },
+  {
+    "id": "tx-0204",
+    "at": "2025-05-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 184,
+    "price": 2690,
+    "fee": 74.24
+  },
+  {
+    "id": "tx-0206",
+    "at": "2025-05-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 191,
+    "price": 2340,
+    "fee": 67.04
+  },
+  {
+    "id": "tx-0208",
+    "at": "2025-06-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 17,
+    "price": 124.82,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0210",
+    "at": "2025-06-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 8,
+    "price": 33.62,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0212",
+    "at": "2025-06-06T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 39,
+    "price": 45072,
+    "fee": 263.67
+  },
+  {
+    "id": "tx-0214",
+    "at": "2025-06-11T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 23,
+    "price": 25419,
+    "fee": 87.7
+  },
+  {
+    "id": "tx-0216",
+    "at": "2025-06-11T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 195,
+    "price": 2540,
+    "fee": 74.29
+  },
+  {
+    "id": "tx-0218",
+    "at": "2025-06-13T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 202,
+    "price": 2210,
+    "fee": 66.96
+  },
+  {
+    "id": "tx-0399",
+    "at": "2025-06-17T10:12:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "sell",
+    "shares": 120,
+    "price": 44625,
+    "fee": 1231.65,
+    "note": "리밸런싱"
+  },
+  {
+    "id": "tx-0220",
+    "at": "2025-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 15,
+    "price": 141.47,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0222",
+    "at": "2025-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 8,
+    "price": 35.51,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0224",
+    "at": "2025-07-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 40,
+    "price": 44167,
+    "fee": 265
+  },
+  {
+    "id": "tx-0226",
+    "at": "2025-07-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 23,
+    "price": 25102,
+    "fee": 86.6
+  },
+  {
+    "id": "tx-0228",
+    "at": "2025-07-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 220,
+    "price": 2255,
+    "fee": 74.41
+  },
+  {
+    "id": "tx-0230",
+    "at": "2025-07-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 231,
+    "price": 1935,
+    "fee": 67.05
+  },
+  {
+    "id": "tx-0232",
+    "at": "2025-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 17,
+    "price": 123.92,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0234",
+    "at": "2025-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 37.54,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0236",
+    "at": "2025-08-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 41,
+    "price": 42811,
+    "fee": 263.29
+  },
+  {
+    "id": "tx-0238",
+    "at": "2025-08-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 23,
+    "price": 25332,
+    "fee": 87.4
+  },
+  {
+    "id": "tx-0240",
+    "at": "2025-08-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 235,
+    "price": 2110,
+    "fee": 74.38
+  },
+  {
+    "id": "tx-0242",
+    "at": "2025-08-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 248,
+    "price": 1805,
+    "fee": 67.15
+  },
+  {
+    "id": "tx-0244",
+    "at": "2025-09-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 18,
+    "price": 123.14,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0246",
+    "at": "2025-09-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 38.58,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0248",
+    "at": "2025-09-05T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 42,
+    "price": 42168,
+    "fee": 265.66
+  },
+  {
+    "id": "tx-0250",
+    "at": "2025-09-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 23,
+    "price": 25005,
+    "fee": 86.27
+  },
+  {
+    "id": "tx-0252",
+    "at": "2025-09-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 258,
+    "price": 1925,
+    "fee": 74.5
+  },
+  {
+    "id": "tx-0254",
+    "at": "2025-09-12T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 267,
+    "price": 1675,
+    "fee": 67.08
+  },
+  {
+    "id": "tx-0256",
+    "at": "2025-10-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 16,
+    "price": 134.12,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0258",
+    "at": "2025-10-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 39.26,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0260",
+    "at": "2025-10-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 38,
+    "price": 47127,
+    "fee": 268.62
+  },
+  {
+    "id": "tx-0262",
+    "at": "2025-10-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 22,
+    "price": 26211,
+    "fee": 86.5
+  },
+  {
+    "id": "tx-0264",
+    "at": "2025-10-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 277,
+    "price": 1790,
+    "fee": 74.37
+  },
+  {
+    "id": "tx-0266",
+    "at": "2025-10-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 288,
+    "price": 1550,
+    "fee": 66.96
+  },
+  {
+    "id": "tx-0268",
+    "at": "2025-11-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 15,
+    "price": 145.43,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0270",
+    "at": "2025-11-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 40.2,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0272",
+    "at": "2025-11-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 34,
+    "price": 51866,
+    "fee": 264.52
+  },
+  {
+    "id": "tx-0274",
+    "at": "2025-11-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 20,
+    "price": 28789,
+    "fee": 86.37
+  },
+  {
+    "id": "tx-0276",
+    "at": "2025-11-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 298,
+    "price": 1665,
+    "fee": 74.43
+  },
+  {
+    "id": "tx-0278",
+    "at": "2025-11-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 323,
+    "price": 1385,
+    "fee": 67.1
+  },
+  {
+    "id": "tx-0280",
+    "at": "2025-12-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 14,
+    "price": 148.92,
+    "fee": 0.31
+  },
+  {
+    "id": "tx-0282",
+    "at": "2025-12-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 42.47,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0284",
+    "at": "2025-12-05T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 34,
+    "price": 52288,
+    "fee": 266.67
+  },
+  {
+    "id": "tx-0286",
+    "at": "2025-12-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 20,
+    "price": 29670,
+    "fee": 89.01
+  },
+  {
+    "id": "tx-0288",
+    "at": "2025-12-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 325,
+    "price": 1530,
+    "fee": 74.59
+  },
+  {
+    "id": "tx-0290",
+    "at": "2025-12-12T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 340,
+    "price": 1315,
+    "fee": 67.07
+  },
+  {
+    "id": "tx-0292",
+    "at": "2026-01-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 13,
+    "price": 161.94,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0294",
+    "at": "2026-01-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 44.03,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0296",
+    "at": "2026-01-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 30,
+    "price": 58720,
+    "fee": 264.24
+  },
+  {
+    "id": "tx-0298",
+    "at": "2026-01-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 19,
+    "price": 30554,
+    "fee": 87.08
+  },
+  {
+    "id": "tx-0300",
+    "at": "2026-01-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 369,
+    "price": 1345,
+    "fee": 74.45
+  },
+  {
+    "id": "tx-0302",
+    "at": "2026-01-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 389,
+    "price": 1150,
+    "fee": 67.1
+  },
+  {
+    "id": "tx-0304",
+    "at": "2026-02-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 14,
+    "price": 155.49,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0306",
+    "at": "2026-02-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 40.82,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0308",
+    "at": "2026-02-06T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 31,
+    "price": 57728,
+    "fee": 268.44
+  },
+  {
+    "id": "tx-0310",
+    "at": "2026-02-11T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 20,
+    "price": 29224,
+    "fee": 87.67
+  },
+  {
+    "id": "tx-0312",
+    "at": "2026-02-11T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 421,
+    "price": 1180,
+    "fee": 74.52
+  },
+  {
+    "id": "tx-0314",
+    "at": "2026-02-13T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 454,
+    "price": 985,
+    "fee": 67.08
+  },
+  {
+    "id": "tx-0316",
+    "at": "2026-03-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 13,
+    "price": 165.46,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0318",
+    "at": "2026-03-04T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 40.79,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0320",
+    "at": "2026-03-06T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 31,
+    "price": 57268,
+    "fee": 266.3
+  },
+  {
+    "id": "tx-0322",
+    "at": "2026-03-11T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 20,
+    "price": 29426,
+    "fee": 88.28
+  },
+  {
+    "id": "tx-0324",
+    "at": "2026-03-11T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 462,
+    "price": 1075,
+    "fee": 74.5
+  },
+  {
+    "id": "tx-0400",
+    "at": "2026-03-12T23:40:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "TQQQ",
+    "side": "sell",
+    "shares": 45,
+    "price": 165.62,
+    "fee": 1.71,
+    "note": "리밸런싱"
+  },
+  {
+    "id": "tx-0326",
+    "at": "2026-03-13T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 508,
+    "price": 880,
+    "fee": 67.06
+  },
+  {
+    "id": "tx-0328",
+    "at": "2026-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 14,
+    "price": 151.82,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0330",
+    "at": "2026-04-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 7,
+    "price": 41.75,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0332",
+    "at": "2026-04-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 33,
+    "price": 53390,
+    "fee": 264.28
+  },
+  {
+    "id": "tx-0334",
+    "at": "2026-04-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 20,
+    "price": 29690,
+    "fee": 89.07
+  },
+  {
+    "id": "tx-0336",
+    "at": "2026-04-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 505,
+    "price": 985,
+    "fee": 74.61
+  },
+  {
+    "id": "tx-0338",
+    "at": "2026-04-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 536,
+    "price": 835,
+    "fee": 67.13
+  },
+  {
+    "id": "tx-0340",
+    "at": "2026-05-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 11,
+    "price": 199.98,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0342",
+    "at": "2026-05-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 44.39,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0344",
+    "at": "2026-05-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 25,
+    "price": 69426,
+    "fee": 260.35
+  },
+  {
+    "id": "tx-0346",
+    "at": "2026-05-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 17,
+    "price": 33443,
+    "fee": 85.28
+  },
+  {
+    "id": "tx-0348",
+    "at": "2026-05-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 523,
+    "price": 950,
+    "fee": 74.53
+  },
+  {
+    "id": "tx-0350",
+    "at": "2026-05-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 563,
+    "price": 795,
+    "fee": 67.14
+  },
+  {
+    "id": "tx-0352",
+    "at": "2026-06-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 11,
+    "price": 198.73,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0354",
+    "at": "2026-06-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 45.68,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0356",
+    "at": "2026-06-05T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 24,
+    "price": 72767,
+    "fee": 261.96
+  },
+  {
+    "id": "tx-0358",
+    "at": "2026-06-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 17,
+    "price": 34413,
+    "fee": 87.75
+  },
+  {
+    "id": "tx-0360",
+    "at": "2026-06-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 568,
+    "price": 875,
+    "fee": 74.55
+  },
+  {
+    "id": "tx-0362",
+    "at": "2026-06-12T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 609,
+    "price": 735,
+    "fee": 67.14
+  },
+  {
+    "id": "tx-0364",
+    "at": "2026-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 10,
+    "price": 211.37,
+    "fee": 0.32
+  },
+  {
+    "id": "tx-0366",
+    "at": "2026-07-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 47.54,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0368",
+    "at": "2026-07-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 23,
+    "price": 77609,
+    "fee": 267.75
+  },
+  {
+    "id": "tx-0370",
+    "at": "2026-07-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 16,
+    "price": 36439,
+    "fee": 87.45
+  },
+  {
+    "id": "tx-0372",
+    "at": "2026-07-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 610,
+    "price": 815,
+    "fee": 74.57
+  },
+  {
+    "id": "tx-0374",
+    "at": "2026-07-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 683,
+    "price": 655,
+    "fee": 67.1
+  },
+  {
+    "id": "tx-0376",
+    "at": "2026-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 14,
+    "price": 157.27,
+    "fee": 0.33
+  },
+  {
+    "id": "tx-0378",
+    "at": "2026-08-05T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 45.07,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0380",
+    "at": "2026-08-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 31,
+    "price": 56315,
+    "fee": 261.86
+  },
+  {
+    "id": "tx-0382",
+    "at": "2026-08-12T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 19,
+    "price": 31222,
+    "fee": 88.98
+  },
+  {
+    "id": "tx-0384",
+    "at": "2026-08-12T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 726,
+    "price": 685,
+    "fee": 74.6
+  },
+  {
+    "id": "tx-0386",
+    "at": "2026-08-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 799,
+    "price": 560,
+    "fee": 67.12
+  },
+  {
+    "id": "tx-0388",
+    "at": "2026-09-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "side": "buy",
+    "shares": 13,
+    "price": 159.95,
+    "fee": 0.31
+  },
+  {
+    "id": "tx-0390",
+    "at": "2026-09-03T23:35:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "side": "buy",
+    "shares": 6,
+    "price": 44.41,
+    "fee": 0.04
+  },
+  {
+    "id": "tx-0392",
+    "at": "2026-09-07T09:30:00+09:00",
+    "accountId": "isa",
+    "symbolId": "418660",
+    "side": "buy",
+    "shares": 31,
+    "price": 57552,
+    "fee": 267.62
+  },
+  {
+    "id": "tx-0394",
+    "at": "2026-09-10T09:30:00+09:00",
+    "accountId": "pension-saving",
+    "symbolId": "0015B0",
+    "side": "buy",
+    "shares": 19,
+    "price": 31384,
+    "fee": 89.44
+  },
+  {
+    "id": "tx-0396",
+    "at": "2026-09-10T09:30:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "side": "buy",
+    "shares": 789,
+    "price": 630,
+    "fee": 74.56
+  },
+  {
+    "id": "tx-0398",
+    "at": "2026-09-14T09:30:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "side": "buy",
+    "shares": 861,
+    "price": 520,
+    "fee": 67.16
+  }
+]

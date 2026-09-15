@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+ * 디자인 토큰. 다크를 기본으로 하고 라이트를 대비로 둔다.
+ * data-theme 속성으로 사용자가 고른 테마가 시스템 설정을 이긴다.
+ */
+:root,
+:root[data-theme="dark"] {
+  --bg: #07090e;
+  --bg-elevated: #0d1117;
+  --surface: #11161f;
+  --surface-hover: #161d28;
+  --border: #1e2633;
+  --border-strong: #2b3648;
+
+  --text: #e8edf5;
+  --text-muted: #8b97ab;
+  --text-faint: #5d6878;
+
+  --accent: #4f8cff;
+  --accent-soft: #1b2a45;
+
+  --up: #f0616d;
+  --up-soft: #35171d;
+  --down: #3d8bfd;
+  --down-soft: #14243d;
+  --flat: #8b97ab;
+
+  --grid: #1a2130;
+}
+
+:root[data-theme="light"] {
+  --bg: #f5f7fa;
+  --bg-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-hover: #f1f4f9;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --text: #0f172a;
+  --text-muted: #5b6678;
+  --text-faint: #8a94a6;
+
+  --accent: #2563eb;
+  --accent-soft: #e4edff;
+
+  --up: #d92d3f;
+  --up-soft: #fdeaec;
+  --down: #1d63d8;
+  --down-soft: #e6eefc;
+  --flat: #5b6678;
+
+  --grid: #e8edf4;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-muted: var(--text-muted);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-flat: var(--flat);
+  --color-grid: var(--grid);
+  --font-sans: var(--font-sans-stack);
+}
+
+html {
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * 현재 테마에 따라 둘 중 하나만 보여준다. 테마 전환 버튼의 글자처럼
+ * 서버가 알 수 없는 값을 React 상태 없이 표시할 때 쓴다.
+ */
+:root[data-theme="dark"] .only-light,
+:root[data-theme="light"] .only-dark {
+  display: none;
+}
+
+/* 숫자는 항상 같은 폭으로 흐르게 해서 표가 흔들리지 않도록 한다. */
+.tnum {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

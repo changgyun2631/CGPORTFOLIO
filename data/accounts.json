@@ -1,0 +1,7 @@
+[
+  { "id": "brokerage-us", "name": "위탁계좌", "kind": "위탁", "currency": "USD", "broker": "미래에셋" },
+  { "id": "pension-saving", "name": "연금저축", "kind": "연금", "currency": "KRW", "broker": "미래에셋" },
+  { "id": "irp", "name": "퇴직연금", "kind": "연금", "currency": "KRW", "broker": "삼성증권" },
+  { "id": "isa", "name": "ISA", "kind": "절세", "currency": "KRW", "broker": "키움증권" },
+  { "id": "taxfree-1", "name": "비과세1", "kind": "일반", "currency": "KRW", "broker": "키움증권" }
+]

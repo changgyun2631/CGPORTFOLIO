@@ -1,0 +1,706 @@
+[
+  {
+    "id": "dv-0403",
+    "at": "2024-01-22T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 123947,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0404",
+    "at": "2024-01-22T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 93378,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0405",
+    "at": "2024-02-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 129117,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0406",
+    "at": "2024-02-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 97581,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0407",
+    "at": "2024-03-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 57.15,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0408",
+    "at": "2024-03-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 134945,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0409",
+    "at": "2024-03-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 102424,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0410",
+    "at": "2024-03-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 80.94,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0411",
+    "at": "2024-04-19T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 141434,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0412",
+    "at": "2024-04-19T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 107632,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0413",
+    "at": "2024-05-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 149023,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0414",
+    "at": "2024-05-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 113662,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0415",
+    "at": "2024-06-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 65.18,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0416",
+    "at": "2024-06-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 157051,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0417",
+    "at": "2024-06-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 120240,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0418",
+    "at": "2024-06-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 87.06,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0419",
+    "at": "2024-07-19T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 165740,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0420",
+    "at": "2024-07-19T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 127184,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0421",
+    "at": "2024-08-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 175528,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0422",
+    "at": "2024-08-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 135225,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0423",
+    "at": "2024-09-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 72.29,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0424",
+    "at": "2024-09-20T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 186526,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0425",
+    "at": "2024-09-20T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 144270,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0426",
+    "at": "2024-09-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 91.95,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0427",
+    "at": "2024-10-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 198844,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0428",
+    "at": "2024-10-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 154777,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0429",
+    "at": "2024-11-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 211821,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0430",
+    "at": "2024-11-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 165742,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0431",
+    "at": "2024-12-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 78.95,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0432",
+    "at": "2024-12-20T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 225349,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0433",
+    "at": "2024-12-20T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 176980,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0434",
+    "at": "2024-12-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 96.29,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0435",
+    "at": "2025-01-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 239646,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0436",
+    "at": "2025-01-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 188858,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0437",
+    "at": "2025-02-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 255374,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0438",
+    "at": "2025-02-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 202015,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0439",
+    "at": "2025-03-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 85.14,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0440",
+    "at": "2025-03-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 272310,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0441",
+    "at": "2025-03-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 216177,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0442",
+    "at": "2025-03-21T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 99.25,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0443",
+    "at": "2025-04-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 289797,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0444",
+    "at": "2025-04-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 230978,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0445",
+    "at": "2025-05-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 310034,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0446",
+    "at": "2025-05-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 248430,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0447",
+    "at": "2025-06-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 90.65,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0448",
+    "at": "2025-06-20T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 331480,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0449",
+    "at": "2025-06-20T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 266886,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0450",
+    "at": "2025-06-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 101.95,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0451",
+    "at": "2025-07-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 355675,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0452",
+    "at": "2025-07-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 287992,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0453",
+    "at": "2025-08-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 381521,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0454",
+    "at": "2025-08-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 310651,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0455",
+    "at": "2025-09-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 95.7,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0456",
+    "at": "2025-09-19T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 409895,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0457",
+    "at": "2025-09-19T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 335046,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0458",
+    "at": "2025-09-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 104.5,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0459",
+    "at": "2025-10-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 440360,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0460",
+    "at": "2025-10-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 361360,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0461",
+    "at": "2025-11-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 473134,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0462",
+    "at": "2025-11-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 390872,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0463",
+    "at": "2025-12-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 100.29,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0464",
+    "at": "2025-12-19T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 508877,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0465",
+    "at": "2025-12-19T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 421937,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0466",
+    "at": "2025-12-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 106.79,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0467",
+    "at": "2026-01-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 549460,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0468",
+    "at": "2026-01-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 457480,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0469",
+    "at": "2026-02-20T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 595762,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0470",
+    "at": "2026-02-20T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 498961,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0471",
+    "at": "2026-03-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 104.88,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0472",
+    "at": "2026-03-20T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 646572,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0473",
+    "at": "2026-03-20T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 545376,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0474",
+    "at": "2026-03-20T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 108.83,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0475",
+    "at": "2026-04-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 702112,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0476",
+    "at": "2026-04-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 594349,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0477",
+    "at": "2026-05-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 759632,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0478",
+    "at": "2026-05-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 645789,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0479",
+    "at": "2026-06-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 109.24,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0480",
+    "at": "2026-06-19T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 822101,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0481",
+    "at": "2026-06-19T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 701432,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0482",
+    "at": "2026-06-19T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 110.67,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0483",
+    "at": "2026-07-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 889188,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0484",
+    "at": "2026-07-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 763836,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0485",
+    "at": "2026-08-21T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 969034,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0486",
+    "at": "2026-08-21T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 836840,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0487",
+    "at": "2026-09-15T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "SCHD",
+    "amount": 113.37,
+    "currency": "USD"
+  },
+  {
+    "id": "dv-0488",
+    "at": "2026-09-15T10:00:00+09:00",
+    "accountId": "irp",
+    "symbolId": "490590",
+    "amount": 1055808,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0489",
+    "at": "2026-09-15T10:00:00+09:00",
+    "accountId": "taxfree-1",
+    "symbolId": "491620",
+    "amount": 915507,
+    "currency": "KRW"
+  },
+  {
+    "id": "dv-0490",
+    "at": "2026-09-15T10:00:00+09:00",
+    "accountId": "brokerage-us",
+    "symbolId": "QLD",
+    "amount": 112.56,
+    "currency": "USD"
+  }
+]

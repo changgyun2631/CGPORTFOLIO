@@ -1,0 +1,54 @@
+[
+  {
+    "id": "qld-lumpsum",
+    "title": "QLD 100% 일시금 거치",
+    "summary": "레버리지 단일 종목에 1억을 넣고 아무것도 하지 않았을 때. 다른 시나리오를 비교할 기준선으로 쓴다.",
+    "allocations": [{ "symbolId": "QLD", "weight": 100 }],
+    "initialKrw": 100000000,
+    "rebalance": "none"
+  },
+  {
+    "id": "qld-self-dividend",
+    "title": "QLD 100% + 월 250만원 자가배당 인출",
+    "summary": "같은 1억에서 매달 250만원을 팔아 쓴다. 인출이 원금을 어떻게 갉아먹는지, 상승장에서도 버티는지 본다. 인출 시 22% 세금을 차감한다.",
+    "allocations": [{ "symbolId": "QLD", "weight": 100 }],
+    "initialKrw": 100000000,
+    "monthlyWithdrawalKrw": 2500000,
+    "withdrawalTaxRate": 0.22,
+    "rebalance": "none"
+  },
+  {
+    "id": "qld-schd-balanced",
+    "title": "QLD 60 / SCHD 40 분기 리밸런싱",
+    "summary": "레버리지에 배당주를 섞고 분기마다 목표 비중으로 되돌린다. 단일 종목 대비 낙폭이 얼마나 줄고 수익을 얼마나 포기하는지 본다.",
+    "allocations": [
+      { "symbolId": "QLD", "weight": 60 },
+      { "symbolId": "SCHD", "weight": 40 }
+    ],
+    "initialKrw": 100000000,
+    "rebalance": "quarterly"
+  },
+  {
+    "id": "dca-monthly",
+    "title": "적립식 월 300만원 (QLD 70 / 커버드콜 30)",
+    "summary": "일시금 없이 매달 300만원씩만 넣는다. 거치식과 달리 하락 구간이 평균단가를 낮추는 쪽으로 작용한다.",
+    "allocations": [
+      { "symbolId": "QLD", "weight": 70 },
+      { "symbolId": "491620", "weight": 30 }
+    ],
+    "initialKrw": 0,
+    "monthlyContributionKrw": 3000000,
+    "rebalance": "none"
+  },
+  {
+    "id": "leverage-ladder",
+    "title": "TQQQ 3배 vs QLD 2배",
+    "summary": "배수만 다른 두 상품에 같은 금액을 반씩 넣는다. 복리 잠식이 배수에 따라 얼마나 다르게 작용하는지 확인한다.",
+    "allocations": [
+      { "symbolId": "TQQQ", "weight": 50 },
+      { "symbolId": "QLD", "weight": 50 }
+    ],
+    "initialKrw": 100000000,
+    "rebalance": "none"
+  }
+]
