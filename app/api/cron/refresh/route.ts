@@ -1,8 +1,8 @@
-import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { writeJsonAtomic, withDataLock } from "@/lib/data/atomic-write";
 import { getFxQuote, getSnapshots, getSymbols } from "@/lib/data/store";
 import { loadPortfolio } from "@/lib/data/views";
 import type { FxRate, Snapshot } from "@/lib/domain/types";
@@ -58,39 +58,43 @@ export async function GET(request: Request) {
     const merged = new Map(previous.quotes.map((quote) => [quote.symbolId, quote]));
     for (const quote of report.quotes) merged.set(quote.symbolId, quote);
 
-    await writeFile(join(dataDir, "quotes.json"), `${JSON.stringify([...merged.values()], null, 2)}\n`, "utf8");
-
-    // 환율
+    // quotes/fx/snapshots 세 파일을 한 잠금 아래 원자적으로 쓴다. 가져오기
+    // 스크립트(--replace)와 겹치면 잠금에서 바로 에러로 걸린다.
     let fx: FxRate = await getFxQuote();
-    const fxProvider = buildFxProvider();
-    if (fxProvider) {
-      try {
-        const fetched = await fxProvider.fetchRate("USD", "KRW");
-        fx = { pair: "USD/KRW", ...fetched };
-        await writeFile(join(dataDir, "fx-quote.json"), `${JSON.stringify(fx, null, 2)}\n`, "utf8");
-      } catch (error) {
-        report.errors.push({ provider: fxProvider.name, message: (error as Error).message });
-      }
-    }
+    const { totalKrw } = await withDataLock(dataDir, async () => {
+      writeJsonAtomic(join(dataDir, "quotes.json"), `${JSON.stringify([...merged.values()], null, 2)}\n`);
 
-    // 갱신된 시세로 평가금액을 다시 계산해 스냅샷 한 점을 남긴다.
-    // 이 점들이 쌓여서 추이 차트와 MDD가 된다.
-    const snapshots = await getSnapshots();
-    const refreshed = await recomputeTotal();
-    const point: Snapshot = {
-      at: new Date().toISOString(),
-      totalKrw: refreshed.totalKrw,
-      principalKrw: refreshed.principalKrw,
-      fxRate: fx.rate,
-    };
-    await writeFile(join(dataDir, "snapshots.json"), `${JSON.stringify([...snapshots, point], null, 2)}\n`, "utf8");
+      const fxProvider = buildFxProvider();
+      if (fxProvider) {
+        try {
+          const fetched = await fxProvider.fetchRate("USD", "KRW");
+          fx = { pair: "USD/KRW", ...fetched };
+          writeJsonAtomic(join(dataDir, "fx-quote.json"), `${JSON.stringify(fx, null, 2)}\n`);
+        } catch (error) {
+          report.errors.push({ provider: fxProvider.name, message: (error as Error).message });
+        }
+      }
+
+      // 갱신된 시세로 평가금액을 다시 계산해 스냅샷 한 점을 남긴다.
+      // 이 점들이 쌓여서 추이 차트와 MDD가 된다.
+      const snapshots = await getSnapshots();
+      const refreshed = await recomputeTotal();
+      const point: Snapshot = {
+        at: new Date().toISOString(),
+        totalKrw: refreshed.totalKrw,
+        principalKrw: refreshed.principalKrw,
+        fxRate: fx.rate,
+      };
+      writeJsonAtomic(join(dataDir, "snapshots.json"), `${JSON.stringify([...snapshots, point], null, 2)}\n`);
+      return refreshed;
+    });
 
     return NextResponse.json({
       ok: true,
       updated: report.quotes.length,
       missing: report.missing,
       errors: report.errors,
-      totalKrw: refreshed.totalKrw,
+      totalKrw,
       fxRate: fx.rate,
       elapsedMs: Date.now() - startedAt,
     });

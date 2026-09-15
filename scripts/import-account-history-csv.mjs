@@ -4,10 +4,11 @@
  *
  * node scripts/import-account-history-csv.mjs <csv...> [--replace]
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
 import { validateSnapshots } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -123,6 +124,8 @@ if (validationErrors.length > 0) {
 }
 
 const target = join(dataDir, replace ? "snapshots.json" : "out-snapshots.json");
-writeFileSync(target, `${JSON.stringify(snapshots, null, 2)}\n`);
+const write = () => writeJsonAtomic(target, `${JSON.stringify(snapshots, null, 2)}\n`);
+if (replace) withDataLock(dataDir, write);
+else write();
 console.log(`${totals.size}일의 실제 계좌자산과 현금 입출금을 병합해 총 ${snapshots.length}개 스냅샷을 저장했습니다.`);
 if (!replace) console.log("검토 후 --replace를 붙이면 실제 차트에 반영됩니다.");

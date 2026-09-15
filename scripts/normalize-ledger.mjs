@@ -1,8 +1,9 @@
 /** 거래원장의 주식 이체·액면분할과 현금흐름 성격을 명시한다. */
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
 import { validateCashFlows, validateTransactions } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -98,7 +99,11 @@ if (validationErrors.length > 0) {
 }
 
 const prefix = replace ? "" : "out-";
-writeFileSync(join(dataDir, `${prefix}transactions.json`), `${JSON.stringify(normalizedTransactions, null, 2)}\n`);
-writeFileSync(join(dataDir, `${prefix}cashflows.json`), `${JSON.stringify(normalizedCashflows, null, 2)}\n`);
+const write = () => {
+  writeJsonAtomic(join(dataDir, `${prefix}transactions.json`), `${JSON.stringify(normalizedTransactions, null, 2)}\n`);
+  writeJsonAtomic(join(dataDir, `${prefix}cashflows.json`), `${JSON.stringify(normalizedCashflows, null, 2)}\n`);
+};
+if (replace) withDataLock(dataDir, write);
+else write();
 console.log(`거래 ${normalizedTransactions.length}건과 현금흐름 ${normalizedCashflows.length}건을 정규화했습니다.`);
 if (!replace) console.log("검토 후 --replace를 붙이면 실제 원장에 반영됩니다.");

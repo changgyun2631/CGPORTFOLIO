@@ -4,10 +4,11 @@
  *
  * node scripts/import-position-basis-csv.mjs <csv> --account-id=acc-main [--replace]
  */
-import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -95,6 +96,8 @@ if (validationErrors.length > 0) {
 }
 
 const target = join(dataDir, flags.replace ? "position-basis.json" : "out-position-basis.json");
-writeFileSync(target, `${JSON.stringify(basis, null, 2)}\n`);
+const write = () => writeJsonAtomic(target, `${JSON.stringify(basis, null, 2)}\n`);
+if (flags.replace) withDataLock(dataDir, write);
+else write();
 console.log(`현재 잔고 기준 ${basis.length}종목을 ${target}에 저장했습니다.`);
 if (!flags.replace) console.log("검토 후 --replace를 붙이면 실제 화면 기준값으로 반영됩니다.");
