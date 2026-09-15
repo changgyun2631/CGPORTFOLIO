@@ -171,7 +171,14 @@ Vitest 도입, `lib/domain/` 5개 파일에 45개 테스트 작성 (`npm test`�
   상태" 참고)
 - Twelve Data 무료 플랜 분당 크레딧 한도(8) 때문에 실제 종목 수(28개+)에서 cron이
   전부 실패하던 버그를 발견·수정함 (`lib/providers/twelve-data.ts`, 8개씩 분당 청크)
-- `scripts/backup-data.mjs` 작성, 수동 실행 1회 확인 (`C:\Users\ACC-002\cgportfolio-backups\`)
+- `scripts/backup-data.mjs` 작성, Windows 작업 스케줄러에 "CGPORTFOLIO 데이터 백업"
+  이름으로 등록 완료 (매일 새벽 3시, `C:\Users\ACC-002\cgportfolio-backups\`로 복사,
+  최근 30개 보관). 수동 트리거로 정상 동작 확인(`LastTaskResult: 0`)
+- 작업 폴더를 워크트리에서 메인 체크아웃(`C:\Users\ACC-002\Desktop\cgportfolio`)으로
+  합침. 실제 데이터·의존성 전부 메인에 반영, `tsc`/`eslint`/`test`/`build` 전부 통과
+- (부수 발견) 워크트리가 저장소 안(`.claude/worktrees/`)에 중첩돼 있어 메인에서
+  lint/test 실행 시 워크트리 산출물까지 중복 스캔되던 버그 발견·수정
+  (`eslint.config.mjs`/`vitest.config.mts`)
 
 **안 된 것 — 다음 담당자가 이어받을 부분**
 1. 실제 매매 날짜별 개별 거래 이력. 지금은 "평단가×수량"짜리 부트스트랩 거래 1건뿐이라
@@ -179,11 +186,9 @@ Vitest 도입, `lib/domain/` 5개 파일에 45개 테스트 작성 (`npm test`�
    맞다). 사용자가 실제 거래내역(날짜별)을 주면 부트스트랩 거래를 지우고 교체할 것
 2. 실제 입출금 이력. 지금 원금은 매입금액 합계로 근사한 값이다
 3. 배당 실지급 이력 (`data/dividends.json`이 비어 있음)
-4. 백업 자동화. 스크립트는 있지만 Windows 작업 스케줄러 등록은 사람이 해야 한다
-   (관리자 권한/시스템 설정 변경이라 에이전트가 임의로 하지 않음)
 
 **완료 조건**: 실제 평가금액이 증권사 앱과 일치한다 (부트스트랩 시점 기준으로는 일치
-확인함 — 이후 시세가 계속 바뀌므로 재확인은 큰 의미 없음). 백업이 자동으로 돈다 (미완).
+확인함 — 이후 시세가 계속 바뀌므로 재확인은 큰 의미 없음). 백업이 자동으로 돈다 — ✅.
 
 **주의**: `data/`에 실제 금융 정보가 들어가 있다. 커밋·스크린샷·로그에 노출되지 않도록
 각별히 주의할 것. `scripts/import-holdings-csv.mjs`는 같은 형식의 CSV를 다시 가져올 때

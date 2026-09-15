@@ -140,6 +140,9 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 | **`CRON_SECRET` 인증** | 설정 후 무인증/오답 헤더는 401, 올바른 `Authorization: Bearer <secret>`만 200. 실제로 헤더를 바꿔가며 확인 |
 | **실제 데이터 (부분)** | 2026-09-15 사용자의 실제 미국주식 위탁계좌 CSV(28종목)를 `scripts/import-holdings-csv.mjs`로 부트스트랩. 실제 평단가·수량이 반영된 채로 대시보드·계좌·종목·백테스트 전 페이지 200 확인, `npm test`/`tsc`/`eslint`/`build` 전부 통과. 상세는 아래 "실거래 데이터 상태" 참고 |
 | **Twelve Data 대량 종목 처리** | 실제 28종목으로 cron을 돌려보다 발견: 무료 플랜은 분당 8크레딧인데 심볼 하나당 1크레딧이라, 8개 넘는 심볼을 한 URL에 묶어도 429로 전부 실패한다. `twelve-data.ts`를 8개씩 분당 한 묶음으로 보내도록 고쳐 30개 심볼 전부 성공(약 3.1분 소요)하는 것까지 실측 확인 |
+| **백업 자동화** | `scripts/backup-data.mjs` 작성 후 Windows 작업 스케줄러에 "CGPORTFOLIO 데이터 백업" 이름으로 등록 완료 (매일 새벽 3시, `C:\Users\ACC-002\cgportfolio-backups\`, 최근 30개 보관). `Start-ScheduledTask`로 수동 트리거해 `LastTaskResult: 0`(성공)과 실제 백업 폴더 생성까지 확인 |
+| **작업 폴더를 메인 체크아웃으로 합침** | 이 작업은 원래 `.claude/worktrees/continue-previous-work-f7f06a`라는 워크트리에서 했다. 실제 데이터가 워크트리 삭제 시 같이 사라지는 걸 막기 위해 브랜치를 `C:\Users\ACC-002\Desktop\cgportfolio`(메인 체크아웃, `main` 브랜치)에 fast-forward 병합하고, gitignore된 실제 데이터 파일 8종(`accounts.json` 등)과 `.env.local`도 그대로 옮겼다. 메인에서 `npm install` 후 `tsc`/`eslint`/`test`/`build` 전부 통과 |
+| **워크트리 중첩 버그** | 위 병합 과정에서 발견: 워크트리가 저장소 안에 있다 보니 메인에서 `eslint .`/`vitest run`을 돌리면 워크트리의 `.next` 빌드 산출물·테스트 파일까지 같이 스캔돼 eslint 683개 오류, vitest 테스트 2배 중복 실행이 났다. `eslint.config.mjs`/`vitest.config.mts`에 `**/.claude/worktrees/**` 제외 규칙을 추가해 고침 |
 
 ### 검증되지 않음 — 반드시 확인할 것
 
@@ -147,7 +150,6 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 |---|---|
 | **Twelve Data/네이버 값의 육안 대조** | 코드 실행 결과는 확인했으나, 이 환경의 브라우저 도구가 `finance.naver.com` 접근을 차단해 시세 앱과의 육안 대조는 못 했다. 네이버 시세는 그 사이트가 쓰는 실시간 폴링 API를 직접 부른 값이라 원천은 같다 |
 | **배포** | 한 번도 안 해봤다 |
-| **백업 자동화** | `scripts/backup-data.mjs`를 만들고 수동 실행은 확인했다(`C:\Users\ACC-002\cgportfolio-backups\`에 첫 백업 생성). Windows 작업 스케줄러 등록은 사람이 직접 해야 한다 — 아직 안 함 |
 
 ### 실거래 데이터 상태 (2026-09-15)
 
