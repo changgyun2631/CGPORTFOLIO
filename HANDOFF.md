@@ -143,6 +143,7 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 | **백업 자동화** | `scripts/backup-data.mjs` 작성 후 Windows 작업 스케줄러에 "CGPORTFOLIO 데이터 백업" 이름으로 등록 완료 (매일 새벽 3시, `C:\Users\ACC-002\cgportfolio-backups\`, 최근 30개 보관). `Start-ScheduledTask`로 수동 트리거해 `LastTaskResult: 0`(성공)과 실제 백업 폴더 생성까지 확인 |
 | **작업 폴더를 메인 체크아웃으로 합침** | 이 작업은 원래 `.claude/worktrees/continue-previous-work-f7f06a`라는 워크트리에서 했다. 실제 데이터가 워크트리 삭제 시 같이 사라지는 걸 막기 위해 브랜치를 `C:\Users\ACC-002\Desktop\cgportfolio`(메인 체크아웃, `main` 브랜치)에 fast-forward 병합하고, gitignore된 실제 데이터 파일 8종(`accounts.json` 등)과 `.env.local`도 그대로 옮겼다. 메인에서 `npm install` 후 `tsc`/`eslint`/`test`/`build` 전부 통과 |
 | **워크트리 중첩 버그** | 위 병합 과정에서 발견: 워크트리가 저장소 안에 있다 보니 메인에서 `eslint .`/`vitest run`을 돌리면 워크트리의 `.next` 빌드 산출물·테스트 파일까지 같이 스캔돼 eslint 683개 오류, vitest 테스트 2배 중복 실행이 났다. `eslint.config.mjs`/`vitest.config.mts`에 `**/.claude/worktrees/**` 제외 규칙을 추가해 고침 |
+| **시세 자동 갱신 스케줄링 (P2-1)** | `scripts/refresh-quotes.mjs` + `scripts/start-server.cmd` 작성, Windows 작업 스케줄러에 "CGPORTFOLIO 서버"(매일 새벽 4시 기동, 실패 시 3회 재시도)·"CGPORTFOLIO 시세 갱신"(6시간마다 `/api/cron/refresh` 호출) 등록. 수동 트리거로 30종목 갱신 성공(30/0/0) 2회 확인, 로그는 `~/cgportfolio-logs/refresh.log` |
 
 ### 검증되지 않음 — 반드시 확인할 것
 
@@ -150,6 +151,7 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 |---|---|
 | **Twelve Data/네이버 값의 육안 대조** | 코드 실행 결과는 확인했으나, 이 환경의 브라우저 도구가 `finance.naver.com` 접근을 차단해 시세 앱과의 육안 대조는 못 했다. 네이버 시세는 그 사이트가 쓰는 실시간 폴링 API를 직접 부른 값이라 원천은 같다 |
 | **배포** | 한 번도 안 해봤다 |
+| **서버 상시구동 안정성** | 테스트 중 "CGPORTFOLIO 서버" 작업으로 띄운 프로세스가 원인 불명으로 한 번 죽었다(`LastTaskResult: 0xC000013A`, Ctrl+C로 종료된 것과 같은 코드). Task Scheduler 이벤트 로그가 이 환경에서 비활성이라(`wevtutil` 조회 결과 없음) 원인을 못 찾았다. 재기동 후에는 5분+ 안정적이었고 갱신도 정상 성공했다. **로그온 트리거(`ONLOGON`)는 이 환경에서 `Access is denied`로 등록 자체가 안 돼서**, 대안으로 "매일 새벽 4시 기동 + 실패 시 재시도 3회"를 썼다 — PC 재부팅 시 다음 새벽 4시까지 서버가 안 뜰 수 있다. 다음 담당자는 며칠 지켜보고, 자주 죽으면 `start-server.cmd`에 무한 재시작 루프(`:loop`/`goto`)를 넣거나 다른 프로세스 매니저(pm2 등) 도입을 고려할 것 |
 
 ### 실거래 데이터 상태 (2026-09-15)
 
