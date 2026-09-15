@@ -40,7 +40,10 @@ const readJsonCached = cache(async (name: string): Promise<unknown> => {
   try {
     return JSON.parse(await readFile(join(dataDir, name), "utf8"));
   } catch (error) {
-    throw new Error(`data/${name} 을 읽지 못했습니다: ${(error as Error).message}`);
+    // 개인 데이터 파일은 저장소에 없다. 처음 받아서 실행한 경우가 대부분이므로 다음 할 일을 알려준다.
+    const missing = (error as NodeJS.ErrnoException).code === "ENOENT";
+    const hint = missing ? " 개인 데이터는 저장소에 없습니다. `node scripts/seed.mjs` 를 먼저 실행하세요." : "";
+    throw new Error(`data/${name} 을 읽지 못했습니다.${hint} (${(error as Error).message})`);
   }
 });
 

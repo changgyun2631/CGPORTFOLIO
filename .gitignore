@@ -35,6 +35,26 @@ yarn-error.log*
 # 값이 비어 있는 설정 견본은 커밋한다. 실제 키가 든 .env.local 은 위 규칙으로 계속 제외된다.
 !.env.example
 
+# 개인 금융 데이터 — 저장소에 넣지 않는다.
+#
+# 한 번 커밋하면 git 이력에 영구히 남아서, 나중에 지워도 이력·포크·캐시에 그대로
+# 남는다. 보유 종목·수량·평단·평가금액·계좌 잔고·입출금이 전부 이 파일들에 있다.
+#
+# 처음 받았다면 `node scripts/seed.mjs` 를 실행하면 data/sample 을 바탕으로
+# 돌아가는 한 벌이 만들어진다.
+/data/accounts.json
+/data/symbols.json
+/data/transactions.json
+/data/cashflows.json
+/data/dividends.json
+/data/calendar.json
+# cron 이 적재하는 시세·스냅샷. 여기에도 내 평가금액이 그대로 담긴다.
+/data/snapshots.json
+/data/quotes.json
+/data/fx-quote.json
+/data/prices.json
+/data/fx.json
+
 # vercel
 .vercel
 

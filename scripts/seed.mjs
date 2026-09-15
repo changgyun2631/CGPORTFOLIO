@@ -7,12 +7,26 @@
  *
  *   node scripts/seed.mjs
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = join(root, "data");
+const sampleDir = join(dataDir, "sample");
+
+/*
+ * 계좌와 종목 정의는 개인 데이터라 저장소에 올라가지 않는다.
+ * 처음 받아서 실행하는 경우라면 샘플 한 벌을 깔아준 뒤 진행한다.
+ * 이미 자기 파일을 만들어 둔 경우에는 덮어쓰지 않는다.
+ */
+mkdirSync(dataDir, { recursive: true });
+for (const name of ["accounts.json", "symbols.json"]) {
+  const target = join(dataDir, name);
+  if (existsSync(target)) continue;
+  copyFileSync(join(sampleDir, name), target);
+  console.log(`  data/${name} 이 없어 data/sample 에서 복사했습니다.`);
+}
 
 /** 같은 입력이면 항상 같은 결과가 나오도록 고정 시드 난수를 쓴다. */
 function mulberry32(seed) {

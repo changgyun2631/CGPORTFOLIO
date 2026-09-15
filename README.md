@@ -1,15 +1,40 @@
-# 개인 포트폴리오 대시보드
+# CGPORTFOLIO
 
-보유 자산과 전일 변동을 한 화면에서 보는 개인용 대시보드다. 거래원장 하나에서
-평가금액·수익률·비중·배당을 전부 파생시킨다.
+보유 자산과 전일 변동을 한 화면에서 보는 개인용 포트폴리오 대시보드. 거래원장
+하나에서 평가금액·수익률·비중·배당을 전부 파생시킨다.
 
 ## 빠르게 띄우기
 
 ```bash
 npm install
-node scripts/seed.mjs   # 샘플 데이터 생성 (한 번만)
+```
+
+```bash
+node scripts/seed.mjs
+```
+
+```bash
 npm run dev
 ```
+
+`seed.mjs` 는 `data/sample` 을 바탕으로 가상 포트폴리오 한 벌을 만든다. 실제 금액이
+아니라 화면이 돌아가는 것을 확인하기 위한 값이다.
+
+## 개인 데이터는 저장소에 없다
+
+보유 종목·수량·평단·평가금액·계좌 잔고·입출금이 담기는 파일은 `.gitignore` 로 빼
+두었다. 한 번 커밋하면 git 이력에 영구히 남아서, 나중에 지워도 이력·포크·캐시에
+그대로 남기 때문이다.
+
+| 저장소에 있음 | 저장소에 없음 (로컬 전용) |
+|---|---|
+| `lookthrough.json` — 공개된 ETF 구성 | `accounts.json`, `symbols.json` |
+| `backtests.json` — 시나리오 정의 | `transactions.json`, `cashflows.json`, `dividends.json` |
+| `philosophy.md`, `reports/` — 직접 쓴 글 | `snapshots.json`, `quotes.json`, `prices.json`, `fx*.json` |
+| `sample/` — 실행해보기용 가상 데이터 | `calendar.json` |
+
+내 데이터로 쓰려면 `data/accounts.json` 과 `data/symbols.json` 부터 고치고 거래·입출금·
+배당 파일을 채운다. 이 파일들은 커밋되지 않으므로 **따로 백업해 둘 것.**
 
 ## 설계의 핵심
 
