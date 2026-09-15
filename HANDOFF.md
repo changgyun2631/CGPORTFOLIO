@@ -135,15 +135,25 @@ PHP 호스팅에 월 5천~8천원이 드는 반면 Next.js는 Vercel 무료로 �
 | **Twelve Data 실호출** | 2026-09-15 `tsx`로 `lib/providers/twelve-data.ts` 실제 실행. QLD/TQQQ/SCHD 단일·복수 조회, USD/KRW 환율 전부 성공. 응답 형태가 코드 가정과 정확히 일치했다 (단일 심볼은 객체, 복수는 심볼 키 객체 — 가정대로) |
 | **네이버 국내 시세 크롤링** | 2026-09-15 `lib/providers/naver-kr.ts` 실제 실행. 418660/0015B0/490590/491620 4종목 전부 성공. `closePrice`/`compareToPreviousClosePrice` 필드명 가정이 맞았고, 하락 종목(490590)에서 `compareToPreviousClosePrice`가 음수로 오는 것도 확인(부호 포함). 버그 1건 발견·수정: `marketState`를 항상 `"closed"`로 하드코딩하고 있었는데, 실제 응답의 `marketStatus` 필드(`"OPEN"`/그 외)를 반영하도록 고침 |
 | **공급자 실패 처리** | 존재하지 않는 심볼을 섞어 호출 → 해당 심볼만 `ProviderShapeError`로 건너뛰고 나머지는 정상 반환되는 것을 Twelve Data·네이버 양쪽에서 확인 (`console.warn`에 원인 메시지 출력) |
+| **`/api/cron/refresh` 실행** | 2026-09-15 `npm run dev` + `curl`로 실제 호출. 7종목 전부 갱신, `data/quotes.json`·`fx-quote.json`·`snapshots.json`이 실제로 갱신되고 대시보드 HTML에 새 총액이 그대로 반영되는 것까지 확인. `recomputeTotal()`이 계산한 총액이 `loadPortfolio()`(정식 계산 경로)가 페이지에 렌더한 총액과 정확히 일치함을 확인 — 두 계산 경로가 어긋나지 않는다 |
+| **부분 실패 시 기존 값 유지** | Twelve Data 키를 일부러 무효화해 US 3종목만 실패시켜 봄. 실패한 종목은 `asOf`가 그대로였고(값이 안 바뀜), 성공한 KR 4종목만 갱신됨. `fx-quote.json`도 환율 조회 실패 시 안 덮어써짐. 빈 값으로 덮어쓰는 사고는 없었다 |
+| **`CRON_SECRET` 인증** | 설정 후 무인증/오답 헤더는 401, 올바른 `Authorization: Bearer <secret>`만 200. 실제로 헤더를 바꿔가며 확인 |
 
 ### 검증되지 않음 — 반드시 확인할 것
 
 | 항목 | 상태 |
 |---|---|
 | **Twelve Data/네이버 값의 육안 대조** | 코드 실행 결과는 확인했으나, 이 환경의 브라우저 도구가 `finance.naver.com` 접근을 차단해 시세 앱과의 육안 대조는 못 했다. 네이버 시세는 그 사이트가 쓰는 실시간 폴링 API를 직접 부른 값이라 원천은 같다 |
-| **`/api/cron/refresh` 실행** | 한 번도 호출한 적 없다. `recomputeTotal()` 부분이 특히 미검증 |
 | **배포** | 한 번도 안 해봤다 |
 | **실제 데이터** | 전부 `seed.mjs`가 만든 가상 값. 실거래 입력 안 됨 |
+
+**환경 관련 발견**: 이 작업 환경에서 Browser 도구(`preview_start`)가 띄운 `next dev`
+프로세스는 외부 API(Twelve Data·네이버)로 나가는 `fetch`가 전부 `fetch failed`로
+실패했다. 반면 터미널(Bash 도구)에서 직접 `npm run dev`로 띄운 프로세스는 같은
+코드로 정상 호출됐다. Browser 도구가 띄우는 프로세스에 별도의 아웃바운드 네트워크
+제약이 있는 것으로 보인다 — 실제 VPS나 로컬 상시구동 환경에서는 해당하지 않을
+가능성이 높지만, 다음에 이 환경에서 cron을 다시 검증할 때는 dev 서버를 Browser
+도구가 아니라 터미널에서 직접 띄울 것.
 
 시세 공급자 코드는 응답 구조가 다르면 `ProviderShapeError`로 **즉시 터지게** 만들어
 뒀다. 조용히 틀린 값을 쓰는 것보다 낫기 때문이다. 실제로 돌려본 결과 이 설계가
