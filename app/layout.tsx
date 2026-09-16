@@ -42,7 +42,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         }}
       >
         <TopNav />
-        <main className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-6 sm:px-6 lg:px-8">{children}</main>
+        {/* 폭 상한 없이 화면을 다 쓴다. 표·차트가 많아서 넓을수록 한눈에 들어온다 —
+            줄글 위주인 투자철학·리포트만 각 페이지에서 따로 좁게 잡는다. */}
+        <main className="w-full px-4 pb-24 pt-6 sm:px-6 lg:px-8">{children}</main>
         <footer className="border-t border-line px-4 py-8 text-center text-xs text-faint sm:px-6">
           <p>{site.name} · 개인 자산 기록용 화면입니다. 투자 판단의 근거로 쓰기 전에 원자료를 직접 확인하세요.</p>
           <p className="mt-2">

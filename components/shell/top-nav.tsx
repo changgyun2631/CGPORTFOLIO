@@ -30,7 +30,7 @@ function MobileMenu({ pathname }: { pathname: string }) {
 
   return (
     <>
-      <div className="mx-auto flex h-14 w-full max-w-[1400px] items-center gap-2 px-4 sm:px-6 lg:px-8">
+      <div className="flex h-14 w-full items-center gap-2 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="mr-2 flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-tight">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[11px] font-black text-white">
             {site.shortName.slice(0, 2)}
