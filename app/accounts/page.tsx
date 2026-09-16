@@ -25,7 +25,15 @@ export default async function AccountsPage() {
 
   return (
     <div className="space-y-8">
-      <PageTitle title="계좌" description="계좌별 평가금액과 예수금입니다. 세제가 다른 계좌를 나눠서 봅니다." />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <PageTitle title="계좌" description="계좌별 평가금액과 예수금입니다. 세제가 다른 계좌를 나눠서 봅니다." />
+        <Link
+          href="/accounts/import"
+          className="mb-6 shrink-0 rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-line-strong hover:text-text"
+        >
+          CSV 가져오기
+        </Link>
+      </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Card>
