@@ -30,14 +30,7 @@ import type {
 
 const dataDir = join(process.cwd(), "data");
 
-/**
- * 요청 한 번 안에서만 같은 파일을 재사용한다.
- *
- * 모듈 수준 Map에 담아두면 프로세스가 사는 동안 영원히 남아서, cron이 파일을
- * 새로 써도 화면은 낡은 값을 계속 보여준다. React cache는 요청 경계에서
- * 비워지므로 중복 읽기는 막으면서 갱신은 바로 반영된다.
- */
-const readJsonCached = cache(async (name: string): Promise<unknown> => {
+async function readJsonRaw(name: string): Promise<unknown> {
   try {
     return JSON.parse(await readFile(join(dataDir, name), "utf8"));
   } catch (error) {
@@ -46,10 +39,34 @@ const readJsonCached = cache(async (name: string): Promise<unknown> => {
     const hint = missing ? " 개인 데이터는 저장소에 없습니다. `node scripts/seed.mjs` 를 먼저 실행하세요." : "";
     throw new Error(`data/${name} 을 읽지 못했습니다.${hint} (${(error as Error).message})`);
   }
-});
+}
+
+/**
+ * 요청 한 번 안에서만 같은 파일을 재사용한다.
+ *
+ * 모듈 수준 Map에 담아두면 프로세스가 사는 동안 영원히 남아서, cron이 파일을
+ * 새로 써도 화면은 낡은 값을 계속 보여준다. React cache는 요청 경계에서
+ * 비워지므로 중복 읽기는 막으면서 갱신은 바로 반영된다.
+ */
+const readJsonCached = cache(readJsonRaw);
 
 function readJson<T>(name: string): Promise<T> {
   return readJsonCached(name) as Promise<T>;
+}
+
+/**
+ * 캐시를 거치지 않고 지금 이 순간의 파일 내용을 직접 읽는다.
+ *
+ * cron의 세대 쓰기(`app/api/cron/refresh/route.ts`)처럼, 같은 요청 안에서 이미
+ * `loadPortfolio()` 등으로 캐시가 채워진 뒤에도 잠금 안에서 "진짜 지금" 값을 다시
+ * 봐야 하는 경로에서만 쓴다(WORK_ORDER B-0A-3) — React `cache()`는 같은 파일을
+ * 한 요청 안에서 몇 번을 불러도 첫 결과를 그대로 돌려주므로, 외부 API 호출(느림)이
+ * 끝나고 잠금을 잡은 시점에는 그 사이 다른 프로세스가 써 둔 최신 값이 아니라
+ * "요청 시작 시점"의 낡은 값을 보게 될 수 있다. 평소 페이지 렌더링에는 쓰지
+ * 않는다 — 캐시를 우회하면 같은 요청 안에서 같은 파일을 여러 번 디스크에서 읽게 된다.
+ */
+export function readJsonUncached<T>(name: string): Promise<T> {
+  return readJsonRaw(name) as Promise<T>;
 }
 
 export const getAccounts = () => readJson<Account[]>("accounts.json");

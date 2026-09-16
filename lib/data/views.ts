@@ -21,7 +21,20 @@ import {
   getSnapshots,
   getSymbols,
   getTransactions,
+  readJsonUncached,
 } from "./store";
+import type {
+  Account,
+  CashFlow,
+  DividendPayment,
+  FxRate,
+  LookthroughTable,
+  PositionBasis,
+  Quote,
+  Snapshot,
+  Symbol,
+  Transaction,
+} from "@/lib/domain/types";
 
 /**
  * 페이지가 쓰는 뷰모델을 한 곳에서 조립한다.
@@ -47,8 +60,30 @@ export const loadRaw = cache(async () => {
   return { accounts, symbols, transactions, cashflows, dividends, positionBasis, quotes, fx, snapshots, lookthrough, fxHistory };
 });
 
+/**
+ * `loadRaw()`와 같은 파일 묶음을 캐시 없이(=지금 이 순간의 디스크 값으로) 읽는다.
+ * 목록은 `loadRaw()`와 반드시 같이 맞출 것 — 필드가 어긋나면
+ * `lib/data/__tests__/views-raw-parity.test.ts`가 잡는다.
+ */
+export async function loadRawUncached() {
+  const [accounts, symbols, transactions, cashflows, dividends, positionBasis, quotes, fx, snapshots, lookthrough, fxHistory] = await Promise.all([
+    readJsonUncached<Account[]>("accounts.json"),
+    readJsonUncached<Symbol[]>("symbols.json"),
+    readJsonUncached<Transaction[]>("transactions.json"),
+    readJsonUncached<CashFlow[]>("cashflows.json"),
+    readJsonUncached<DividendPayment[]>("dividends.json"),
+    readJsonUncached<PositionBasis[]>("position-basis.json").catch(() => [] as PositionBasis[]),
+    readJsonUncached<Quote[]>("quotes.json"),
+    readJsonUncached<FxRate>("fx-quote.json"),
+    readJsonUncached<Snapshot[]>("snapshots.json"),
+    readJsonUncached<LookthroughTable>("lookthrough.json"),
+    readJsonUncached<{ d: string; rate: number }[]>("fx.json"),
+  ]);
+  return { accounts, symbols, transactions, cashflows, dividends, positionBasis, quotes, fx, snapshots, lookthrough, fxHistory };
+}
+
 /** 과거 환율 조회. 없는 날짜는 그 이전 마지막 값을 쓴다. */
-function makeFxLookup(history: { d: string; rate: number }[], fallback: number) {
+export function makeFxLookup(history: { d: string; rate: number }[], fallback: number) {
   if (history.length === 0) return () => fallback;
   const sorted = [...history].sort((a, b) => a.d.localeCompare(b.d));
   return (date: string) => {

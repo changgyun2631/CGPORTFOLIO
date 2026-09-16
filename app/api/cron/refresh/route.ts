@@ -3,10 +3,12 @@ import { join } from "node:path";
 import { NextResponse } from "next/server";
 
 import { withDataLock } from "@/lib/data/atomic-write";
+import { logCronStage } from "@/lib/data/cron-log";
 import { readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
-import { getFxQuote, getSnapshots, getSymbols } from "@/lib/data/store";
-import { loadPortfolio } from "@/lib/data/views";
-import type { FxRate, Snapshot } from "@/lib/domain/types";
+import { getSymbols } from "@/lib/data/store";
+import { loadRawUncached, makeFxLookup } from "@/lib/data/views";
+import { buildPortfolio } from "@/lib/domain/portfolio";
+import type { FxRate, Quote, Snapshot } from "@/lib/domain/types";
 import { buildFxProvider, fetchAllQuotes } from "@/lib/providers";
 
 /**
@@ -42,68 +44,102 @@ export async function GET(request: Request) {
   }
 
   const startedAt = Date.now();
+  logCronStage("시작");
 
   try {
+    // 느린 외부 호출(시세·환율 조회)은 전부 잠금 밖에서 끝낸다 — data/.write.lock을
+    // 잡은 채로 네트워크 응답을 기다리면, 그동안 다른 가져오기 작업이 전부 막힌다.
     const symbols = await getSymbols();
+    const tQuotes = Date.now();
     const report = await fetchAllQuotes(symbols);
+    logCronStage(
+      `종목 조회 완료 — 성공 ${report.quotes.length}건, 누락 ${report.missing.length}건, 오류 ${report.errors.length}건, ${Date.now() - tQuotes}ms`,
+    );
 
     if (report.quotes.length === 0) {
+      logCronStage("중단 — 시세를 한 건도 받지 못함");
       return NextResponse.json(
         { ok: false, error: "시세를 한 건도 받지 못해 저장하지 않았습니다.", missing: report.missing, errors: report.errors },
         { status: 502 },
       );
     }
 
-    // 이번에 받지 못한 종목은 기존 값을 그대로 둔다. 빈 값으로 덮어쓰지 않는다.
-    const previous = await loadPortfolio();
-    const merged = new Map(previous.quotes.map((quote) => [quote.symbolId, quote]));
-    for (const quote of report.quotes) merged.set(quote.symbolId, quote);
-    const mergedQuotes = [...merged.values()];
-
-    let fx: FxRate = await getFxQuote();
+    let liveFx: FxRate | null = null;
+    const fxProvider = buildFxProvider();
+    if (fxProvider) {
+      const tFx = Date.now();
+      try {
+        const fetched = await fxProvider.fetchRate("USD", "KRW");
+        liveFx = { pair: "USD/KRW", ...fetched };
+        logCronStage(`환율 조회 완료 — ${Date.now() - tFx}ms`);
+      } catch (error) {
+        report.errors.push({ provider: fxProvider.name, message: (error as Error).message });
+        logCronStage(`환율 조회 실패 — ${(error as Error).message}, ${Date.now() - tFx}ms`);
+      }
+    }
 
     // quotes/fx/snapshots 세 파일을 한 세대로 묶어 쓴다: 셋 다 쓰기 전에 새 내용을
-    // 전부 메모리에서 준비해 두고(recomputeTotal이 디스크 대신 이 값들을 그대로
-    // 쓴다), 순서대로 원자적 교체한다. 그중 하나라도 실패하면 이미 쓴 파일들을
-    // 실패 직전 원본 바이트로 되돌려, "일부는 새 세대·일부는 이전 세대"로 섞인
-    // 채 남는 걸 막는다(개별 파일 자체가 일부만 쓰이는 것은 writeJsonAtomic이
-    // 이미 막는다 — 이건 그 위에서 파일 "사이"의 일관성을 보장하는 것이다).
-    const { totalKrw } = await withDataLock(dataDir, async () => {
+    // 전부 메모리에서 준비해 두고, 순서대로 원자적 교체한다. 그중 하나라도
+    // 실패하면 이미 쓴 파일들을 실패 직전 원본 바이트로 되돌려, "일부는 새
+    // 세대·일부는 이전 세대"로 섞인 채 남는 걸 막는다(개별 파일 자체가 일부만
+    // 쓰이는 것은 writeJsonAtomic이 이미 막는다 — 이건 그 위에서 파일 "사이"의
+    // 일관성을 보장하는 것이다).
+    //
+    // 총액 계산에 쓰는 계좌·잔고·시세 등은 잠금을 잡은 "지금" 다시 읽는다
+    // (`loadRawUncached`, 캐시를 거치지 않는 직접 읽기) — 이 요청이 시작할 때
+    // `getSymbols()`가 이미 React cache를 채워 뒀으므로, 같은 캐시를 쓰는
+    // `loadPortfolio()`류 함수를 다시 불러 봐야 외부 API를 기다리는 동안
+    // 다른 프로세스가 바꿔 놓았을 수 있는 최신 값이 아니라 요청 시작 시점의
+    // 값을 그대로 돌려받는다(WORK_ORDER B-0A-3).
+    const tWrite = Date.now();
+    const { totalKrw, fxRate } = await withDataLock(dataDir, async () => {
       const quotesPath = join(dataDir, "quotes.json");
       const fxPath = join(dataDir, "fx-quote.json");
       const snapshotsPath = join(dataDir, "snapshots.json");
       const originals = readOriginals([quotesPath, fxPath, snapshotsPath]);
 
-      const fxProvider = buildFxProvider();
-      if (fxProvider) {
-        try {
-          const fetched = await fxProvider.fetchRate("USD", "KRW");
-          fx = { pair: "USD/KRW", ...fetched };
-        } catch (error) {
-          report.errors.push({ provider: fxProvider.name, message: (error as Error).message });
-        }
-      }
+      const raw = await loadRawUncached();
 
-      // 갱신된 시세로 평가금액을 다시 계산해 스냅샷 한 점을 만든다. 아직 아무
-      // 파일도 쓰지 않은 상태의 메모리 값으로 계산한다.
-      const snapshots = await getSnapshots();
-      const refreshed = await recomputeTotal(previous, mergedQuotes, fx);
+      // 이번에 받지 못한 종목은 "지금" 저장돼 있는 값을 그대로 둔다(외부 조회
+      // 시작 시점 값이 아니라, 잠금 잡은 시점 기준 최신 값 위에 얹는다).
+      const merged = new Map(raw.quotes.map((quote) => [quote.symbolId, quote]));
+      for (const quote of report.quotes) merged.set(quote.symbolId, quote);
+      const mergedQuotes: Quote[] = [...merged.values()];
+
+      const fx: FxRate = liveFx ?? raw.fx;
+
+      const fxRateAt = makeFxLookup(raw.fxHistory, fx.rate);
+      const portfolio = buildPortfolio({
+        accounts: raw.accounts,
+        symbols: raw.symbols,
+        transactions: raw.transactions,
+        cashflows: raw.cashflows,
+        dividends: raw.dividends,
+        positionBasis: raw.positionBasis,
+        principalKrw: raw.snapshots.at(-1)?.principalKrw,
+        quotes: mergedQuotes,
+        fx,
+        fxRateAt,
+      });
+
       const point: Snapshot = {
         at: new Date().toISOString(),
-        totalKrw: refreshed.totalKrw,
-        principalKrw: refreshed.principalKrw,
+        totalKrw: portfolio.totals.totalKrw,
+        principalKrw: portfolio.totals.principalKrw,
         fxRate: fx.rate,
       };
 
       const writes = [
         { path: quotesPath, content: `${JSON.stringify(mergedQuotes, null, 2)}\n` },
         { path: fxPath, content: `${JSON.stringify(fx, null, 2)}\n` },
-        { path: snapshotsPath, content: `${JSON.stringify([...snapshots, point], null, 2)}\n` },
+        { path: snapshotsPath, content: `${JSON.stringify([...raw.snapshots, point], null, 2)}\n` },
       ];
       writeGenerationOrRollback(writes, originals);
 
-      return refreshed;
+      return { totalKrw: portfolio.totals.totalKrw, fxRate: fx.rate };
     });
+    logCronStage(`파일 세대 쓰기 완료 — ${Date.now() - tWrite}ms`);
+    logCronStage(`전체 완료 — ${Date.now() - startedAt}ms`);
 
     return NextResponse.json({
       ok: true,
@@ -111,35 +147,11 @@ export async function GET(request: Request) {
       missing: report.missing,
       errors: report.errors,
       totalKrw,
-      fxRate: fx.rate,
+      fxRate,
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
+    logCronStage(`오류로 중단 — ${(error as Error).message}`);
     return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
   }
-}
-
-/**
- * 아직 쓰지 않은 메모리 상의 시세·환율 값으로 평가금액을 계산한다. 예전에는
- * 파일을 쓴 뒤 다시 읽어 계산했지만, 세대 묶음 쓰기에서는 쓰기 전에 최종 값을
- * 전부 준비해 둬야 해서 인자로 직접 받는다.
- */
-async function recomputeTotal(
-  portfolio: Awaited<ReturnType<typeof loadPortfolio>>,
-  quotes: { symbolId: string; price: number; currency: "KRW" | "USD" }[],
-  fx: FxRate,
-): Promise<{ totalKrw: number; principalKrw: number }> {
-  const priceById = new Map(quotes.map((q) => [q.symbolId, q]));
-
-  let total = 0;
-  for (const holding of portfolio.holdings) {
-    if (holding.kind === "cash") {
-      total += holding.currency === "USD" ? holding.shares * fx.rate : holding.shares;
-      continue;
-    }
-    const quote = priceById.get(holding.symbolId);
-    const unit = quote?.price ?? holding.price;
-    total += holding.shares * unit * (holding.currency === "USD" ? fx.rate : 1);
-  }
-  return { totalKrw: Math.round(total), principalKrw: portfolio.totals.principalKrw };
 }
