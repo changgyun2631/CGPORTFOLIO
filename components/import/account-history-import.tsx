@@ -2,11 +2,13 @@
 
 import { useState, useTransition } from "react";
 
+import { applyFinished, applyStarted, applyThrew } from "@/lib/import/apply-ui-state";
 import {
   applyAccountHistory,
   previewAccountHistory,
   type AccountHistoryPreview,
 } from "@/lib/import/account-history-actions";
+import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, formatBytes } from "@/lib/import/limits-shared";
 import { Card } from "@/components/ui/primitives";
 
 import { ValidationList } from "./validation-list";
@@ -35,24 +37,21 @@ export function AccountHistoryImportSection() {
     });
   }
 
+  function applyState(state: { preview: AccountHistoryPreview | null; error: string | null; result: string | null }) {
+    setPreview(state.preview);
+    setError(state.error);
+    setResult(state.result);
+  }
+
   function handleApply() {
     if (!preview) return;
+    applyState(applyStarted(preview));
     startTransition(async () => {
       try {
         const res = await applyAccountHistory(preview.token);
-        if (res.ok) {
-          setResult(res.message);
-          setPreview(null);
-        } else if (res.retryToken) {
-          setPreview({ ...preview, token: res.retryToken });
-          setError(res.errors.join(" / "));
-        } else {
-          setPreview(null);
-          setError(res.errors.join(" / "));
-        }
+        applyState(applyFinished(preview, res));
       } catch (e) {
-        setPreview(null);
-        setError((e as Error).message);
+        applyState(applyThrew(e));
       }
     });
   }
@@ -85,6 +84,9 @@ export function AccountHistoryImportSection() {
               required
               className="mt-1 block w-full text-xs"
             />
+            <p className="mt-1 text-[11px] text-faint">
+              최대 {MAX_FILES}개, 파일당 {formatBytes(MAX_FILE_BYTES)}, 합산 {formatBytes(MAX_TOTAL_BYTES)}
+            </p>
           </div>
           <button
             type="submit"

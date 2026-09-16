@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from "react";
 
+import { applyFinished, applyStarted, applyThrew } from "@/lib/import/apply-ui-state";
+import { MAX_FILE_BYTES, formatBytes } from "@/lib/import/limits-shared";
 import { applyPositionBasis, previewPositionBasis, type PositionBasisPreview } from "@/lib/import/position-basis-actions";
 import { Card } from "@/components/ui/primitives";
 
@@ -32,28 +34,21 @@ export function PositionBasisImportSection() {
     });
   }
 
+  function applyState(state: { preview: PositionBasisPreview | null; error: string | null; result: string | null }) {
+    setPreview(state.preview);
+    setError(state.error);
+    setResult(state.result);
+  }
+
   function handleApply() {
     if (!preview) return;
+    applyState(applyStarted(preview)); // 이전 시도의 성공/오류 문구를 먼저 지운다 — 실패→재시도 성공 뒤 둘 다 보이던 문제(WORK_ORDER B-0A-5)
     startTransition(async () => {
       try {
         const res = await applyPositionBasis(preview.token);
-        if (res.ok) {
-          setResult(res.message);
-          setPreview(null);
-        } else if (res.retryToken) {
-          // 백업/쓰기 자체가 실패했을 뿐 데이터는 안 바뀌었다 — 재업로드 없이 같은
-          // 내용으로 다시 시도할 수 있게 토큰만 새 것으로 바꿔 둔다.
-          setPreview({ ...preview, token: res.retryToken });
-          setError(res.errors.join(" / "));
-        } else {
-          // 검증 실패·동시성 충돌 등 다시 시도해도 똑같이 실패할 문제 — 이미 소모된
-          // 토큰을 붙들고 있지 않게 미리보기를 지워 다시 업로드하도록 안내한다.
-          setPreview(null);
-          setError(res.errors.join(" / "));
-        }
+        applyState(applyFinished(preview, res));
       } catch (e) {
-        setPreview(null);
-        setError((e as Error).message);
+        applyState(applyThrew(e));
       }
     });
   }
@@ -89,6 +84,7 @@ export function PositionBasisImportSection() {
               CSV 파일
             </label>
             <input id="position-basis-file" type="file" name="file" accept=".csv" required className="mt-1 block w-full text-xs" />
+            <p className="mt-1 text-[11px] text-faint">.csv 파일 1개, 최대 {formatBytes(MAX_FILE_BYTES)}</p>
           </div>
           <button
             type="submit"

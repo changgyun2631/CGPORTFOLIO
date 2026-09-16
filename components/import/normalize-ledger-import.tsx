@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 
+import { applyFinished, applyStarted, applyThrew } from "@/lib/import/apply-ui-state";
 import {
   applyNormalizeLedger,
   previewNormalizeLedger,
@@ -36,24 +37,21 @@ export function NormalizeLedgerImportSection() {
     });
   }
 
+  function applyState(state: { preview: NormalizeLedgerPreview | null; error: string | null; result: string | null }) {
+    setPreview(state.preview);
+    setError(state.error);
+    setResult(state.result);
+  }
+
   function handleApply() {
     if (!preview) return;
+    applyState(applyStarted(preview));
     startTransition(async () => {
       try {
         const res = await applyNormalizeLedger(preview.token);
-        if (res.ok) {
-          setResult(res.message);
-          setPreview(null);
-        } else if (res.retryToken) {
-          setPreview({ ...preview, token: res.retryToken });
-          setError(res.errors.join(" / "));
-        } else {
-          setPreview(null);
-          setError(res.errors.join(" / "));
-        }
+        applyState(applyFinished(preview, res));
       } catch (e) {
-        setPreview(null);
-        setError((e as Error).message);
+        applyState(applyThrew(e));
       }
     });
   }

@@ -10,7 +10,7 @@ import { validateSnapshots } from "../../scripts/lib/validate.mjs";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
 import type { Snapshot } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
-import { assertFileWithinLimits, assertRowCountWithinLimits } from "./limits";
+import { assertFileCountAndTotalWithinLimits, assertFileWithinLimits, assertRowCountWithinLimits } from "./limits";
 import { backupRoot, dataDir } from "./paths";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 import type { ApplyResult } from "./position-basis-actions";
@@ -40,6 +40,7 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) throw new Error("계좌수익률 CSV 파일을 선택하세요.");
   files.forEach((file, index) => assertFileWithinLimits(file, `계좌수익률 CSV #${index + 1}`));
+  assertFileCountAndTotalWithinLimits(files, "계좌수익률 CSV");
 
   const decodedTexts = await Promise.all(files.map(async (file) => decodeEucKr(Buffer.from(await file.arrayBuffer()))));
   const totals = parseAccountHistoryTotals(decodedTexts);

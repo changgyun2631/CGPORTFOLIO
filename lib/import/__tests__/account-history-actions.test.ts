@@ -18,7 +18,7 @@ vi.mock("../paths", () => ({
 }));
 
 const { applyAccountHistory, previewAccountHistory } = await import("../account-history-actions");
-const { MAX_FILE_BYTES } = await import("../limits");
+const { MAX_FILE_BYTES, MAX_FILES } = await import("../limits");
 
 // "일자,예탁자산,입금,출금" 헤더를 EUC-KR로 인코딩한 바이트의 base64 — Node에는
 // EUC-KR 인코더가 없어서 PowerShell [System.Text.Encoding]::GetEncoding(51949)로
@@ -89,6 +89,15 @@ describe("account-history-actions", () => {
 
     await expect(previewAccountHistory(form)).rejects.toThrow("너무 큽니다");
     expect(JSON.parse(readFileSync(join(dataDir, "snapshots.json"), "utf8"))).toEqual([]);
+  });
+
+  it("파일 개수가 한도를 넘으면 미리보기가 거부된다", async () => {
+    const form = new FormData();
+    for (let i = 0; i < MAX_FILES + 1; i += 1) {
+      form.append("files", accountHistoryCsv([`2026-01-0${i + 1},1000000,1000000,0`]));
+    }
+
+    await expect(previewAccountHistory(form)).rejects.toThrow("파일 개수가 너무 많습니다");
   });
 
   it(".csv가 아닌 파일은 미리보기가 거부된다", async () => {
