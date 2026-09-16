@@ -269,6 +269,25 @@ export function ValueChart({
           ) : null}
         </svg>
 
+        {tradeMarkers.length > 0 ? (
+          <ul className="sr-only">
+            <li>매매 타점 {tradeMarkers.length}개 — 아래는 각 타점의 날짜와 매수·매도 요약입니다.</li>
+            {tradeMarkers.map((marker) => {
+              const detail = [
+                marker.buy > 0 ? `매수 ${marker.buy}건` : "",
+                marker.sell > 0 ? `매도 ${marker.sell}건` : "",
+              ]
+                .filter(Boolean)
+                .join(", ");
+              return (
+                <li key={marker.point.snapshot.at}>
+                  {shortDateTime(marker.point.snapshot.at)}: {detail} ({marker.symbols.join(", ")})
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
         <div className="pointer-events-none absolute left-0 top-0 rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg">
           <p className="text-faint">{shortDateTime(active.snapshot.at)}</p>
           <p className="tnum mt-0.5 text-sm font-bold">{money(active.snapshot.totalKrw)}</p>
