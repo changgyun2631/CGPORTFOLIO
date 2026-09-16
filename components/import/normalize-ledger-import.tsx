@@ -39,12 +39,21 @@ export function NormalizeLedgerImportSection() {
   function handleApply() {
     if (!preview) return;
     startTransition(async () => {
-      const res = await applyNormalizeLedger(preview.token);
-      if (res.ok) {
-        setResult(res.message);
+      try {
+        const res = await applyNormalizeLedger(preview.token);
+        if (res.ok) {
+          setResult(res.message);
+          setPreview(null);
+        } else if (res.retryToken) {
+          setPreview({ ...preview, token: res.retryToken });
+          setError(res.errors.join(" / "));
+        } else {
+          setPreview(null);
+          setError(res.errors.join(" / "));
+        }
+      } catch (e) {
         setPreview(null);
-      } else {
-        setError(res.errors.join(" / "));
+        setError((e as Error).message);
       }
     });
   }

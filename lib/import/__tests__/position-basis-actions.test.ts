@@ -20,7 +20,26 @@ vi.mock("../paths", () => ({
   },
 }));
 
+// backupData를 감싸서 딱 한 번만 실패를 주입할 수 있게 한다 — "백업 단계에서
+// 예기치 못한 오류가 나도 데이터는 안 바뀌고 재시도 토큰을 받는다"를 검증하려는
+// 용도. 평소에는 실제 구현 그대로 통과시킨다.
+let backupShouldThrowOnce = false;
+vi.mock("../../../scripts/lib/backup.mjs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../scripts/lib/backup.mjs")>();
+  return {
+    ...actual,
+    backupData: (...args: Parameters<typeof actual.backupData>) => {
+      if (backupShouldThrowOnce) {
+        backupShouldThrowOnce = false;
+        throw new Error("시뮬레이션된 백업 실패");
+      }
+      return actual.backupData(...args);
+    },
+  };
+});
+
 const { applyPositionBasis, previewPositionBasis } = await import("../position-basis-actions");
+const { MAX_FILE_BYTES } = await import("../limits");
 
 // "종목명,코드,보유량,매입가,매입금액,평가금액,평가손익,수수료" 줄 하나를 EUC-KR로
 // 인코딩한 바이트(WORK_ORDER P1-7 검증 때 PowerShell [System.Text.Encoding]::GetEncoding(51949)로
@@ -106,6 +125,23 @@ describe("position-basis-actions", () => {
     expect(second.ok).toBe(false);
   });
 
+  it("파일이 크기 한도를 넘으면 미리보기가 거부된다", async () => {
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    const huge = new File([new Uint8Array(MAX_FILE_BYTES + 1)], "huge.csv", { type: "text/csv" });
+    form.set("file", huge);
+
+    await expect(previewPositionBasis(form)).rejects.toThrow("너무 큽니다");
+  });
+
+  it(".csv가 아닌 파일은 미리보기가 거부된다", async () => {
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    form.set("file", new File([Buffer.from("아무 내용")], "basis.xlsx", { type: "application/octet-stream" }));
+
+    await expect(previewPositionBasis(form)).rejects.toThrow(".csv 파일만 지원합니다");
+  });
+
   it("존재하지 않는 토큰으로 적용을 시도하면 거부된다", async () => {
     const result = await applyPositionBasis("00000000-0000-0000-0000-000000000000");
     expect(result.ok).toBe(false);
@@ -127,5 +163,29 @@ describe("position-basis-actions", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors[0]).toContain("미리보기 이후 데이터가 바뀌었습니다");
     expect(existsSync(join(dataDir, "position-basis.json"))).toBe(false);
+  });
+
+  it("백업 단계에서 예기치 못한 오류가 나면 데이터는 안 바뀌고, retryToken으로 재업로드 없이 재시도할 수 있다", async () => {
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    form.set("file", positionBasisCsv(["test,QLD,10,1000,10000,12000,1998,2"]));
+    const preview = await previewPositionBasis(form);
+
+    backupShouldThrowOnce = true;
+    const failed = await applyPositionBasis(preview.token);
+    expect(failed.ok).toBe(false);
+    expect(existsSync(join(dataDir, "position-basis.json"))).toBe(false); // 백업 전에 실패했으니 아직 안 바뀜
+    if (failed.ok) throw new Error("unreachable");
+    expect(failed.errors[0]).toContain("반영 중 오류가 발생했습니다");
+    expect(failed.retryToken).toBeTruthy();
+
+    // 원래 토큰은 이미 소모됐으니 재사용하면 거부된다.
+    const reuseOriginal = await applyPositionBasis(preview.token);
+    expect(reuseOriginal.ok).toBe(false);
+
+    // retryToken으로는(백업이 이번엔 정상 동작하므로) 재업로드 없이 그대로 성공한다.
+    const retried = await applyPositionBasis(failed.retryToken!);
+    expect(retried.ok).toBe(true);
+    expect(existsSync(join(dataDir, "position-basis.json"))).toBe(true);
   });
 });

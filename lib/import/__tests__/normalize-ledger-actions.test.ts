@@ -17,7 +17,17 @@ vi.mock("../paths", () => ({
   },
 }));
 
+// renameSync만 spy로 바꿔서 회차별로 실패를 주입한다(generation-write.test.ts와
+// 같은 기법) — transactions.json/cashflows.json 두 파일 쓰기 중 두 번째가
+// 실패했을 때 첫 번째가 롤백되는지 확인하려는 용도.
+vi.mock("node:fs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs")>();
+  return { ...actual, renameSync: vi.fn(actual.renameSync) };
+});
+
 const { applyNormalizeLedger, previewNormalizeLedger } = await import("../normalize-ledger-actions");
+const fsNode = await import("node:fs");
+const actualFs = await vi.importActual<typeof import("node:fs")>("node:fs");
 
 function writeFixtures(dir: string) {
   writeFileSync(dir + "/accounts.json", JSON.stringify([{ id: "acc-1", name: "테스트", kind: "위탁", currency: "USD" }]));
@@ -44,6 +54,8 @@ describe("normalize-ledger-actions", () => {
   afterEach(() => {
     rmSync(dataDir, { recursive: true, force: true });
     rmSync(backupRoot, { recursive: true, force: true });
+    vi.mocked(fsNode.renameSync).mockReset();
+    vi.mocked(fsNode.renameSync).mockImplementation((...args: Parameters<typeof fsNode.renameSync>) => actualFs.renameSync(...args));
   });
 
   it("미리보기가 이체 거래를 action: transfer로 정규화하고, 적용하면 실제 파일이 바뀐다", async () => {
@@ -87,5 +99,35 @@ describe("normalize-ledger-actions", () => {
 
     const stillExternal = JSON.parse(readFileSync(join(dataDir, "cashflows.json"), "utf8"));
     expect(stillExternal).toEqual(externalCashflows);
+  });
+
+  it("cashflows.json 쓰기(두 번째)가 실패하면 이미 쓴 transactions.json이 원본으로 롤백되고, retryToken으로 재업로드 없이 재시도할 수 있다", async () => {
+    const preview = await previewNormalizeLedger();
+    const originalTransactions = readFileSync(join(dataDir, "transactions.json"), "utf8");
+
+    // transactions.json이 1번째 rename, cashflows.json이 2번째 — 2번째에서만 실패시킨다.
+    let call = 0;
+    vi.mocked(fsNode.renameSync).mockImplementation((...args: Parameters<typeof fsNode.renameSync>) => {
+      call += 1;
+      if (call === 2) throw new Error("시뮬레이션된 두 번째 파일 쓰기 실패");
+      return actualFs.renameSync(...args);
+    });
+
+    const failed = await applyNormalizeLedger(preview.token);
+    expect(failed.ok).toBe(false);
+    if (failed.ok) throw new Error("unreachable");
+    expect(failed.errors[0]).toContain("반영 중 오류가 발생했습니다");
+    expect(failed.retryToken).toBeTruthy();
+
+    // 롤백 확인 — transactions.json이 정규화된 새 값이 아니라 원래 내용 그대로.
+    expect(readFileSync(join(dataDir, "transactions.json"), "utf8")).toBe(originalTransactions);
+
+    // rename이 다시 정상 동작하는 상태에서 retryToken으로 재시도하면 성공한다.
+    vi.mocked(fsNode.renameSync).mockImplementation((...args: Parameters<typeof fsNode.renameSync>) => actualFs.renameSync(...args));
+    const retried = await applyNormalizeLedger(failed.retryToken!);
+    expect(retried.ok).toBe(true);
+
+    const written = JSON.parse(readFileSync(join(dataDir, "transactions.json"), "utf8"));
+    expect(written[0].action).toBe("transfer");
   });
 });

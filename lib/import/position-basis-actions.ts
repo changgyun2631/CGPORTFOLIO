@@ -11,6 +11,7 @@ import { parsePositionBasisCsv } from "../../scripts/lib/import-position-basis.m
 import { validateBasisNotRegressing, validatePositionBasis } from "../../scripts/lib/validate.mjs";
 import type { PositionBasis } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
+import { assertFileWithinLimits, assertRowCountWithinLimits } from "./limits";
 import { backupRoot, dataDir } from "./paths";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 
@@ -27,7 +28,14 @@ export type PositionBasisPreview = {
   crossCheck: { exceeded: string[]; toleranceKrw: number; ok: boolean };
 };
 
-export type ApplyResult = { ok: true; message: string } | { ok: false; errors: string[] };
+export type ApplyResult =
+  | { ok: true; message: string }
+  // retryToken: 반영 직전(백업·잠금·쓰기) 예기치 못한 오류가 났을 때만 붙는다. 이
+  // 시점에는 아무 파일도 바뀌지 않았다는 게 보장되므로, staged 데이터를 다시
+  // 스테이징해 재업로드·재파싱 없이 같은 내용으로 한 번 더 적용을 시도할 수 있게
+  // 한다. 검증 실패나 동시성 충돌처럼 "데이터 자체가 문제"인 경우는 다시 시도해도
+  // 똑같이 실패하므로 retryToken을 주지 않는다 — 다시 미리보기하라고 안내한다.
+  | { ok: false; errors: string[]; retryToken?: string };
 
 function readJson<T>(name: string): T {
   return JSON.parse(readFileSync(join(dataDir, name), "utf8")) as T;
@@ -41,10 +49,12 @@ export async function previewPositionBasis(formData: FormData): Promise<Position
   const accountId = String(formData.get("accountId") ?? "").trim();
   if (!(file instanceof File)) throw new Error("보유종목 CSV 파일을 선택하세요.");
   if (!accountId) throw new Error("계좌 ID를 입력하세요.");
+  assertFileWithinLimits(file, "보유종목 CSV");
 
   const decoded = decodeEucKr(Buffer.from(await file.arrayBuffer()));
   const at = new Date(file.lastModified || Date.now()).toISOString();
   const { basis, crossCheckInput } = parsePositionBasisCsv(decoded, { accountId, at });
+  assertRowCountWithinLimits(basis.length, "보유종목 CSV");
 
   const accounts = readJson<{ id: string }[]>("accounts.json");
   const symbols = readJson<{ id: string }[]>("symbols.json");
@@ -79,31 +89,43 @@ export async function applyPositionBasis(token: string): Promise<ApplyResult> {
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  return withDataLock(dataDir, async () => {
-    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
-    if (changed.length > 0) {
-      return {
-        ok: false,
-        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
-      };
-    }
+  try {
+    return await withDataLock(dataDir, async () => {
+      const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+      if (changed.length > 0) {
+        return {
+          ok: false,
+          errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+        };
+      }
 
-    const accounts = readJson<{ id: string }[]>("accounts.json");
-    const symbols = readJson<{ id: string }[]>("symbols.json");
-    const accountIds = new Set(accounts.map((a) => a.id));
-    const symbolIds = new Set(symbols.map((s) => s.id));
-    const transactions = readJson<{ at: string }[]>("transactions.json");
-    const cashflows = readJson<{ at: string }[]>("cashflows.json");
+      const accounts = readJson<{ id: string }[]>("accounts.json");
+      const symbols = readJson<{ id: string }[]>("symbols.json");
+      const accountIds = new Set(accounts.map((a) => a.id));
+      const symbolIds = new Set(symbols.map((s) => s.id));
+      const transactions = readJson<{ at: string }[]>("transactions.json");
+      const cashflows = readJson<{ at: string }[]>("cashflows.json");
 
-    const validationErrors = [
-      ...validatePositionBasis(staged.basis, { accountIds, symbolIds }),
-      ...validateBasisNotRegressing(staged.basis, { transactions, cashflows }),
-    ] as string[];
-    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+      const validationErrors = [
+        ...validatePositionBasis(staged.basis, { accountIds, symbolIds }),
+        ...validateBasisNotRegressing(staged.basis, { transactions, cashflows }),
+      ] as string[];
+      if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
 
-    backupData(dataDir, backupRoot);
-    writeJsonAtomic(join(dataDir, "position-basis.json"), `${JSON.stringify(staged.basis, null, 2)}\n`);
+      backupData(dataDir, backupRoot);
+      writeJsonAtomic(join(dataDir, "position-basis.json"), `${JSON.stringify(staged.basis, null, 2)}\n`);
 
-    return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다.` };
-  });
+      return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다.` };
+    });
+  } catch (error) {
+    // 잠금 획득·백업·쓰기 자체가 실패한 경우(위 return들과 달리 예기치 못한 예외) —
+    // 이 시점까지 data/ 파일은 전혀 바뀌지 않았으니, staged 데이터를 다시
+    // 스테이징해서 재업로드 없이 재시도할 수 있게 한다.
+    const retryToken = stageImport(KIND, staged);
+    return {
+      ok: false,
+      errors: [`반영 중 오류가 발생했습니다: ${(error as Error).message} (데이터는 바뀌지 않았습니다 — 다시 시도할 수 있습니다.)`],
+      retryToken,
+    };
+  }
 }

@@ -35,12 +35,25 @@ export function PositionBasisImportSection() {
   function handleApply() {
     if (!preview) return;
     startTransition(async () => {
-      const res = await applyPositionBasis(preview.token);
-      if (res.ok) {
-        setResult(res.message);
+      try {
+        const res = await applyPositionBasis(preview.token);
+        if (res.ok) {
+          setResult(res.message);
+          setPreview(null);
+        } else if (res.retryToken) {
+          // 백업/쓰기 자체가 실패했을 뿐 데이터는 안 바뀌었다 — 재업로드 없이 같은
+          // 내용으로 다시 시도할 수 있게 토큰만 새 것으로 바꿔 둔다.
+          setPreview({ ...preview, token: res.retryToken });
+          setError(res.errors.join(" / "));
+        } else {
+          // 검증 실패·동시성 충돌 등 다시 시도해도 똑같이 실패할 문제 — 이미 소모된
+          // 토큰을 붙들고 있지 않게 미리보기를 지워 다시 업로드하도록 안내한다.
+          setPreview(null);
+          setError(res.errors.join(" / "));
+        }
+      } catch (e) {
         setPreview(null);
-      } else {
-        setError(res.errors.join(" / "));
+        setError((e as Error).message);
       }
     });
   }

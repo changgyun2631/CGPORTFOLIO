@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { backupData } from "../../scripts/lib/backup.mjs";
 import { normalizeLedger } from "../../scripts/lib/ledger-normalize.mjs";
 import { validateCashFlows, validateTransactions } from "../../scripts/lib/validate.mjs";
-import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
+import { withDataLock } from "../data/atomic-write";
+import { readOriginals, writeGenerationOrRollback } from "../data/generation-write";
 import type { CashFlow, Transaction } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
 import { backupRoot, dataDir } from "./paths";
@@ -69,29 +70,50 @@ export async function applyNormalizeLedger(token: string): Promise<ApplyResult> 
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  return withDataLock(dataDir, async () => {
-    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
-    if (changed.length > 0) {
-      return {
-        ok: false,
-        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
-      };
-    }
+  try {
+    return await withDataLock(dataDir, async () => {
+      const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+      if (changed.length > 0) {
+        return {
+          ok: false,
+          errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+        };
+      }
 
-    const accounts = readJson<{ id: string }[]>("accounts.json");
-    const symbols = readJson<{ id: string }[]>("symbols.json");
-    const accountIds = new Set(accounts.map((a) => a.id));
-    const symbolIds = new Set(symbols.map((s) => s.id));
-    const validationErrors = [
-      ...validateTransactions(staged.transactions, { accountIds, symbolIds }),
-      ...validateCashFlows(staged.cashflows, { accountIds }),
-    ] as string[];
-    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+      const accounts = readJson<{ id: string }[]>("accounts.json");
+      const symbols = readJson<{ id: string }[]>("symbols.json");
+      const accountIds = new Set(accounts.map((a) => a.id));
+      const symbolIds = new Set(symbols.map((s) => s.id));
+      const validationErrors = [
+        ...validateTransactions(staged.transactions, { accountIds, symbolIds }),
+        ...validateCashFlows(staged.cashflows, { accountIds }),
+      ] as string[];
+      if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
 
-    backupData(dataDir, backupRoot);
-    writeJsonAtomic(join(dataDir, "transactions.json"), `${JSON.stringify(staged.transactions, null, 2)}\n`);
-    writeJsonAtomic(join(dataDir, "cashflows.json"), `${JSON.stringify(staged.cashflows, null, 2)}\n`);
+      const transactionsPath = join(dataDir, "transactions.json");
+      const cashflowsPath = join(dataDir, "cashflows.json");
+      const originals = readOriginals([transactionsPath, cashflowsPath]);
 
-    return { ok: true, message: `거래 ${staged.transactions.length}건과 현금흐름 ${staged.cashflows.length}건을 반영했습니다.` };
-  });
+      backupData(dataDir, backupRoot);
+      // transactions.json과 cashflows.json 둘을 한 세대로 묶어 쓴다 — 하나만
+      // 쓰고 둘째에서 실패하면 두 파일이 서로 다른 세대로 섞일 수 있어서다
+      // (cron의 quotes/fx/snapshots 묶음과 같은 이유, lib/data/generation-write.ts).
+      writeGenerationOrRollback(
+        [
+          { path: transactionsPath, content: `${JSON.stringify(staged.transactions, null, 2)}\n` },
+          { path: cashflowsPath, content: `${JSON.stringify(staged.cashflows, null, 2)}\n` },
+        ],
+        originals,
+      );
+
+      return { ok: true, message: `거래 ${staged.transactions.length}건과 현금흐름 ${staged.cashflows.length}건을 반영했습니다.` };
+    });
+  } catch (error) {
+    const retryToken = stageImport(KIND, staged);
+    return {
+      ok: false,
+      errors: [`반영 중 오류가 발생했습니다: ${(error as Error).message} (데이터는 바뀌지 않았습니다 — 다시 시도할 수 있습니다.)`],
+      retryToken,
+    };
+  }
 }

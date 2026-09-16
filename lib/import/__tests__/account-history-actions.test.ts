@@ -18,6 +18,7 @@ vi.mock("../paths", () => ({
 }));
 
 const { applyAccountHistory, previewAccountHistory } = await import("../account-history-actions");
+const { MAX_FILE_BYTES } = await import("../limits");
 
 // "일자,예탁자산,입금,출금" 헤더를 EUC-KR로 인코딩한 바이트의 base64 — Node에는
 // EUC-KR 인코더가 없어서 PowerShell [System.Text.Encoding]::GetEncoding(51949)로
@@ -79,6 +80,22 @@ describe("account-history-actions", () => {
   it("파일을 하나도 안 주면 미리보기가 거부된다", async () => {
     const form = new FormData();
     await expect(previewAccountHistory(form)).rejects.toThrow();
+  });
+
+  it("파일이 크기 한도를 넘으면 미리보기가 거부되고 기존 데이터는 그대로다", async () => {
+    const form = new FormData();
+    const huge = new File([new Uint8Array(MAX_FILE_BYTES + 1)], "huge.csv", { type: "text/csv" });
+    form.append("files", huge);
+
+    await expect(previewAccountHistory(form)).rejects.toThrow("너무 큽니다");
+    expect(JSON.parse(readFileSync(join(dataDir, "snapshots.json"), "utf8"))).toEqual([]);
+  });
+
+  it(".csv가 아닌 파일은 미리보기가 거부된다", async () => {
+    const form = new FormData();
+    form.append("files", new File([Buffer.from("아무 내용")], "history.xlsx", { type: "application/octet-stream" }));
+
+    await expect(previewAccountHistory(form)).rejects.toThrow(".csv 파일만 지원합니다");
   });
 
   it("같은 토큰으로 두 번 적용하면 두 번째는 거부된다", async () => {

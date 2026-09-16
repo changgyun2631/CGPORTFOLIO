@@ -10,6 +10,7 @@ import { validateSnapshots } from "../../scripts/lib/validate.mjs";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
 import type { Snapshot } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
+import { assertFileWithinLimits, assertRowCountWithinLimits } from "./limits";
 import { backupRoot, dataDir } from "./paths";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 import type { ApplyResult } from "./position-basis-actions";
@@ -38,9 +39,11 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
   if (files.length === 0) throw new Error("계좌수익률 CSV 파일을 선택하세요.");
+  files.forEach((file, index) => assertFileWithinLimits(file, `계좌수익률 CSV #${index + 1}`));
 
   const decodedTexts = await Promise.all(files.map(async (file) => decodeEucKr(Buffer.from(await file.arrayBuffer()))));
   const totals = parseAccountHistoryTotals(decodedTexts);
+  assertRowCountWithinLimits(totals.size, "계좌수익률 CSV 병합 결과");
 
   const fxHistory = readJson<{ d: string; rate: number }[]>("fx.json");
   const existingSnapshots = readJson<Snapshot[]>("snapshots.json");
@@ -64,21 +67,30 @@ export async function applyAccountHistory(token: string): Promise<ApplyResult> {
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  return withDataLock(dataDir, async () => {
-    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
-    if (changed.length > 0) {
-      return {
-        ok: false,
-        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
-      };
-    }
+  try {
+    return await withDataLock(dataDir, async () => {
+      const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+      if (changed.length > 0) {
+        return {
+          ok: false,
+          errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+        };
+      }
 
-    const validationErrors = validateSnapshots(staged.snapshots) as string[];
-    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+      const validationErrors = validateSnapshots(staged.snapshots) as string[];
+      if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
 
-    backupData(dataDir, backupRoot);
-    writeJsonAtomic(join(dataDir, "snapshots.json"), `${JSON.stringify(staged.snapshots, null, 2)}\n`);
+      backupData(dataDir, backupRoot);
+      writeJsonAtomic(join(dataDir, "snapshots.json"), `${JSON.stringify(staged.snapshots, null, 2)}\n`);
 
-    return { ok: true, message: `총 ${staged.snapshots.length}개 스냅샷을 반영했습니다.` };
-  });
+      return { ok: true, message: `총 ${staged.snapshots.length}개 스냅샷을 반영했습니다.` };
+    });
+  } catch (error) {
+    const retryToken = stageImport(KIND, staged);
+    return {
+      ok: false,
+      errors: [`반영 중 오류가 발생했습니다: ${(error as Error).message} (데이터는 바뀌지 않았습니다 — 다시 시도할 수 있습니다.)`],
+      retryToken,
+    };
+  }
 }
