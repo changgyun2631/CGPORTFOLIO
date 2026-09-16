@@ -71,6 +71,18 @@ export function AllocationBar({ holdings, paginate = false }: { holdings: Holdin
             </li>
           );
         })}
+
+        {/* 마지막 장이 10종목을 못 채워도 빈 줄로 높이를 맞춘다. 안 그러면 장이
+            넘어갈 때마다 카드 높이가 줄었다 늘었다 하고, 높이를 맞춰 둔 옆
+            차트까지 4초마다 같이 출렁인다. */}
+        {Array.from({ length: paginate ? PAGE_SIZE - listed.length : 0 }, (_, index) => (
+          <li key={`filler-${index}`} aria-hidden="true" className="invisible">
+            <span className="flex items-center gap-3 px-1.5 py-1.5">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" />
+              <span className="text-[12px] font-bold tracking-tight">—</span>
+            </span>
+          </li>
+        ))}
       </ul>
 
       {paginate && pageCount > 1 ? (
