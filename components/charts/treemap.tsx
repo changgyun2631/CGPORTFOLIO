@@ -14,14 +14,18 @@ export type TreemapDatum = {
   changePercent: number;
 };
 
-/** 등락률을 색 농도로 바꾼다. ±3%에서 가장 진해진다. */
+/**
+ * 등락률을 색 농도로 바꾼다. ±3%에서 가장 진해진다.
+ * 상승 초록·하락 빨강(핀비즈 등 미국식). 화면의 나머지 등락 표시(`--up`/`--down`)와도
+ * 같은 방향이라, 여기만 반대였던 걸 맞췄다.
+ */
 function toneFor(changePercent: number) {
   const clamped = Math.max(Math.min(changePercent / 3, 1), -1);
   const intensity = Math.abs(clamped);
   if (Math.abs(changePercent) < 0.03) {
     return { background: "var(--surface)", border: "var(--border)", text: "var(--text-muted)" };
   }
-  const base = clamped > 0 ? "240, 97, 109" : "61, 139, 253";
+  const base = clamped > 0 ? "34, 197, 94" : "239, 68, 68";
   return {
     background: `rgba(${base}, ${(0.16 + intensity * 0.55).toFixed(3)})`,
     border: `rgba(${base}, ${(0.35 + intensity * 0.4).toFixed(3)})`,

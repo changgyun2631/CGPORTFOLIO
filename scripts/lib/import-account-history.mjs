@@ -62,15 +62,19 @@ export function buildAccountHistorySnapshots(totals, { fxHistory, existingSnapsh
     const value = totals.get(date);
     runningPrincipalKrw += value.depositKrw - value.withdrawalKrw;
     principalByDate.set(date, runningPrincipalKrw);
-    merged.set(date, {
-      at: `${date}T15:30:00+09:00`,
+    const at = `${date}T15:30:00+09:00`;
+    merged.set(at, {
+      at,
       totalKrw: value.totalKrw,
       principalKrw: runningPrincipalKrw,
       fxRate: rateAt(date),
     });
   }
+  // 시각까지 포함해 키를 잡는다. 날짜로만 묶으면 cron이 하루에 여러 번 남긴
+  // 기록이 하나로 뭉개져서, 가져오기를 돌릴 때마다 당일 세부 추이가 사라졌다.
+  // 같은 CSV를 다시 넣는 경우는 at이 똑같이 만들어지므로 그대로 덮어쓴다.
   for (const snapshot of existingSnapshots) {
-    merged.set(snapshot.at.slice(0, 10), snapshot);
+    merged.set(snapshot.at, snapshot);
   }
 
   // 계좌수익률 CSV가 끝난 뒤의 실제 외부 입출금만 이어 붙인다. 과거 구간은 CSV의

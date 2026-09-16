@@ -45,7 +45,33 @@ describe("fxRateAt", () => {
 });
 
 describe("buildAccountHistorySnapshots", () => {
-  it("CSV의 순입금 누적을 원금으로, 기존 스냅샷을 같은 날짜에 덮어쓴다", () => {
+  it("같은 CSV를 다시 넣어도 스냅샷이 늘지 않고, cron이 남긴 당일 여러 기록은 살아남는다", () => {
+    const totals = new Map([["2026-01-01", { totalKrw: 1_000_000, depositKrw: 1_000_000, withdrawalKrw: 0 }]]);
+    const context = {
+      fxHistory: [{ d: "2026-01-01", rate: 1300 }],
+      existingCashflows: [],
+    };
+
+    const first = buildAccountHistorySnapshots(totals, { ...context, existingSnapshots: [] });
+    expect(first).toHaveLength(1);
+
+    // 같은 CSV 재적용 — at이 똑같이 만들어지므로 덮어쓰기만 되고 중복이 안 생긴다.
+    const again = buildAccountHistorySnapshots(totals, { ...context, existingSnapshots: first });
+    expect(again).toHaveLength(1);
+
+    // cron이 같은 날 여러 번 남긴 기록은 시각이 달라 그대로 남는다.
+    const withIntraday = buildAccountHistorySnapshots(totals, {
+      ...context,
+      existingSnapshots: [
+        ...first,
+        { at: "2026-01-01T03:00:00Z", totalKrw: 1_010_000, fxRate: 1300 },
+        { at: "2026-01-01T09:00:00Z", totalKrw: 1_020_000, fxRate: 1300 },
+      ],
+    });
+    expect(withIntraday).toHaveLength(3);
+  });
+
+  it("CSV의 순입금 누적을 원금으로 쓴다", () => {
     const totals = new Map([
       ["2026-01-01", { totalKrw: 1_000_000, depositKrw: 1_000_000, withdrawalKrw: 0 }],
       ["2026-01-02", { totalKrw: 1_100_000, depositKrw: 0, withdrawalKrw: 0 }],
