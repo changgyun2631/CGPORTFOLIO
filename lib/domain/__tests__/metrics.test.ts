@@ -62,13 +62,36 @@ describe("filterSnapshots", () => {
   ];
 
   it("빈 배열이면 빈 배열을 반환하고 fallback은 아니다", () => {
-    expect(filterSnapshots([], "1y")).toEqual({ snapshots: [], usedFallback: false });
+    expect(filterSnapshots([], "1y")).toEqual({ snapshots: [], usedFallback: false, shortOfRange: false });
   });
 
   it("all 범위는 전체를 반환하고 fallback은 아니다", () => {
     const result = filterSnapshots(snapshots, "all");
     expect(result.snapshots).toHaveLength(3);
     expect(result.usedFallback).toBe(false);
+    expect(result.shortOfRange).toBe(false);
+  });
+
+  it("기록에 공백이 있어 구간 앞부분이 비면 shortOfRange로 알린다", () => {
+    // 마지막 며칠치만 촘촘하고 그 앞은 한 달 넘게 비어 있는 실제 모양.
+    const gapped = [
+      snap("2026-06-20T15:30:00+09:00", 90),
+      snap("2026-08-10T15:30:00+09:00", 100),
+      snap("2026-09-15T21:00:00Z", 110),
+      snap("2026-09-16T05:07:00Z", 111),
+      snap("2026-09-16T17:07:00Z", 112),
+    ];
+
+    // "1개월"은 점이 여러 개라 fallback은 아니지만, 실제로는 이틀치만 덮는다.
+    const month = filterSnapshots(gapped, "1m");
+    expect(month.usedFallback).toBe(false);
+    expect(month.shortOfRange).toBe(true);
+    expect(month.snapshots).toHaveLength(3);
+
+    // "3개월"은 2026-06-20까지 닿으므로 구간을 충분히 덮는다.
+    const quarter = filterSnapshots(gapped, "3m");
+    expect(quarter.shortOfRange).toBe(false);
+    expect(quarter.snapshots).toHaveLength(5);
   });
 
   it("1일 범위에 실제 점이 부족하면 마지막 두 관측값을 fallback으로 반환한다", () => {

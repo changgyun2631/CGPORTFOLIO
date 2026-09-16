@@ -44,9 +44,9 @@ export function ValueChart({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, returnMin, returnMax, usedFallback } =
+  const { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, returnMin, returnMax, usedFallback, shortOfRange } =
     useMemo(() => {
-    const { snapshots: filtered, usedFallback } = filterSnapshots(snapshots, range);
+    const { snapshots: filtered, usedFallback, shortOfRange } = filterSnapshots(snapshots, range);
     const stats = analyzeSeries(filtered);
     // 점이 많으면 솎아내되 최고점과 최저점은 반드시 남긴다.
     const series = downsample(filtered, 260, (s) => s.at === stats.peak?.at || s.at === stats.trough?.at);
@@ -108,7 +108,7 @@ export function ValueChart({
       }));
     }
 
-    return { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, fxMin, fxMax, returnMin, returnMax, usedFallback };
+    return { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, fxMin, fxMax, returnMin, returnMax, usedFallback, shortOfRange };
   }, [snapshots, range, principalKrw]);
 
   if (points.length === 0) {
@@ -205,10 +205,16 @@ export function ValueChart({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         <p className="text-xs text-faint">
           {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
-          {series.length}개 스냅샷
+          {/* 그린 점(series)이 아니라 구간에 실제로 있는 스냅샷 수다 — 점이 많으면
+              솎아서 그리므로 둘이 다르고, 아래 지표는 솎기 전 전체로 계산한다. */}
+          {stats.count}개 스냅샷
           {usedFallback ? (
             <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
               자료 공백으로 최근 관측값 표시 — {ranges.find((r) => r.key === range)?.label} 구간을 다 못 채웠습니다
+            </span>
+          ) : shortOfRange ? (
+            <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
+              기록이 {dateLabel(series[0].at)}부터라 {ranges.find((r) => r.key === range)?.label} 구간을 다 못 채웠습니다 — 아래 지표도 이 구간 기준입니다
             </span>
           ) : null}
         </p>
@@ -377,11 +383,21 @@ export function ValueChart({
           }
           tone={stats.maxDrawdown < 0 ? "down" : "default"}
         />
-        <MiniStat label="현재/최고" value={percent(stats.vsPeakPercent)} sub={`최고 대비 ${moneySigned(stats.vsPeakAmount)}`} />
-        <MiniStat label="현재/최저" value={percent(stats.vsTroughPercent)} sub={`최저 대비 ${moneySigned(stats.vsTroughAmount)}`} />
+        <MiniStat label="현재/최고" value={ratioLabel(stats.vsPeakPercent)} sub={`최고 대비 ${moneySigned(stats.vsPeakAmount)}`} />
+        <MiniStat label="현재/최저" value={ratioLabel(stats.vsTroughPercent)} sub={`최저 대비 ${moneySigned(stats.vsTroughAmount)}`} />
       </div>
     </div>
   );
+}
+
+/**
+ * 최저점 대비 비율은 계좌를 막 열어 잔고가 거의 0이던 날이 구간에 들어오면
+ * 백만 %가 넘는 값이 나온다 — 그 구간은 퍼센트 대신 배수로 읽는 게 낫다.
+ */
+function ratioLabel(value: number) {
+  if (!Number.isFinite(value)) return "—";
+  if (value < 1000) return percent(value);
+  return `×${Math.round(value / 100).toLocaleString("ko-KR")}`;
 }
 
 function TradeMarker({

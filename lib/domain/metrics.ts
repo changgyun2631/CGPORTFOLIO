@@ -60,16 +60,29 @@ export type FilteredSnapshots = {
    * 하려고 값 자체가 아니라 이 플래그를 공유한다.
    */
   usedFallback: boolean;
+  /**
+   * 점은 충분히 있지만(2개 이상) 기록이 구간 시작까지 닿지 못했으면 true.
+   * 기록에 공백이 있으면 "1일"·"7일"·"1개월"이 전부 같은 며칠치를 보여주면서도
+   * 아무 표시가 없었다 — 숫자는 맞지만 기간 이름이 사실과 달라 보이는 경우다.
+   */
+  shortOfRange: boolean;
 };
 
+/** 요청한 구간 대비 실제로 덮은 기간이 이 비율보다 짧으면 구간을 못 채운 걸로 본다. */
+const RANGE_COVERAGE_MIN = 0.7;
+
 export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): FilteredSnapshots {
-  if (snapshots.length === 0) return { snapshots: [], usedFallback: false };
+  if (snapshots.length === 0) return { snapshots: [], usedFallback: false, shortOfRange: false };
   const latest = new Date(snapshots[snapshots.length - 1].at);
   const start = rangeStart(range, latest);
-  if (!start) return { snapshots, usedFallback: false };
+  if (!start) return { snapshots, usedFallback: false, shortOfRange: false };
   const startIso = start.toISOString();
   const filtered = snapshots.filter((s) => new Date(s.at).toISOString() >= startIso);
-  if (filtered.length >= 2) return { snapshots: filtered, usedFallback: false };
+  if (filtered.length >= 2) {
+    const requested = latest.getTime() - start.getTime();
+    const covered = latest.getTime() - new Date(filtered[0].at).getTime();
+    return { snapshots: filtered, usedFallback: false, shortOfRange: covered < requested * RANGE_COVERAGE_MIN };
+  }
 
   // 실제 일별 기록이 듬성듬성한 구간에서도 기간 버튼끼리 같은 두 점만
   // 반복하지 않도록, 가짜 날짜를 만들지 않고 마지막 N개 실제 관측값을 쓴다.
@@ -84,7 +97,7 @@ export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): Filtere
     "5y": 1_825,
   };
   const count = fallbackObservations[range] ?? 2;
-  return { snapshots: snapshots.slice(-Math.min(count, snapshots.length)), usedFallback: true };
+  return { snapshots: snapshots.slice(-Math.min(count, snapshots.length)), usedFallback: true, shortOfRange: false };
 }
 
 export type SeriesStats = {

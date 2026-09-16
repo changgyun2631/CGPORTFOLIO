@@ -46,8 +46,17 @@ export function shortDateTime(iso: string) {
   return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/**
+ * 날짜만 있는 문자열("2026-01-15")은 그대로 쓰고, 시각까지 있는 ISO는 현지
+ * 날짜로 바꾼다. 스냅샷은 CSV에서 온 건 `+09:00`, cron이 쓴 건 `Z`로 섞여 있어서
+ * 앞 10자만 자르면 `Z` 쪽이 하루 어긋났다 — 같은 시점을 `shortDateTime`은 09/17,
+ * 이 함수는 09/16으로 표시하던 문제.
+ */
 export function dateLabel(iso: string) {
-  return iso.slice(0, 10);
+  if (!/\d{2}:\d{2}/.test(iso)) return iso.slice(0, 10);
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 export function trendOf(value: number | null | undefined): "up" | "down" | "flat" {
