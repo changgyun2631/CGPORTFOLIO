@@ -21,6 +21,15 @@ const BASE = "https://api.twelvedata.com";
 const MAX_SYMBOLS_PER_MINUTE = 8;
 const CHUNK_WAIT_MS = 61_000;
 
+/**
+ * 개별 HTTP 요청 하나에 거는 시간 제한. 이게 없으면 외부 API가 응답을 미루기만
+ * 해도 이 함수가 끝없이 매달리고, 호출자(cron route)도 같이 매달려 상위 요청이
+ * "서버가 죽었다"로 오인되는 원인이 된다(WORK_ORDER B-0A-1). 분당 요청 간격
+ * (CHUNK_WAIT_MS)과는 별개다 — 그건 "다음 묶음을 언제 보낼지"고, 이건 "한 번
+ * 보낸 요청이 얼마나 기다릴지"다.
+ */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function chunk<T>(items: T[], size: number): T[][] {
@@ -73,7 +82,7 @@ export function createTwelveDataProvider(apiKey: string): QuoteProvider {
           url.searchParams.set("symbol", group.join(","));
           url.searchParams.set("apikey", apiKey);
 
-          const response = await fetch(url, { cache: "no-store" });
+          const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
           if (!response.ok) throw new ProviderShapeError("twelve-data", `HTTP ${response.status}`);
           const payload = (await response.json()) as RawQuote | Record<string, RawQuote>;
 
@@ -111,7 +120,7 @@ export function createTwelveDataFxProvider(apiKey: string): FxProvider {
       url.searchParams.set("symbol", `${from}/${to}`);
       url.searchParams.set("apikey", apiKey);
 
-      const response = await fetch(url, { cache: "no-store" });
+      const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
       if (!response.ok) throw new ProviderShapeError("twelve-data-fx", `HTTP ${response.status}`);
       const raw = (await response.json()) as RawQuote;
       if (raw.status === "error" || raw.code) throw new ProviderShapeError("twelve-data-fx", raw.message ?? "환율 조회 실패");

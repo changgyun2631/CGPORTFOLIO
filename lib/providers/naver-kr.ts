@@ -22,6 +22,9 @@ const ENDPOINT = "https://polling.finance.naver.com/api/realtime/domestic/stock"
 /** 호출 사이에 두는 최소 간격(ms). 상대 서버에 부담을 주지 않기 위한 예의. */
 const MIN_INTERVAL_MS = 400;
 
+/** 요청 하나가 무기한 매달리지 않게 거는 시간 제한(WORK_ORDER B-0A-1). */
+const REQUEST_TIMEOUT_MS = 15_000;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type RawDatum = {
@@ -61,6 +64,7 @@ export function createNaverKrProvider(): QuoteProvider {
           const response = await fetch(`${ENDPOINT}/${encodeURIComponent(symbolId)}`, {
             cache: "no-store",
             headers: { accept: "application/json" },
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
           });
           if (!response.ok) throw new ProviderShapeError("naver-kr", `${symbolId} HTTP ${response.status}`);
 
