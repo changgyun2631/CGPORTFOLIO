@@ -17,8 +17,11 @@ import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./sta
 
 const KIND = "position-basis";
 
-// 검증에 쓰는 파일들 — 미리보기 이후 이 중 하나라도 바뀌면 적용을 거부한다.
-const BASELINE_FILES = ["accounts.json", "symbols.json", "transactions.json", "cashflows.json"] as const;
+// 검증에 쓰는 파일들 + 실제 교체 대상(position-basis.json) — 미리보기 이후
+// 이 중 하나라도 바뀌면 적용을 거부한다. 대상 파일이 빠져 있으면, 같은
+// baseline에서 미리보기 두 개를 만들고 순서대로 적용했을 때 둘 다 "안 바뀜"으로
+// 통과해 두 번째가 첫 번째를 조용히 덮어쓸 수 있다(WORK_ORDER B-0A-2).
+const BASELINE_FILES = ["accounts.json", "symbols.json", "transactions.json", "cashflows.json", "position-basis.json"] as const;
 
 export type PositionBasisPreview = {
   token: string;
@@ -55,22 +58,29 @@ export async function previewPositionBasis(formData: FormData): Promise<Position
   const at = new Date(file.lastModified || Date.now()).toISOString();
   const { basis, crossCheckInput } = parsePositionBasisCsv(decoded, { accountId, at });
   assertRowCountWithinLimits(basis.length, "보유종목 CSV");
-
-  const accounts = readJson<{ id: string }[]>("accounts.json");
-  const symbols = readJson<{ id: string }[]>("symbols.json");
-  const accountIds = new Set(accounts.map((a) => a.id));
-  const symbolIds = new Set(symbols.map((s) => s.id));
-
-  const transactions = readJson<{ at: string }[]>("transactions.json");
-  const cashflows = readJson<{ at: string }[]>("cashflows.json");
-
-  const validationErrors = [
-    ...validatePositionBasis(basis, { accountIds, symbolIds }),
-    ...validateBasisNotRegressing(basis, { transactions, cashflows }),
-  ] as string[];
   const crossCheck = crossCheckPositionBasis(crossCheckInput) as { exceeded: string[]; toleranceKrw: number; ok: boolean };
 
-  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+  // 입력 읽기 → 검증 → baseline 생성을 같은 잠금 스냅샷 안에서 한다. 잠금 밖에서
+  // 따로따로 하면 그 사이(TOCTOU) 다른 프로세스가 관련 파일을 바꿔도, baseline은
+  // "바뀐 뒤" 값을 찍어 버려 정작 검증은 "바뀌기 전" 데이터로 한 상태가 될 수
+  // 있다(WORK_ORDER B-0A-2). CSV decode/parse는 업로드 파일 자체에 대한 계산이라
+  // data/와 무관해 잠금 밖에서 미리 끝낸다 — 느린 작업을 잠금 안에 넣지 않는다.
+  const { validationErrors, baseline } = await withDataLock(dataDir, async () => {
+    const accounts = readJson<{ id: string }[]>("accounts.json");
+    const symbols = readJson<{ id: string }[]>("symbols.json");
+    const accountIds = new Set(accounts.map((a) => a.id));
+    const symbolIds = new Set(symbols.map((s) => s.id));
+    const transactions = readJson<{ at: string }[]>("transactions.json");
+    const cashflows = readJson<{ at: string }[]>("cashflows.json");
+
+    const validationErrors = [
+      ...validatePositionBasis(basis, { accountIds, symbolIds }),
+      ...validateBasisNotRegressing(basis, { transactions, cashflows }),
+    ] as string[];
+
+    return { validationErrors, baseline: hashDataFiles(dataDir, BASELINE_FILES) };
+  });
+
   const token = stageImport(KIND, { basis, accountId, baseline });
 
   return { token, count: basis.length, accountId, validationErrors, crossCheck };

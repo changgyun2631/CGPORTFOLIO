@@ -188,4 +188,31 @@ describe("position-basis-actions", () => {
     expect(retried.ok).toBe(true);
     expect(existsSync(join(dataDir, "position-basis.json"))).toBe(true);
   });
+
+  it("WORK_ORDER B-0A-2: 같은 baseline에서 미리보기 두 개를 만들면 첫 적용만 성공하고 두 번째는 거부된다", async () => {
+    // position-basis.json이 baseline에 없던 이전 버전에서는, 둘 다 "미리보기
+    // 이후 아무것도 안 바뀜"으로 통과해 preview B가 preview A의 결과를 조용히
+    // 덮어쓸 수 있었다 — target 파일 자체를 baseline에 넣어 막는다.
+    const formA = new FormData();
+    formA.set("accountId", "acc-1");
+    formA.set("file", positionBasisCsv(["test,QLD,10,1000,10000,12000,1998,2"]));
+    const previewA = await previewPositionBasis(formA);
+
+    const formB = new FormData();
+    formB.set("accountId", "acc-1");
+    formB.set("file", positionBasisCsv(["test,QLD,20,1000,20000,24000,3996,2"]));
+    const previewB = await previewPositionBasis(formB);
+
+    const applyA = await applyPositionBasis(previewA.token);
+    expect(applyA.ok).toBe(true);
+
+    const applyB = await applyPositionBasis(previewB.token);
+    expect(applyB.ok).toBe(false);
+    if (applyB.ok) throw new Error("unreachable");
+    expect(applyB.errors[0]).toContain("미리보기 이후 데이터가 바뀌었습니다");
+
+    // A가 반영한 값이 B에 덮이지 않고 그대로 남아 있어야 한다.
+    const written = JSON.parse(readFileSync(join(dataDir, "position-basis.json"), "utf8"));
+    expect(written[0].shares).toBe(10);
+  });
 });

@@ -33,25 +33,32 @@ function readJson<T>(name: string): T {
 export async function previewNormalizeLedger(): Promise<NormalizeLedgerPreview> {
   pruneStaleStagedImports();
 
-  const transactions = readJson<Transaction[]>("transactions.json");
-  const cashflows = readJson<CashFlow[]>("cashflows.json");
-  const symbols = readJson<{ id: string; currency: string }[]>("symbols.json");
+  // 입력 읽기 → 정규화 계산 → baseline 생성을 같은 잠금 스냅샷 안에서 한다 —
+  // 이 사이(TOCTOU)에 다른 프로세스가 원장을 바꾸면 정규화 결과는 옛 데이터
+  // 기준인데 baseline만 "바뀐 뒤" 값을 찍어, 적용 때 동시성 검사를 통과해
+  // 버릴 수 있다(WORK_ORDER B-0A-2).
+  const { normalizedTransactions, normalizedCashflows, validationErrors, baseline } = await withDataLock(dataDir, async () => {
+    const transactions = readJson<Transaction[]>("transactions.json");
+    const cashflows = readJson<CashFlow[]>("cashflows.json");
+    const symbols = readJson<{ id: string; currency: string }[]>("symbols.json");
 
-  const { transactions: normalizedTransactions, cashflows: normalizedCashflows } = normalizeLedger({
-    transactions,
-    cashflows,
-    symbols,
-  }) as { transactions: Transaction[]; cashflows: CashFlow[] };
+    const { transactions: normalizedTransactions, cashflows: normalizedCashflows } = normalizeLedger({
+      transactions,
+      cashflows,
+      symbols,
+    }) as { transactions: Transaction[]; cashflows: CashFlow[] };
 
-  const accounts = readJson<{ id: string }[]>("accounts.json");
-  const accountIds = new Set(accounts.map((a) => a.id));
-  const symbolIds = new Set(symbols.map((s) => s.id));
-  const validationErrors = [
-    ...validateTransactions(normalizedTransactions, { accountIds, symbolIds }),
-    ...validateCashFlows(normalizedCashflows, { accountIds }),
-  ] as string[];
+    const accounts = readJson<{ id: string }[]>("accounts.json");
+    const accountIds = new Set(accounts.map((a) => a.id));
+    const symbolIds = new Set(symbols.map((s) => s.id));
+    const validationErrors = [
+      ...validateTransactions(normalizedTransactions, { accountIds, symbolIds }),
+      ...validateCashFlows(normalizedCashflows, { accountIds }),
+    ] as string[];
 
-  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+    return { normalizedTransactions, normalizedCashflows, validationErrors, baseline: hashDataFiles(dataDir, BASELINE_FILES) };
+  });
+
   const token = stageImport(KIND, { transactions: normalizedTransactions, cashflows: normalizedCashflows, baseline });
 
   return {

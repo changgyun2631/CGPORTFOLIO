@@ -45,15 +45,22 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
   const totals = parseAccountHistoryTotals(decodedTexts);
   assertRowCountWithinLimits(totals.size, "계좌수익률 CSV 병합 결과");
 
-  const fxHistory = readJson<{ d: string; rate: number }[]>("fx.json");
-  const existingSnapshots = readJson<Snapshot[]>("snapshots.json");
-  const existingCashflows = readJson<{ at: string; kind?: string; type: string; amount: number; currency: string }[]>(
-    "cashflows.json",
-  );
-  const snapshots = buildAccountHistorySnapshots(totals, { fxHistory, existingSnapshots, existingCashflows }) as Snapshot[];
+  // 입력 읽기(병합 대상 fx/snapshots/cashflows) → 병합 계산 → baseline 생성을
+  // 같은 잠금 스냅샷 안에서 한다 — 특히 snapshots.json은 cron이 6시간마다
+  // 건드리므로, 이 사이(TOCTOU)에 새 스냅샷이 추가되면 병합 결과가 그걸
+  // 반영 못 한 채로 baseline만 "바뀐 뒤" 값을 찍을 수 있다(WORK_ORDER B-0A-2).
+  const { snapshots, validationErrors, baseline } = await withDataLock(dataDir, async () => {
+    const fxHistory = readJson<{ d: string; rate: number }[]>("fx.json");
+    const existingSnapshots = readJson<Snapshot[]>("snapshots.json");
+    const existingCashflows = readJson<{ at: string; kind?: string; type: string; amount: number; currency: string }[]>(
+      "cashflows.json",
+    );
+    const snapshots = buildAccountHistorySnapshots(totals, { fxHistory, existingSnapshots, existingCashflows }) as Snapshot[];
+    const validationErrors = validateSnapshots(snapshots) as string[];
 
-  const validationErrors = validateSnapshots(snapshots) as string[];
-  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+    return { snapshots, validationErrors, baseline: hashDataFiles(dataDir, BASELINE_FILES) };
+  });
+
   const token = stageImport(KIND, { snapshots, baseline });
 
   return { token, fileCount: files.length, dayCount: totals.size, snapshotCount: snapshots.length, validationErrors };
