@@ -21,10 +21,12 @@
  * 새벽 4시 DAILY 트리거까지 방치되는데, 이 스크립트가 6시간마다 도니 최악의 경우도
  * 6시간 안에는 복구된다 (WORK_ORDER.md B-0 참고).
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
+
+import { trimLogFile } from "./lib/log-rotate.mjs";
 
 const SERVER_TASK_NAME = "CGPORTFOLIO 서버";
 
@@ -81,7 +83,8 @@ function parseArgs(argv) {
 const flags = parseArgs(process.argv.slice(2));
 const url = flags.url ?? "http://localhost:3000/api/cron/refresh";
 const secret = flags.secret ?? process.env.CRON_SECRET;
-const logPath = flags.log ?? join(homedir(), "cgportfolio-logs", "refresh.log");
+const logDir = join(homedir(), "cgportfolio-logs");
+const logPath = flags.log ?? join(logDir, "refresh.log");
 const MAX_LOG_LINES = 500;
 
 mkdirSync(dirname(logPath), { recursive: true });
@@ -92,12 +95,16 @@ function log(line) {
   appendFileSync(logPath, `${stamped}\n`, "utf8");
 }
 
-/** 로그 파일이 무한정 커지지 않도록 최근 N줄만 남긴다. */
-function trimLog() {
-  if (!existsSync(logPath)) return;
-  const lines = readFileSync(logPath, "utf8").split("\n").filter(Boolean);
-  if (lines.length <= MAX_LOG_LINES) return;
-  writeFileSync(logPath, `${lines.slice(-MAX_LOG_LINES).join("\n")}\n`, "utf8");
+/**
+ * 로그 파일들이 무한정 커지지 않도록 최근 N줄만 남긴다. 이 스크립트의 로그뿐
+ * 아니라 재시작 루프가 쓰는 `server.log`도 같이 정리한다 — `start-server.cmd`는
+ * 배치 파일이라 자체 회전 로직을 넣기 까다롭고(한글 처리 문제로 이미 한 번
+ * 죽은 전적이 있다, WORK_ORDER B-0), 이 스크립트가 6시간마다 안정적으로 도니
+ * 별도 예약 작업 없이 청소 역할까지 겸한다.
+ */
+function trimLogs() {
+  trimLogFile(logPath, MAX_LOG_LINES);
+  trimLogFile(join(logDir, "server.log"), MAX_LOG_LINES);
 }
 
 async function main() {
@@ -112,7 +119,7 @@ async function main() {
   } catch (error) {
     log(`실패: 서버에 연결하지 못했습니다 (${error.message}). 서버가 떠 있는지 확인하세요.`);
     tryRecoverServerTask();
-    trimLog();
+    trimLogs();
     process.exitCode = 1;
     return;
   }
@@ -121,16 +128,17 @@ async function main() {
 
   if (!response.ok || !body?.ok) {
     log(`실패: HTTP ${response.status} ${JSON.stringify(body)}`);
-    trimLog();
+    trimLogs();
     process.exitCode = 1;
     return;
   }
 
+  // 총액(개인 금융 데이터)은 로그에 남기지 않는다 — 건수·소요시간만 남긴다.
   log(
     `성공: 갱신 ${body.updated}건, 누락 ${body.missing.length}건${body.missing.length ? ` (${body.missing.join(",")})` : ""}, ` +
-      `오류 ${body.errors.length}건, 총액 ${body.totalKrw?.toLocaleString?.() ?? body.totalKrw}원, ${body.elapsedMs}ms`,
+      `오류 ${body.errors.length}건, ${body.elapsedMs}ms`,
   );
-  trimLog();
+  trimLogs();
 }
 
 main();

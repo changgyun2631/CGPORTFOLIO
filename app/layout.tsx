@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { TopNav } from "@/components/shell/top-nav";
 import { site } from "@/lib/config";
@@ -44,6 +45,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-[1400px] px-4 pb-24 pt-6 sm:px-6 lg:px-8">{children}</main>
         <footer className="border-t border-line px-4 py-8 text-center text-xs text-faint sm:px-6">
           <p>{site.name} · 개인 자산 기록용 화면입니다. 투자 판단의 근거로 쓰기 전에 원자료를 직접 확인하세요.</p>
+          <p className="mt-2">
+            <Link href="/status" className="hover:text-muted hover:underline">
+              운영 상태
+            </Link>
+          </p>
         </footer>
       </body>
     </html>
