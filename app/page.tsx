@@ -4,6 +4,7 @@ import { MonthlyBars } from "@/components/charts/monthly-bars";
 import { Treemap, TreemapLegend } from "@/components/charts/treemap";
 import { ValueChart } from "@/components/charts/value-chart";
 import { AllocationBar } from "@/components/dashboard/allocation";
+import { FreshnessBadges } from "@/components/dashboard/freshness-badges";
 import { HoldingsTable } from "@/components/dashboard/holdings-table";
 import { TickerStrip } from "@/components/dashboard/ticker-strip";
 import { Card, Delta, Empty, PageTitle, Section, Stat, WeightBar } from "@/components/ui/primitives";
@@ -18,6 +19,7 @@ import {
   loadSparklines,
 } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
+import { assessFreshness, earliestAsOf } from "@/lib/domain/freshness";
 import { money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 
 // cron이 갱신한 시세·스냅샷을 재빌드 없이 매 요청에 반영한다.
@@ -35,9 +37,15 @@ export default async function DashboardPage() {
     loadChartTrades(),
   ]);
 
-  const { holdings, totals, fx, snapshots } = portfolio;
+  const { holdings, totals, fx, snapshots, quotes, positionBasis } = portfolio;
   const fxChange = fx.rate - fx.prevRate;
   const fxChangePercent = fx.prevRate > 0 ? (fxChange / fx.prevRate) * 100 : 0;
+
+  const freshness = assessFreshness({
+    quoteAsOf: earliestAsOf(quotes.map((q) => q.asOf)),
+    basisAsOf: earliestAsOf(positionBasis.map((p) => p.at)),
+    principalAsOf: snapshots.at(-1)?.at ?? null,
+  });
 
   const invested = holdings.filter((h) => h.kind !== "cash");
   const winners = invested.filter((h) => h.totalGainKrw > 0);
@@ -52,6 +60,9 @@ export default async function DashboardPage() {
         title="대시보드"
         description={`보유 자산 ${totals.symbolCount}개 · ${totals.accountCount}개 계좌 · ${shortDateTime(fx.asOf)} 기준`}
       />
+      <div className="-mt-4 mb-6">
+        <FreshnessBadges checks={freshness} />
+      </div>
 
       <TickerStrip holdings={holdings} sparklines={sparklines} />
 
