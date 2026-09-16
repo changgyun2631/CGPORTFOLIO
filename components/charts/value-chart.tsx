@@ -202,15 +202,27 @@ export function ValueChart({
         </div>
       </div>
 
-      <p className="text-xs text-faint">
-        {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
-        {series.length}개 스냅샷
-        {usedFallback ? (
-          <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
-            자료 공백으로 최근 관측값 표시 — {ranges.find((r) => r.key === range)?.label} 구간을 다 못 채웠습니다
-          </span>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+        <p className="text-xs text-faint">
+          {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
+          {series.length}개 스냅샷
+          {usedFallback ? (
+            <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
+              자료 공백으로 최근 관측값 표시 — {ranges.find((r) => r.key === range)?.label} 구간을 다 못 채웠습니다
+            </span>
+          ) : null}
+        </p>
+
+        {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
+            {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
+            {principalPoints.length > 0 ? <Legend color="var(--text-muted)" label="투입 원금" dashed /> : null}
+            {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
+            {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
+            {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
+          </div>
         ) : null}
-      </p>
+      </div>
 
       <div className="relative">
         <svg
@@ -340,16 +352,6 @@ export function ValueChart({
             </p>
           ) : null}
         </div>
-
-        {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
-          <div className="pointer-events-none absolute right-1 top-1 flex flex-col items-end gap-1 text-[10px] text-muted">
-            {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
-            {principalPoints.length > 0 ? <Legend color="var(--text-muted)" label="투입 원금" dashed /> : null}
-            {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
-            {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
-            {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
-          </div>
-        ) : null}
       </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
