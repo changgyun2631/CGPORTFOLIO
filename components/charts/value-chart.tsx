@@ -227,7 +227,13 @@ export function ValueChart({
           onMouseLeave={() => setHover(null)}
           onMouseMove={(event) => {
             const rect = event.currentTarget.getBoundingClientRect();
-            const ratio = (event.clientX - rect.left) / rect.width;
+            // 화면 좌표 -> viewBox 좌표(preserveAspectRatio="none"이라 선형으로 정확히
+            // 맞아떨어진다) -> 데이터 인덱스. 그냥 (clientX-rect.left)/rect.width를
+            // 바로 인덱스 비율로 썼더니, 차트 좌우 여백(PAD)만큼 실제 마우스 위치와
+            // 크로스헤어가 어긋났었다 — xAt()의 역함수를 그대로 써야 정확하다.
+            const svgX = ((event.clientX - rect.left) / rect.width) * WIDTH;
+            const innerW = WIDTH - PAD.left - PAD.right;
+            const ratio = (svgX - PAD.left) / innerW;
             const index = Math.round(ratio * (points.length - 1));
             setHover(Math.max(0, Math.min(index, points.length - 1)));
           }}
