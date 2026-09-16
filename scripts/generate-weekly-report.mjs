@@ -47,21 +47,32 @@ function log(message) {
   process.stdout.write(line);
 }
 
-async function main() {
+async function attempt() {
   const response = await fetch(url, {
     headers: secret ? { authorization: `Bearer ${secret}` } : undefined,
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
   const body = await response.json().catch(() => null);
-
-  if (!response.ok || !body?.ok) {
-    log(`실패 — HTTP ${response.status} ${body?.error ?? ""}`.trim());
-    process.exit(1);
-  }
-  log(`완료 — ${body.slug} (보관 ${body.total}건)`);
+  if (!response.ok || !body?.ok) throw new Error(`HTTP ${response.status} ${body?.error ?? ""}`.trim());
+  return body;
 }
 
-main().catch((error) => {
-  log(`실패 — ${error.message}`);
-  process.exit(1);
-});
+async function main() {
+  // 원자적 쓰기의 rename이 Windows에서 가끔 EPERM으로 튕긴다(다른 프로세스가
+  // 그 파일을 잠깐 잡고 있을 때). 주 1회짜리 작업이라 한 번 튕기면 그 주 기록이
+  // 통째로 비므로, 짧게 한 번 더 시도한다.
+  try {
+    return await attempt();
+  } catch (error) {
+    log(`1차 실패 — ${error.message} · 5초 뒤 재시도`);
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
+    return attempt();
+  }
+}
+
+main()
+  .then((body) => log(`완료 — ${body.slug} (보관 ${body.total}건)`))
+  .catch((error) => {
+    log(`실패 — ${error.message}`);
+    process.exit(1);
+  });
