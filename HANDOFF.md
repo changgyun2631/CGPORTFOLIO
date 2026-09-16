@@ -744,16 +744,74 @@ HTTP GET /        → 200
   간주한다. 그러나 이 프로젝트는 이미 작업 상태와 실제 포트/프로세스 상태가 어긋나는
   사례를 여러 번 겪었다. `Running`은 헬스체크가 아니다.
 
-| 우선순위 | 판정 | 발견 사항 | 완료 조건 |
-| --- | --- | --- | --- |
-| P0 | 🔴 | 자동 갱신 실패가 계속되고, 호출자·Twelve Data·네이버 요청에 명시적 타임아웃과 단계별 진단이 없다. 복구도 Task Scheduler 상태만 신뢰한다. | 공급자별 타임아웃·단계별 소요시간·실제 HTTP 헬스체크를 추가하고 테스트한다. 다음 **예약** 실행이 성공하는지 관찰한다. 수동 API 호출은 사용자 승인 없이는 하지 않는다. |
-| P0 | 🟡 | 세 import 미리보기는 관련 파일을 읽어 결과를 만든 뒤 나중에 baseline 해시를 찍는다. 다른 프로세스가 그 사이 쓰면 오래된 결과에 새 baseline이 붙는 TOCTOU가 남는다. | 입력 파일 읽기→결과 계산→baseline 생성을 같은 잠금 스냅샷에서 수행하거나 전후 해시가 다르면 미리보기를 폐기한다. 중간 쓰기 주입 테스트를 추가한다. |
-| P0 | 🟡 | cron은 `loadPortfolio()`/`getFxQuote()`를 잠금 전에 호출하고, 잠금 안의 `getSnapshots()`는 같은 요청의 React cache에서 이미 읽은 값을 받을 수 있다. 읽기와 세대 쓰기가 하나의 일관된 스냅샷이 아니다. | 외부 시세 조회는 잠금 밖에서 하되, 실제 데이터 읽기·총액 계산·세 파일 쓰기는 같은 잠금 안의 fresh snapshot으로 묶는다. 읽기와 잠금 사이 변경을 재현하는 테스트를 추가한다. |
-| P1 | 🟡 | position-basis import baseline에 실제 교체 대상 `position-basis.json`이 없다. 두 미리보기를 만든 뒤 순서대로 적용하면 두 번째가 첫 번째를 조용히 덮어쓸 수 있다. | target 파일도 baseline에 포함하고 `preview A → preview B → apply A → apply B 거부` 회귀 테스트를 추가한다. |
-| P1 | 🟡 | `writeGenerationOrRollback()`은 원본 읽기 오류를 모두 `파일 없음`으로 처리하고 롤백 실패도 삼킨다. 강제 종료·재부팅에는 JS `catch`가 실행되지 않는다. 그런데 import 오류 문구는 항상 `데이터는 바뀌지 않았습니다`라고 단정한다. | `ENOENT`만 없음으로 처리하고 나머지는 즉시 실패시킨다. 롤백 성공/실패를 typed error로 구분하며, 롤백이 확인된 경우에만 retryToken을 준다. 강제 종료까지 견디는 보장이 필요하면 journal/manifest 기반 복구를 별도 설계한다. |
-| P2 | 🟡 | retryToken으로 한 번 실패한 뒤 성공하면 세 import UI가 이전 빨간 오류를 지우지 않아 실패와 성공이 동시에 보일 수 있다. | 적용 시작 또는 성공 분기에서 오류를 지우고 컴포넌트 테스트로 고정한다. |
-| P2 | 🟡 | 파일당 2MB 제한은 있지만 다중 계좌 이력의 파일 개수·합산 크기 제한이 없다. 2MB 파일 4개는 multipart 오버헤드 때문에 앱 검증 전에 8MB 프레임워크 한도에서 거부될 수 있다. | `MAX_FILES`와 `MAX_TOTAL_BYTES`를 정해 8MB보다 충분히 낮게 맞추고 경계/초과 테스트 및 사용자 메시지를 추가한다. |
-| 보안 | 🟡 | 현재 `next start`는 실제로 `0.0.0.0:3000`에서 수신하며 import Server Action에는 인증이 없다. Windows 방화벽만 믿으면 같은 네트워크의 다른 사용자가 데이터 변경 화면에 접근할 가능성이 있다. | 완전 로컬 전용이면 사용자 확인 후 `127.0.0.1`로 바인딩한다. LAN 접근이 필요하면 인증을 먼저 설계한다. 사용자 선택 전에는 임의로 바꾸지 않는다. |
+| 우선순위 | 판정(2026-09-16 재검토 시) | 판정(Claude 처리 후) | 발견 사항 | 완료 조건 |
+| --- | --- | --- | --- | --- |
+| P0 | 🔴 | 🟢(코드·테스트), 예약 실행 관찰은 미검증 | 자동 갱신 실패가 계속되고, 호출자·Twelve Data·네이버 요청에 명시적 타임아웃과 단계별 진단이 없다. 복구도 Task Scheduler 상태만 신뢰한다. | 공급자별 타임아웃·단계별 소요시간·실제 HTTP 헬스체크를 추가하고 테스트한다. 다음 **예약** 실행이 성공하는지 관찰한다. 수동 API 호출은 사용자 승인 없이는 하지 않는다. |
+| P0 | 🟡 | 🟢 | 세 import 미리보기는 관련 파일을 읽어 결과를 만든 뒤 나중에 baseline 해시를 찍는다. 다른 프로세스가 그 사이 쓰면 오래된 결과에 새 baseline이 붙는 TOCTOU가 남는다. | 입력 파일 읽기→결과 계산→baseline 생성을 같은 잠금 스냅샷에서 수행하거나 전후 해시가 다르면 미리보기를 폐기한다. 중간 쓰기 주입 테스트를 추가한다. |
+| P0 | 🟡 | 🟢 | cron은 `loadPortfolio()`/`getFxQuote()`를 잠금 전에 호출하고, 잠금 안의 `getSnapshots()`는 같은 요청의 React cache에서 이미 읽은 값을 받을 수 있다. 읽기와 세대 쓰기가 하나의 일관된 스냅샷이 아니다. | 외부 시세 조회는 잠금 밖에서 하되, 실제 데이터 읽기·총액 계산·세 파일 쓰기는 같은 잠금 안의 fresh snapshot으로 묶는다. 읽기와 잠금 사이 변경을 재현하는 테스트를 추가한다. |
+| P1 | 🟡 | 🟢 | position-basis import baseline에 실제 교체 대상 `position-basis.json`이 없다. 두 미리보기를 만든 뒤 순서대로 적용하면 두 번째가 첫 번째를 조용히 덮어쓸 수 있다. | target 파일도 baseline에 포함하고 `preview A → preview B → apply A → apply B 거부` 회귀 테스트를 추가한다. |
+| P1 | 🟡 | 🟢 | `writeGenerationOrRollback()`은 원본 읽기 오류를 모두 `파일 없음`으로 처리하고 롤백 실패도 삼킨다. 강제 종료·재부팅에는 JS `catch`가 실행되지 않는다. 그런데 import 오류 문구는 항상 `데이터는 바뀌지 않았습니다`라고 단정한다. | `ENOENT`만 없음으로 처리하고 나머지는 즉시 실패시킨다. 롤백 성공/실패를 typed error로 구분하며, 롤백이 확인된 경우에만 retryToken을 준다. 강제 종료까지 견디는 보장이 필요하면 journal/manifest 기반 복구를 별도 설계한다. |
+| P2 | 🟡 | 🟢 | retryToken으로 한 번 실패한 뒤 성공하면 세 import UI가 이전 빨간 오류를 지우지 않아 실패와 성공이 동시에 보일 수 있다. | 적용 시작 또는 성공 분기에서 오류를 지우고 컴포넌트 테스트로 고정한다. |
+| P2 | 🟡 | 🟢 | 파일당 2MB 제한은 있지만 다중 계좌 이력의 파일 개수·합산 크기 제한이 없다. 2MB 파일 4개는 multipart 오버헤드 때문에 앱 검증 전에 8MB 프레임워크 한도에서 거부될 수 있다. | `MAX_FILES`와 `MAX_TOTAL_BYTES`를 정해 8MB보다 충분히 낮게 맞추고 경계/초과 테스트 및 사용자 메시지를 추가한다. |
+| 보안 | 🟡 | 🟡(사용자가 현상 유지를 명시적으로 선택 — WORK_ORDER B-0A-6) | 현재 `next start`는 실제로 `0.0.0.0:3000`에서 수신하며 import Server Action에는 인증이 없다. Windows 방화벽만 믿으면 같은 네트워크의 다른 사용자가 데이터 변경 화면에 접근할 가능성이 있다. | 완전 로컬 전용이면 사용자 확인 후 `127.0.0.1`로 바인딩한다. LAN 접근이 필요하면 인증을 먼저 설계한다. 사용자 선택 전에는 임의로 바꾸지 않는다. |
+
+**Claude 처리 결과 (2026-09-16, 커밋 `8a58710`~`674f7d3`, 로컬 브랜치 `claude/work-1998ce`에만 있고 아직 main·origin에 병합/푸시/배포 안 함)**
+
+- **B-0A-1(자동 갱신 진단)**: `lib/providers/twelve-data.ts`/`naver-kr.ts`의 모든
+  `fetch`에 `AbortSignal.timeout(15s)` 추가. `scripts/lib/refresh-diagnostics.mjs`
+  (신규, 순수 함수)의 `classifyFetchError`가 timeout/ECONNREFUSED/기타를 구분하고,
+  `describeRecoveryDecision`이 Task Scheduler `Running` 상태만으로 정상이라고
+  단정하지 않는다(`Running`+헬스체크 실패 → `report-only`, 자동 종료·강제 재시작
+  확대 안 함). `scripts/refresh-quotes.mjs`가 실패 시 서버 홈(`/`)으로 짧은
+  헬스체크를 먼저 해서 "서버 사망" vs "요청 자체 문제"를 구분해 보고한다.
+  `lib/data/cron-log.ts`(신규)가 `~/cgportfolio-logs/cron-refresh.log`에 단계별
+  소요시간을 남긴다(`npm start`의 stdout이 어디에도 안 남는다는 걸 발견해서 추가).
+  테스트: `lib/providers/__tests__/{twelve-data,naver-kr}.test.ts`(fetch 모킹,
+  timeout 응답이 매달리지 않고 다음 항목으로 넘어가는지), `scripts/lib/__tests__/
+  refresh-diagnostics.test.mjs`(7건, 실제 API 없음). **예약 실행 관찰은
+  미검증** — 다음 02/08/14/20시(KST) 예약 갱신이 실제로 성공하는지는 프로덕션에
+  이 코드가 배포된 뒤에야 확인 가능하다.
+- **B-0A-2(import TOCTOU)**: 세 `preview*` 함수의 "입력 읽기 → 계산 →
+  baseline 해시"를 전부 `withDataLock` 안으로 묶었다(업로드 파일 decode/parse는
+  느린 작업이라 밖에 둠). `position-basis-actions.ts`의 `BASELINE_FILES`에
+  실제 교체 대상 `position-basis.json`을 추가. 회귀 테스트: "preview A → preview
+  B(같은 baseline) → apply A 성공 → apply B 거부"를 그대로 재현해 통과.
+- **B-0A-3(cron 스냅샷 일관성)**: `lib/data/store.ts`에 `readJsonUncached`
+  (React cache 우회), `lib/data/views.ts`에 `loadRawUncached`/`makeFxLookup`
+  export 추가. cron route가 외부 조회 뒤 잠금 안에서 `loadRawUncached()`로
+  "지금" 값을 다시 읽고, 직접 구현했던 `recomputeTotal`(부분적 계산 중복)을
+  `buildPortfolio()` 재사용으로 교체. `vitest.config.mts`에 `@/*` alias 해석
+  추가(새 의존성 없음 — tsconfig.json에 이미 있던 매핑을 vitest에도 적용한
+  것뿐. 전에는 `@/...`로 값을 import하는 파일이 전혀 테스트 불가능했다).
+  회귀 테스트(`app/api/cron/refresh/__tests__/route.test.ts`): 모킹된
+  `fetchAllQuotes`의 부수효과로 "외부 조회 중" transactions.json을 바꿔, 쓰인
+  스냅샷이 캐시된 옛 값이 아니라 잠금 시점 최신 값을 반영하는지 확인 — 통과.
+- **B-0A-4(rollback 정확성)**: `readOriginals()`가 `ENOENT`만 "없음"으로
+  처리하고 나머지 읽기 오류는 그대로 던짐. `writeGenerationOrRollback()`이
+  `GenerationWriteError`(원래 오류+롤백 오류 전부 보존)를 던지도록 변경.
+  `normalize-ledger-actions.ts`/cron route가 `rollbackOk`를 보고 분기 —
+  롤백이 확인된 경우에만 "데이터는 안 바뀜"+retryToken 제공. 테스트: 두 번째
+  쓰기 실패 + 롤백 쓰기까지 실패를 함께 주입해 `rollbackOk: false`와 두 오류
+  모두 보존되는지 확인.
+- **B-0A-5(UI 상태·업로드 한도)**: 세 import 컴포넌트가 성공 분기에서
+  `error`를 안 지우던 버그 수정(`lib/import/apply-ui-state.ts` 순수 함수로
+  분리 — 이 저장소에 React 컴포넌트 테스트 도구가 없어서 로직만 분리해
+  테스트). `lib/import/limits.ts`에 `assertFileCountAndTotalWithinLimits`
+  (`MAX_FILES=3`, `MAX_TOTAL_BYTES=6MB`, `next.config.ts`의 `bodySizeLimit`
+  8MB보다 낮게) 추가, 화면에도 한도 문구 표시.
+- **B-0A-6(보안)**: 사용자에게 물어봄 — 휴대폰 등 다른 기기에서도 쓰고 싶다고
+  했고, Claude가 인증 없이 열어두는 위험을 설명한 뒤에도 **"그냥 다 오픈된
+  페이지여도 상관없다"**며 현재 상태(`0.0.0.0:3000`, 인증 없음) 유지를 명시적으로
+  선택했다. **코드 변경 없음.**
+
+**검증**: `npx tsc --noEmit`·`npx eslint .`·`npm test`(33개 파일, 259개
+테스트)·`npm run build`(20개 라우트) 전부 순차 실행해 통과 확인. `git status
+--short`·`git diff --check`·`git diff -- data` 전부 깨끗함(빈 출력). 실제
+`data/*.json`은 이번 커밋 어디에도 없음(`git log <range> --stat --name-only
+| grep ^data/` 결과 없음, B-0A-1 커밋 시점에 이미 확인). `/`·`/accounts/import`
+`/status` 전부 200(단, 프로덕션 서버는 아직 이전 커밋 `bb4545f` 기준으로
+떠 있어서 이번 B-0A 변경사항을 서빙하는 상태는 아니다 — 병합·배포는 별도
+승인 필요).
 
 **재발 방지 테스트로 반드시 추가할 것**
 
