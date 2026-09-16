@@ -10,10 +10,14 @@ import { crossCheckPositionBasis } from "../../scripts/lib/cross-check.mjs";
 import { parsePositionBasisCsv } from "../../scripts/lib/import-position-basis.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "../../scripts/lib/validate.mjs";
 import type { PositionBasis } from "../domain/types";
+import { diffDataFiles, hashDataFiles } from "./data-version";
 import { backupRoot, dataDir } from "./paths";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 
 const KIND = "position-basis";
+
+// 검증에 쓰는 파일들 — 미리보기 이후 이 중 하나라도 바뀌면 적용을 거부한다.
+const BASELINE_FILES = ["accounts.json", "symbols.json", "transactions.json", "cashflows.json"] as const;
 
 export type PositionBasisPreview = {
   token: string;
@@ -56,37 +60,50 @@ export async function previewPositionBasis(formData: FormData): Promise<Position
   ] as string[];
   const crossCheck = crossCheckPositionBasis(crossCheckInput) as { exceeded: string[]; toleranceKrw: number; ok: boolean };
 
-  const token = stageImport(KIND, { basis, accountId });
+  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+  const token = stageImport(KIND, { basis, accountId, baseline });
 
   return { token, count: basis.length, accountId, validationErrors, crossCheck };
 }
 
-/** 미리보기 토큰으로 실제 반영한다. 적용 직전 자동 백업을 만들고, 검증을 한 번 더 거친다. */
+/**
+ * 미리보기 토큰으로 실제 반영한다. 동시성 검사·검증·백업·쓰기를 전부 같은 잠금
+ * 안에서 한다 — 잠금 밖에서 "바뀌었는지 확인"하고 잠금 안에서 "쓰기"를 하면 그
+ * 사이(TOCTOU)에 cron이나 다른 가져오기가 끼어들 수 있기 때문이다.
+ */
 export async function applyPositionBasis(token: string): Promise<ApplyResult> {
-  let staged: { basis: PositionBasis[]; accountId: string };
+  let staged: { basis: PositionBasis[]; accountId: string; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);
   } catch (error) {
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  const accounts = readJson<{ id: string }[]>("accounts.json");
-  const symbols = readJson<{ id: string }[]>("symbols.json");
-  const accountIds = new Set(accounts.map((a) => a.id));
-  const symbolIds = new Set(symbols.map((s) => s.id));
-  const transactions = readJson<{ at: string }[]>("transactions.json");
-  const cashflows = readJson<{ at: string }[]>("cashflows.json");
+  return withDataLock(dataDir, async () => {
+    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+    if (changed.length > 0) {
+      return {
+        ok: false,
+        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+      };
+    }
 
-  const validationErrors = [
-    ...validatePositionBasis(staged.basis, { accountIds, symbolIds }),
-    ...validateBasisNotRegressing(staged.basis, { transactions, cashflows }),
-  ] as string[];
-  if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+    const accounts = readJson<{ id: string }[]>("accounts.json");
+    const symbols = readJson<{ id: string }[]>("symbols.json");
+    const accountIds = new Set(accounts.map((a) => a.id));
+    const symbolIds = new Set(symbols.map((s) => s.id));
+    const transactions = readJson<{ at: string }[]>("transactions.json");
+    const cashflows = readJson<{ at: string }[]>("cashflows.json");
 
-  backupData(dataDir, backupRoot);
-  await withDataLock(dataDir, async () => {
+    const validationErrors = [
+      ...validatePositionBasis(staged.basis, { accountIds, symbolIds }),
+      ...validateBasisNotRegressing(staged.basis, { transactions, cashflows }),
+    ] as string[];
+    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+
+    backupData(dataDir, backupRoot);
     writeJsonAtomic(join(dataDir, "position-basis.json"), `${JSON.stringify(staged.basis, null, 2)}\n`);
-  });
 
-  return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다.` };
+    return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다.` };
+  });
 }

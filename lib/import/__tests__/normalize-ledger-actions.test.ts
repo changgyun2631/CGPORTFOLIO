@@ -72,4 +72,20 @@ describe("normalize-ledger-actions", () => {
     const after = readFileSync(join(dataDir, "transactions.json"), "utf8");
     expect(after).toBe(before);
   });
+
+  it("미리보기 이후 cashflows.json이 바뀌면 적용이 거부되고 그 변경이 보존된다", async () => {
+    const preview = await previewNormalizeLedger();
+
+    const externalCashflows = [
+      { id: "cf-external", at: "2026-02-01T00:00:00Z", accountId: "acc-1", type: "deposit", amount: 100, currency: "USD", note: "다른 작업이 씀" },
+    ];
+    writeFileSync(join(dataDir, "cashflows.json"), JSON.stringify(externalCashflows));
+
+    const result = await applyNormalizeLedger(preview.token);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("미리보기 이후 데이터가 바뀌었습니다");
+
+    const stillExternal = JSON.parse(readFileSync(join(dataDir, "cashflows.json"), "utf8"));
+    expect(stillExternal).toEqual(externalCashflows);
+  });
 });

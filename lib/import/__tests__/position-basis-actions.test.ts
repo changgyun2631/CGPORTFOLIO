@@ -110,4 +110,22 @@ describe("position-basis-actions", () => {
     const result = await applyPositionBasis("00000000-0000-0000-0000-000000000000");
     expect(result.ok).toBe(false);
   });
+
+  it("미리보기 이후 검증에 쓰는 파일이 바뀌면 적용이 거부되고 기존 기준값이 보존된다", async () => {
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    form.set("file", positionBasisCsv(["test,QLD,10,1000,10000,12000,1998,2"]));
+    const preview = await previewPositionBasis(form);
+
+    // 미리보기 이후 다른 프로세스(예: 원장 정규화)가 transactions.json을 바꿨다고 가정한다.
+    writeFileSync(
+      join(dataDir, "transactions.json"),
+      JSON.stringify([{ id: "tx-new", at: "2026-01-01T00:00:00Z", accountId: "acc-1", symbolId: "QLD", side: "buy", shares: 1, price: 1 }]),
+    );
+
+    const result = await applyPositionBasis(preview.token);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("미리보기 이후 데이터가 바뀌었습니다");
+    expect(existsSync(join(dataDir, "position-basis.json"))).toBe(false);
+  });
 });

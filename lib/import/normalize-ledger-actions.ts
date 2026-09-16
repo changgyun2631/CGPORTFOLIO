@@ -8,11 +8,14 @@ import { normalizeLedger } from "../../scripts/lib/ledger-normalize.mjs";
 import { validateCashFlows, validateTransactions } from "../../scripts/lib/validate.mjs";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
 import type { CashFlow, Transaction } from "../domain/types";
+import { diffDataFiles, hashDataFiles } from "./data-version";
 import { backupRoot, dataDir } from "./paths";
 import type { ApplyResult } from "./position-basis-actions";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 
 const KIND = "normalize-ledger";
+
+const BASELINE_FILES = ["transactions.json", "cashflows.json", "symbols.json"] as const;
 
 export type NormalizeLedgerPreview = {
   token: string;
@@ -47,7 +50,8 @@ export async function previewNormalizeLedger(): Promise<NormalizeLedgerPreview> 
     ...validateCashFlows(normalizedCashflows, { accountIds }),
   ] as string[];
 
-  const token = stageImport(KIND, { transactions: normalizedTransactions, cashflows: normalizedCashflows });
+  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+  const token = stageImport(KIND, { transactions: normalizedTransactions, cashflows: normalizedCashflows, baseline });
 
   return {
     token,
@@ -58,28 +62,36 @@ export async function previewNormalizeLedger(): Promise<NormalizeLedgerPreview> 
 }
 
 export async function applyNormalizeLedger(token: string): Promise<ApplyResult> {
-  let staged: { transactions: Transaction[]; cashflows: CashFlow[] };
+  let staged: { transactions: Transaction[]; cashflows: CashFlow[]; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);
   } catch (error) {
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  const accounts = readJson<{ id: string }[]>("accounts.json");
-  const symbols = readJson<{ id: string }[]>("symbols.json");
-  const accountIds = new Set(accounts.map((a) => a.id));
-  const symbolIds = new Set(symbols.map((s) => s.id));
-  const validationErrors = [
-    ...validateTransactions(staged.transactions, { accountIds, symbolIds }),
-    ...validateCashFlows(staged.cashflows, { accountIds }),
-  ] as string[];
-  if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+  return withDataLock(dataDir, async () => {
+    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+    if (changed.length > 0) {
+      return {
+        ok: false,
+        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+      };
+    }
 
-  backupData(dataDir, backupRoot);
-  await withDataLock(dataDir, async () => {
+    const accounts = readJson<{ id: string }[]>("accounts.json");
+    const symbols = readJson<{ id: string }[]>("symbols.json");
+    const accountIds = new Set(accounts.map((a) => a.id));
+    const symbolIds = new Set(symbols.map((s) => s.id));
+    const validationErrors = [
+      ...validateTransactions(staged.transactions, { accountIds, symbolIds }),
+      ...validateCashFlows(staged.cashflows, { accountIds }),
+    ] as string[];
+    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+
+    backupData(dataDir, backupRoot);
     writeJsonAtomic(join(dataDir, "transactions.json"), `${JSON.stringify(staged.transactions, null, 2)}\n`);
     writeJsonAtomic(join(dataDir, "cashflows.json"), `${JSON.stringify(staged.cashflows, null, 2)}\n`);
-  });
 
-  return { ok: true, message: `거래 ${staged.transactions.length}건과 현금흐름 ${staged.cashflows.length}건을 반영했습니다.` };
+    return { ok: true, message: `거래 ${staged.transactions.length}건과 현금흐름 ${staged.cashflows.length}건을 반영했습니다.` };
+  });
 }

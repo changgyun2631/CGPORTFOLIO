@@ -91,4 +91,22 @@ describe("account-history-actions", () => {
     const second = await applyAccountHistory(preview.token);
     expect(second.ok).toBe(false);
   });
+
+  it("미리보기 이후 cron이 새 스냅샷을 추가하면 적용이 거부되고 cron이 쌓은 값이 보존된다", async () => {
+    const form = new FormData();
+    form.append("files", accountHistoryCsv(["2026-01-01,1000000,1000000,0"]));
+    const preview = await previewAccountHistory(form);
+
+    // 미리보기 이후, 병합 대상이던 snapshots.json을 cron이 건드렸다고 가정한다.
+    const cronSnapshot = [{ at: "2026-01-01T20:00:00Z", accountId: "acc-1", totalKrw: 1234567 }];
+    writeFileSync(join(dataDir, "snapshots.json"), JSON.stringify(cronSnapshot));
+
+    const result = await applyAccountHistory(preview.token);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors[0]).toContain("미리보기 이후 데이터가 바뀌었습니다");
+
+    // 거부됐으니 cron이 쓴 값이 staged 병합 결과로 덮어써지지 않고 그대로 남아 있어야 한다.
+    const stillCron = JSON.parse(readFileSync(join(dataDir, "snapshots.json"), "utf8"));
+    expect(stillCron).toEqual(cronSnapshot);
+  });
 });

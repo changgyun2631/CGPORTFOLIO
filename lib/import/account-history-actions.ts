@@ -9,11 +9,17 @@ import { buildAccountHistorySnapshots, parseAccountHistoryTotals } from "../../s
 import { validateSnapshots } from "../../scripts/lib/validate.mjs";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
 import type { Snapshot } from "../domain/types";
+import { diffDataFiles, hashDataFiles } from "./data-version";
 import { backupRoot, dataDir } from "./paths";
 import { consumeStagedImport, pruneStaleStagedImports, stageImport } from "./staging";
 import type { ApplyResult } from "./position-basis-actions";
 
 const KIND = "account-history";
+
+// snapshots.json은 6시간마다 cron이 새 스냅샷을 추가한다 — 미리보기 때 만든 병합
+// 결과를 그 사이 값이 바뀐 걸 모르고 통째로 덮어쓰면 cron이 쌓은 새 스냅샷을
+// 잃는다. 그래서 적용 직전 이 파일들이 그대로인지 반드시 확인한다.
+const BASELINE_FILES = ["fx.json", "snapshots.json", "cashflows.json"] as const;
 
 export type AccountHistoryPreview = {
   token: string;
@@ -44,26 +50,35 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
   const snapshots = buildAccountHistorySnapshots(totals, { fxHistory, existingSnapshots, existingCashflows }) as Snapshot[];
 
   const validationErrors = validateSnapshots(snapshots) as string[];
-  const token = stageImport(KIND, { snapshots });
+  const baseline = hashDataFiles(dataDir, BASELINE_FILES);
+  const token = stageImport(KIND, { snapshots, baseline });
 
   return { token, fileCount: files.length, dayCount: totals.size, snapshotCount: snapshots.length, validationErrors };
 }
 
 export async function applyAccountHistory(token: string): Promise<ApplyResult> {
-  let staged: { snapshots: Snapshot[] };
+  let staged: { snapshots: Snapshot[]; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);
   } catch (error) {
     return { ok: false, errors: [(error as Error).message] };
   }
 
-  const validationErrors = validateSnapshots(staged.snapshots) as string[];
-  if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+  return withDataLock(dataDir, async () => {
+    const changed = diffDataFiles(staged.baseline, hashDataFiles(dataDir, BASELINE_FILES));
+    if (changed.length > 0) {
+      return {
+        ok: false,
+        errors: [`미리보기 이후 데이터가 바뀌었습니다 (${changed.join(", ")}). 다시 미리보기한 뒤 적용해 주세요.`],
+      };
+    }
 
-  backupData(dataDir, backupRoot);
-  await withDataLock(dataDir, async () => {
+    const validationErrors = validateSnapshots(staged.snapshots) as string[];
+    if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
+
+    backupData(dataDir, backupRoot);
     writeJsonAtomic(join(dataDir, "snapshots.json"), `${JSON.stringify(staged.snapshots, null, 2)}\n`);
-  });
 
-  return { ok: true, message: `총 ${staged.snapshots.length}개 스냅샷을 반영했습니다.` };
+    return { ok: true, message: `총 ${staged.snapshots.length}개 스냅샷을 반영했습니다.` };
+  });
 }
