@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { analyzeSeries, downsample, filterSnapshots, ranges, type RangeKey } from "@/lib/domain/metrics";
+import { groupTradeMarkers } from "@/lib/domain/trade-markers";
 import type { Snapshot } from "@/lib/domain/types";
 import { dateLabel, money, moneySigned, percent, percentSigned, shortDateTime } from "@/lib/format";
 
@@ -123,38 +124,18 @@ export function ValueChart({
 
   const active = hover === null ? points[points.length - 1] : points[Math.min(hover, points.length - 1)];
 
-  const tradeMarkers = (() => {
-    if (!showTrades || trades.length === 0 || points.length === 0) return [];
-    const firstMs = Date.parse(points[0].snapshot.at);
-    const lastMs = Date.parse(points[points.length - 1].snapshot.at);
-    const grouped = new Map<number, { buy: number; sell: number; symbols: Set<string> }>();
-
-    for (const trade of trades) {
-      const tradeMs = Date.parse(trade.at);
-      if (!Number.isFinite(tradeMs) || tradeMs < firstMs || tradeMs > lastMs) continue;
-
-      let closestIndex = 0;
-      let closestDistance = Number.POSITIVE_INFINITY;
-      points.forEach((point, index) => {
-        const distance = Math.abs(Date.parse(point.snapshot.at) - tradeMs);
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestIndex = index;
-        }
-      });
-
-      const marker = grouped.get(closestIndex) ?? { buy: 0, sell: 0, symbols: new Set<string>() };
-      marker[trade.side] += 1;
-      marker.symbols.add(trade.symbolId);
-      grouped.set(closestIndex, marker);
-    }
-
-    return [...grouped.entries()].map(([index, marker]) => ({
-      point: points[index],
-      ...marker,
-      side: marker.buy > 0 && marker.sell > 0 ? ("both" as const) : marker.buy > 0 ? ("buy" as const) : ("sell" as const),
-    }));
-  })();
+  const tradeMarkers = !showTrades
+    ? []
+    : groupTradeMarkers(
+        points.map((p) => p.snapshot.at),
+        trades,
+      ).map((group) => ({
+        point: points[group.snapshotIndex],
+        buy: group.buy,
+        sell: group.sell,
+        symbols: group.symbols,
+        side: group.side,
+      }));
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -258,7 +239,7 @@ export function ValueChart({
               side={marker.side}
               buy={marker.buy}
               sell={marker.sell}
-              symbols={[...marker.symbols]}
+              symbols={marker.symbols}
             />
           ))}
           {showFx ? (
