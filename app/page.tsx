@@ -6,6 +6,7 @@ import { ValueChart } from "@/components/charts/value-chart";
 import { AllocationBar } from "@/components/dashboard/allocation";
 import { FreshnessBadges } from "@/components/dashboard/freshness-badges";
 import { HoldingsTable } from "@/components/dashboard/holdings-table";
+import { QqqExposure } from "@/components/dashboard/qqq-exposure";
 import { TickerStrip } from "@/components/dashboard/ticker-strip";
 import { Card, Delta, Empty, PageTitle, Section, Stat, WeightBar } from "@/components/ui/primitives";
 import {
@@ -14,6 +15,7 @@ import {
   loadChartTrades,
   loadDividendSummary,
   loadPortfolio,
+  loadQqqExposure,
   loadRecentCashFlows,
   loadRecentTrades,
 } from "@/lib/data/views";
@@ -25,7 +27,7 @@ import { dateTimeLabel, money, moneyBare, percent, price, shortDateTime } from "
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades] = await Promise.all([
+  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades, exposure] = await Promise.all([
     loadPortfolio(),
     loadAccountSummary(),
     loadAssetMap(),
@@ -33,6 +35,7 @@ export default async function DashboardPage() {
     loadRecentTrades(4),
     loadRecentCashFlows(3),
     loadChartTrades(),
+    loadQqqExposure(),
   ]);
 
   const { holdings, totals, fx, snapshots, quotes, positionBasis } = portfolio;
@@ -118,6 +121,15 @@ export default async function DashboardPage() {
           </Card>
         </Section>
       </div>
+
+      <Section
+        title="나스닥100 실효 노출"
+        description="레버리지 배수를 곱해 더한 값입니다. 명목 비중과 달리, 지수가 움직일 때 계좌가 실제로 얼마나 흔들리는지를 봅니다."
+      >
+        <Card>
+          <QqqExposure current={exposure.current} past={exposure.past} />
+        </Card>
+      </Section>
 
       <Section title="핵심 지표" description="평가손익은 증권사 현재 원가와 예상 매도수수료를 반영합니다.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { runBacktest } from "@/lib/domain/backtest";
 import { summarizeDividends } from "@/lib/domain/dividends";
+import { qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
 import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
 
@@ -256,4 +257,52 @@ export const loadSparklines = cache(async (points = 30) => {
     result[symbolId] = series.slice(-points).map((p) => p.c);
   }
   return result;
+});
+
+/**
+ * 나스닥100 실효 노출 — 지금과 1주 전·4주 전.
+ *
+ * 과거 시점은 스냅샷에 종목별 구성이 없어서 그때까지의 거래를 다시 돌려
+ * 계산한다(`qqqExposureAt`). 분모가 되는 계좌 전체 금액만은 추정하지 않고
+ * 그 시점 스냅샷의 실제 예탁자산을 쓴다.
+ */
+export const loadQqqExposure = cache(async () => {
+  const [{ holdings, totals, transactions, symbols, snapshots, fxHistory, fx }, priceHistory] = await Promise.all([
+    loadPortfolio(),
+    getPriceHistory(),
+  ]);
+
+  const currencyById = new Map(symbols.map((symbol) => [symbol.id, symbol.currency]));
+  const currencyOf = (symbolId: string) => currencyById.get(symbolId) ?? "USD";
+
+  const current = summarizeQqqExposure(
+    fx.asOf,
+    totals.totalKrw,
+    holdings.map((holding) => ({ symbolId: holding.symbolId, valueKrw: holding.valueKrw })),
+  );
+
+  const latestAt = snapshots.at(-1)?.at ?? fx.asOf;
+  const past = [
+    { label: "1주 전", days: 7 },
+    { label: "4주 전", days: 28 },
+  ].flatMap(({ label, days }) => {
+    const cutoff = new Date(Date.parse(latestAt) - days * 86_400_000).toISOString();
+    const snapshot = [...snapshots].reverse().find((s) => new Date(s.at).toISOString() <= cutoff);
+    if (!snapshot) return [];
+    return [
+      {
+        label,
+        summary: qqqExposureAt({
+          at: snapshot.at,
+          transactions,
+          priceHistory,
+          fxHistory,
+          totalKrw: snapshot.totalKrw,
+          currencyOf,
+        }),
+      },
+    ];
+  });
+
+  return { current, past };
 });
