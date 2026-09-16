@@ -9,6 +9,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
+import { crossCheckPositionBasis } from "./lib/cross-check.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -59,25 +60,53 @@ if (headerIndex < 0) throw new Error("보유종목 CSV 헤더를 찾지 못했�
 
 const headers = rows[headerIndex];
 const at = String(flags["as-of"] ?? statSync(csvPath).mtime.toISOString());
-const basis = rows.slice(headerIndex + 1)
+const parsedRows = rows.slice(headerIndex + 1)
   .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])))
-  .filter((row) => row["코드"])
-  .map((row) => {
-    const value = number(row["평가금액"]);
-    const fee = number(row["수수료"]);
-    return {
-      at,
-      accountId,
-      symbolId: String(row["코드"]).replace(/^'/, ""),
-      shares: number(row["보유량"]),
-      averagePrice: number(row["매입가"]),
-      costBasis: number(row["매입금액"]),
-      estimatedExitFeeRate: value > 0 ? fee / value : 0,
-    };
-  })
-  .filter((line) => line.shares > 0 && line.costBasis >= 0);
+  .filter((row) => row["코드"]);
+
+// 교차검증(아래)에도 같은 원본 값(평가금액·매입금액·수수료)이 필요해서 basis와
+// 함께 만든다 — CSV를 두 번 파싱하지 않는다.
+const basis = [];
+const crossCheckInput = [];
+for (const row of parsedRows) {
+  const value = number(row["평가금액"]);
+  const fee = number(row["수수료"]);
+  const costBasis = number(row["매입금액"]);
+  const shares = number(row["보유량"]);
+  if (!(shares > 0 && costBasis >= 0)) continue;
+  const symbolId = String(row["코드"]).replace(/^'/, "");
+  basis.push({
+    at,
+    accountId,
+    symbolId,
+    shares,
+    averagePrice: number(row["매입가"]),
+    costBasis,
+    estimatedExitFeeRate: value > 0 ? fee / value : 0,
+  });
+  crossCheckInput.push({ symbolId, value, costBasis, fee, reportedGainLoss: number(row["평가손익"]) });
+}
 
 if (basis.length === 0) throw new Error("가져올 보유종목이 없습니다.");
+
+// CSV 자체의 "평가손익" 열과, 우리가 평가금액-매입금액-수수료로 재계산한 값을
+// 맞춰본다. 시세 API가 아니라 CSV 내부 일관성만 보므로 파싱이 잘못됐을 때(열이
+// 밀렸거나 인코딩이 깨졌거나)를 화면에서 숫자가 이상하다고 느끼기 전에 잡아낸다.
+// 실제 금액이 들어간 상세 리포트는 gitignored 출력 파일에만 남기고, 터미널에는
+// 종목명과 개수만 보여준다.
+const crossCheck = crossCheckPositionBasis(crossCheckInput);
+const crossCheckReportPath = join(dataDir, "out-position-basis-crosscheck.json");
+writeJsonAtomic(crossCheckReportPath, `${JSON.stringify(crossCheck, null, 2)}\n`);
+if (!crossCheck.ok) {
+  console.error(
+    `교차검증: ${crossCheck.exceeded.length}개 종목이 허용 오차(±${crossCheck.toleranceKrw}원)를 초과했습니다 ` +
+      `(${crossCheck.exceeded.join(", ")}). 상세 금액은 ${crossCheckReportPath} 참고.`,
+  );
+  if (flags.replace) {
+    console.error("교차검증 실패 — 반영을 중단합니다.");
+    process.exit(1);
+  }
+}
 
 const accounts = JSON.parse(readFileSync(join(dataDir, "accounts.json"), "utf8"));
 const symbols = JSON.parse(readFileSync(join(dataDir, "symbols.json"), "utf8"));
