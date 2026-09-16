@@ -116,6 +116,7 @@ export function PriceHistory({
       <div className="relative mt-1">
         <svg
           viewBox={`0 0 ${WIDTH} ${height}`}
+          preserveAspectRatio="none"
           className="w-full"
           style={{ height }}
           role="img"

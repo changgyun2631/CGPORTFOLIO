@@ -220,6 +220,7 @@ export function ValueChart({
       <div className="relative">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
+          preserveAspectRatio="none"
           className={fullscreen ? "h-[70vh] w-full" : "h-[240px] w-full sm:h-[300px]"}
           role="img"
           aria-label={`총 평가금액 추이, ${ranges.find((r) => r.key === range)?.label} 구간, ${percentSigned(stats.changePercent)}`}
