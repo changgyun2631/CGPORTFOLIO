@@ -2,6 +2,10 @@
  * 증권사 보유종목 CSV에서 현재 보유수량·매입원가·예상 매도수수료율을 가져온다.
  * 과거 거래원장은 거래 이력용이고, 현재 평가손익은 이 스냅샷을 우선 사용한다.
  *
+ * 실제 파싱·검증 로직은 `scripts/lib/import-position-basis.mjs`(순수 함수)에
+ * 있다 — 웹 가져오기 화면(`lib/import/`)도 같은 함수를 쓴다. 이 파일은 CLI
+ * 인자 처리와 파일 IO만 담당하는 얇은 wrapper다.
+ *
  * node scripts/import-position-basis-csv.mjs <csv> --account-id=acc-main [--replace]
  */
 import { readFileSync, statSync } from "node:fs";
@@ -9,7 +13,9 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
+import { decodeEucKr } from "./lib/csv.mjs";
 import { crossCheckPositionBasis } from "./lib/cross-check.mjs";
+import { parsePositionBasisCsv } from "./lib/import-position-basis.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "./lib/validate.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -28,66 +34,14 @@ function parseArgs(argv) {
   return { positional, flags };
 }
 
-function parseCsvLine(line) {
-  const fields = [];
-  let value = "";
-  let quoted = false;
-  for (let i = 0; i < line.length; i += 1) {
-    const char = line[i];
-    if (quoted && char === '"' && line[i + 1] === '"') {
-      value += '"';
-      i += 1;
-    } else if (char === '"') quoted = !quoted;
-    else if (char === "," && !quoted) {
-      fields.push(value);
-      value = "";
-    } else value += char;
-  }
-  fields.push(value);
-  return fields;
-}
-
-const number = (value) => Number(String(value ?? "0").replaceAll(",", "").replace("%", "").trim() || 0);
 const { positional, flags } = parseArgs(process.argv.slice(2));
 const csvPath = positional[0];
 if (!csvPath) throw new Error("보유종목 CSV 경로가 필요합니다.");
 
 const accountId = String(flags["account-id"] ?? "acc-main");
-const decoded = new TextDecoder("euc-kr").decode(readFileSync(csvPath));
-const rows = decoded.split(/\r?\n/).filter(Boolean).map(parseCsvLine);
-const headerIndex = rows.findIndex((row) => row.includes("종목명") && row.includes("평가손익"));
-if (headerIndex < 0) throw new Error("보유종목 CSV 헤더를 찾지 못했습니다.");
-
-const headers = rows[headerIndex];
+const decoded = decodeEucKr(readFileSync(csvPath));
 const at = String(flags["as-of"] ?? statSync(csvPath).mtime.toISOString());
-const parsedRows = rows.slice(headerIndex + 1)
-  .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])))
-  .filter((row) => row["코드"]);
-
-// 교차검증(아래)에도 같은 원본 값(평가금액·매입금액·수수료)이 필요해서 basis와
-// 함께 만든다 — CSV를 두 번 파싱하지 않는다.
-const basis = [];
-const crossCheckInput = [];
-for (const row of parsedRows) {
-  const value = number(row["평가금액"]);
-  const fee = number(row["수수료"]);
-  const costBasis = number(row["매입금액"]);
-  const shares = number(row["보유량"]);
-  if (!(shares > 0 && costBasis >= 0)) continue;
-  const symbolId = String(row["코드"]).replace(/^'/, "");
-  basis.push({
-    at,
-    accountId,
-    symbolId,
-    shares,
-    averagePrice: number(row["매입가"]),
-    costBasis,
-    estimatedExitFeeRate: value > 0 ? fee / value : 0,
-  });
-  crossCheckInput.push({ symbolId, value, costBasis, fee, reportedGainLoss: number(row["평가손익"]) });
-}
-
-if (basis.length === 0) throw new Error("가져올 보유종목이 없습니다.");
+const { basis, crossCheckInput } = parsePositionBasisCsv(decoded, { accountId, at });
 
 // CSV 자체의 "평가손익" 열과, 우리가 평가금액-매입금액-수수료로 재계산한 값을
 // 맞춰본다. 시세 API가 아니라 CSV 내부 일관성만 보므로 파싱이 잘못됐을 때(열이
