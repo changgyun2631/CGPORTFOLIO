@@ -5,7 +5,7 @@ import { cache } from "react";
 import { runBacktest } from "@/lib/domain/backtest";
 import { summarizeDividends } from "@/lib/domain/dividends";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
-import { buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
+import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
 
 import {
   getAccounts,
@@ -152,11 +152,21 @@ export const loadRecentTrades = cache(async (limit = 6) => {
 
 /** 평가금액 차트의 매수·매도 타점. 이체와 액면분할은 제외한다. */
 export const loadChartTrades = cache(async () => {
-  const { transactions } = await loadPortfolio();
+  const { transactions, symbols, fxRateAt } = await loadPortfolio();
+  const symbolById = new Map(symbols.map((s) => [s.id, s]));
+  // annotateTradesWithRealized는 이체·분할을 포함한 전체 원장을 넣어야 평단이
+  // 정확하다 — 여기서 미리 걸러내면 그 뒤의 매도 실현손익이 틀어진다.
+  const realizedById = new Map(annotateTradesWithRealized(transactions).map((a) => [a.id, a.realized]));
+
   return transactions
     .filter((tx) => (tx.action ?? "trade") === "trade")
     .sort((a, b) => a.at.localeCompare(b.at))
-    .map(({ at, side, symbolId, shares }) => ({ at, side, symbolId, shares }));
+    .map(({ id, at, side, symbolId, shares, price }) => {
+      const currency = symbolById.get(symbolId)?.currency ?? "KRW";
+      const realized = realizedById.get(id) ?? 0;
+      const realizedKrw = currency === "USD" ? realized * fxRateAt(at) : realized;
+      return { at, side, symbolId, shares, price, realizedKrw };
+    });
 });
 
 /** 최근 입출금 내역. */
@@ -204,10 +214,22 @@ export const loadSymbolDetail = cache(async (symbolId: string) => {
   const holding = portfolio.holdings.find((h) => h.symbolId === symbolId) ?? null;
   const history = await loadPriceHistory(symbolId);
 
-  const trades = portfolio.transactions
-    .filter((tx) => tx.symbolId === symbolId && (tx.action ?? "trade") === "trade")
+  // 이 종목의 이체·분할을 포함한 전체 거래(다른 종목은 계산에 안 섞인다 —
+  // annotateTradesWithRealized는 계좌×종목 단위로 따로 추적한다)로 평단을
+  // 재생해야 매도 실현손익이 정확하다. 화면(매매 내역·차트 타점)엔 일반
+  // 매매만 보여준다.
+  const symbolTransactions = portfolio.transactions.filter((tx) => tx.symbolId === symbolId);
+  const realizedById = new Map(annotateTradesWithRealized(symbolTransactions).map((a) => [a.id, a.realized]));
+  const toKrwAt = (amount: number, at: string) => (symbol.currency === "USD" ? amount * portfolio.fxRateAt(at) : amount);
+
+  const trades = symbolTransactions
+    .filter((tx) => (tx.action ?? "trade") === "trade")
     .sort((a, b) => b.at.localeCompare(a.at))
-    .map((tx) => ({ ...tx, accountName: accountById.get(tx.accountId)?.name ?? tx.accountId }));
+    .map((tx) => ({
+      ...tx,
+      accountName: accountById.get(tx.accountId)?.name ?? tx.accountId,
+      realizedKrw: toKrwAt(realizedById.get(tx.id) ?? 0, tx.at),
+    }));
 
   const payments = portfolio.dividends
     .filter((dv) => dv.symbolId === symbolId)

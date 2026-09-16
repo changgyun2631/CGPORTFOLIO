@@ -4,8 +4,8 @@ import { groupTradeMarkers, type ChartTrade } from "../trade-markers";
 
 const times = ["2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z", "2026-01-03T00:00:00Z"];
 
-function trade(at: string, side: ChartTrade["side"], symbolId = "QLD"): ChartTrade {
-  return { at, side, symbolId, shares: 1 };
+function trade(at: string, side: ChartTrade["side"], symbolId = "QLD", overrides: Partial<ChartTrade> = {}): ChartTrade {
+  return { at, side, symbolId, shares: 1, price: 100, realizedKrw: 0, ...overrides };
 }
 
 describe("groupTradeMarkers", () => {
@@ -26,7 +26,20 @@ describe("groupTradeMarkers", () => {
 
   it("거래 시각이 스냅샷과 정확히 같으면(일자 경계) 그 스냅샷에 배정한다", () => {
     const result = groupTradeMarkers(times, [trade("2026-01-02T00:00:00Z", "buy")]);
-    expect(result).toEqual([{ snapshotIndex: 1, buy: 1, sell: 0, symbols: ["QLD"], side: "buy" }]);
+    expect(result).toEqual([
+      {
+        snapshotIndex: 1,
+        buy: 1,
+        sell: 0,
+        symbols: ["QLD"],
+        side: "buy",
+        buyShares: 1,
+        buyAvgPrice: 100,
+        sellShares: 0,
+        sellAvgPrice: 0,
+        sellRealizedKrw: 0,
+      },
+    ]);
   });
 
   it("같은 날 매수·매도가 동시에 있으면 side가 both다", () => {
@@ -72,5 +85,29 @@ describe("groupTradeMarkers", () => {
   it("잘못된 날짜(파싱 불가)는 조용히 제외한다", () => {
     const result = groupTradeMarkers(times, [trade("not-a-date", "buy")]);
     expect(result).toEqual([]);
+  });
+
+  it("같은 날 매수 여러 건은 수량 합·가중평균 단가로 묶인다", () => {
+    const result = groupTradeMarkers(times, [
+      trade("2026-01-01T01:00:00Z", "buy", "QLD", { shares: 10, price: 100 }),
+      trade("2026-01-01T02:00:00Z", "buy", "QLD", { shares: 10, price: 200 }),
+    ]);
+    expect(result[0].buyShares).toBe(20);
+    expect(result[0].buyAvgPrice).toBeCloseTo(150); // (10*100+10*200)/20
+  });
+
+  it("같은 날 매도 여러 건은 수량 합·가중평균 단가·실현손익 합으로 묶인다", () => {
+    const result = groupTradeMarkers(times, [
+      trade("2026-01-01T01:00:00Z", "sell", "QLD", { shares: 5, price: 120, realizedKrw: 10_000 }),
+      trade("2026-01-01T02:00:00Z", "sell", "QLD", { shares: 5, price: 140, realizedKrw: 20_000 }),
+    ]);
+    expect(result[0].sellShares).toBe(10);
+    expect(result[0].sellAvgPrice).toBeCloseTo(130); // (5*120+5*140)/10
+    expect(result[0].sellRealizedKrw).toBe(30_000);
+  });
+
+  it("매수만 있으면 매도 관련 필드는 전부 0이다", () => {
+    const result = groupTradeMarkers(times, [trade("2026-01-01T00:00:00Z", "buy", "QLD", { shares: 3, price: 50 })]);
+    expect(result[0]).toMatchObject({ sellShares: 0, sellAvgPrice: 0, sellRealizedKrw: 0, buyShares: 3, buyAvgPrice: 50 });
   });
 });

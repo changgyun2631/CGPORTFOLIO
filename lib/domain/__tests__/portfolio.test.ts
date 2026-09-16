@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { applyPositionBasis, buildCashBalances, buildCashFlowLedger, buildPortfolio, buildPositions } from "../portfolio";
+import {
+  annotateTradesWithRealized,
+  applyPositionBasis,
+  buildCashBalances,
+  buildCashFlowLedger,
+  buildPortfolio,
+  buildPositions,
+} from "../portfolio";
 import type { Account, CashFlow, DividendPayment, FxRate, PositionBasis, Quote, Symbol, Transaction } from "../types";
 
 const account: Account = { id: "acc1", name: "위탁", kind: "위탁", currency: "KRW" };
@@ -294,5 +301,68 @@ describe("buildCashFlowLedger", () => {
     expect(ledger[1].bucketCurrency).toBe("USD");
     expect(ledger[1].balanceBefore).toBe(0);
     expect(ledger[1].balanceAfter).toBe(50);
+  });
+});
+
+describe("annotateTradesWithRealized", () => {
+  it("매수 거래는 실현손익이 항상 0이다", () => {
+    const [result] = annotateTradesWithRealized([tx({ id: "1", side: "buy", shares: 10, price: 100 })]);
+    expect(result).toMatchObject({ side: "buy", shares: 10, price: 100, realized: 0 });
+  });
+
+  it("매도 거래는 buildPositions와 똑같은 실현손익을 낸다", () => {
+    const transactions = [
+      tx({ id: "1", side: "buy", shares: 10, price: 100 }),
+      tx({ id: "2", side: "sell", shares: 10, price: 150 }),
+    ];
+    const [position] = buildPositions(transactions);
+    const annotated = annotateTradesWithRealized(transactions);
+    const sell = annotated.find((a) => a.id === "2")!;
+    expect(sell.realized).toBeCloseTo(position.realized); // (150-100)*10 = 500
+    expect(sell.realized).toBeCloseTo(500);
+  });
+
+  it("수수료는 실현손익에서 뺀다", () => {
+    const transactions = [
+      tx({ id: "1", side: "buy", shares: 10, price: 100, fee: 10 }),
+      tx({ id: "2", side: "sell", shares: 10, price: 100, fee: 5 }),
+    ];
+    const annotated = annotateTradesWithRealized(transactions);
+    // 매수원가 1010, 매도대금 1000 -> 원가차감 1010, 수수료 5 => 실현손익 -15 (portfolio.test.ts 위쪽 buildPositions 케이스와 동일)
+    expect(annotated.find((a) => a.id === "2")!.realized).toBeCloseTo(-15);
+  });
+
+  it("여러 번 나눠 산 뒤 매도하면 그 시점 이동평균 기준으로 계산한다", () => {
+    const transactions = [
+      tx({ id: "1", side: "buy", shares: 10, price: 100 }),
+      tx({ id: "2", side: "buy", shares: 10, price: 200 }), // 평단 150
+      tx({ id: "3", side: "sell", shares: 5, price: 180 }),
+    ];
+    const annotated = annotateTradesWithRealized(transactions);
+    // (180-150)*5 = 150
+    expect(annotated.find((a) => a.id === "3")!.realized).toBeCloseTo(150);
+  });
+
+  it("이체와 액면분할은 결과에 안 나온다(화면에 매매 타점으로 안 보여줄 거래)", () => {
+    const transactions = [
+      tx({ id: "1", side: "buy", shares: 10, price: 100 }),
+      tx({ id: "2", action: "transfer", side: "sell", shares: 4, price: 150 }),
+      tx({ id: "3", action: "split", splitRatio: 2, shares: 12, price: 0 }),
+    ];
+    const annotated = annotateTradesWithRealized(transactions);
+    expect(annotated.map((a) => a.id)).toEqual(["1"]);
+  });
+
+  it("계좌·종목이 다르면 서로 실현손익 계산이 섞이지 않는다", () => {
+    const otherSymbol = "TQQQ";
+    const transactions = [
+      tx({ id: "1", side: "buy", shares: 10, price: 100 }),
+      tx({ id: "2", symbolId: otherSymbol, side: "buy", shares: 5, price: 50 }),
+      tx({ id: "3", side: "sell", shares: 10, price: 120 }), // QLD만: (120-100)*10=200
+      tx({ id: "4", symbolId: otherSymbol, side: "sell", shares: 5, price: 40 }), // TQQQ만: (40-50)*5=-50
+    ];
+    const annotated = annotateTradesWithRealized(transactions);
+    expect(annotated.find((a) => a.id === "3")!.realized).toBeCloseTo(200);
+    expect(annotated.find((a) => a.id === "4")!.realized).toBeCloseTo(-50);
   });
 });

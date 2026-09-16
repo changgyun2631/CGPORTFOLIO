@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import { groupTradeMarkers, type ChartTrade } from "@/lib/domain/trade-markers";
-import { dateLabel, price as fmtPrice } from "@/lib/format";
+import { dateLabel, moneySigned, price as fmtPrice } from "@/lib/format";
 
 /**
  * 종목 상세의 가격 추이. 마우스를 올리면 그 날짜의 종가를 보여준다
@@ -155,7 +155,12 @@ export function PriceHistory({
           {tradeGroups.map((group) => {
             const x = xAt(group.snapshotIndex);
             const color = group.side === "buy" ? "var(--up)" : group.side === "sell" ? "var(--down)" : "var(--accent)";
-            const detail = [group.buy > 0 ? `매수 ${group.buy}건` : "", group.sell > 0 ? `매도 ${group.sell}건` : ""]
+            const detail = [
+              group.buy > 0 ? `매수 ${group.buy}건 · ${group.buyShares}주 · 평단 ${fmtPrice(group.buyAvgPrice, currency)}` : "",
+              group.sell > 0
+                ? `매도 ${group.sell}건 · ${group.sellShares}주 · 평단 ${fmtPrice(group.sellAvgPrice, currency)} · 손익 ${moneySigned(group.sellRealizedKrw)}`
+                : "",
+            ]
               .filter(Boolean)
               .join(" · ");
             return (
@@ -192,10 +197,20 @@ export function PriceHistory({
           <p className="text-faint">{dateLabel(active.d)}</p>
           <p className="tnum mt-0.5 text-sm font-bold">{fmtPrice(active.c, currency)}</p>
           {activeTrade ? (
-            <p className="mt-1 border-t border-line pt-1 text-[11px] leading-4">
-              {activeTrade.buy > 0 ? <span className="font-semibold text-up">매수 {activeTrade.buy}건 </span> : null}
-              {activeTrade.sell > 0 ? <span className="font-semibold text-down">매도 {activeTrade.sell}건 </span> : null}
-            </p>
+            <div className="mt-1 space-y-0.5 border-t border-line pt-1 text-[11px] leading-4">
+              {activeTrade.buy > 0 ? (
+                <p className="font-semibold text-up">
+                  매수 {activeTrade.buy}건 · {activeTrade.buyShares}주 · 평단 {fmtPrice(activeTrade.buyAvgPrice, currency)}
+                </p>
+              ) : null}
+              {activeTrade.sell > 0 ? (
+                <p className="font-semibold text-down">
+                  매도 {activeTrade.sell}건 · {activeTrade.sellShares}주 · 평단 {fmtPrice(activeTrade.sellAvgPrice, currency)}
+                  <br />
+                  손익 {moneySigned(activeTrade.sellRealizedKrw)}
+                </p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>
@@ -205,8 +220,12 @@ export function PriceHistory({
           <li>매매 타점 {tradeGroups.length}개</li>
           {tradeGroups.map((group) => (
             <li key={points[group.snapshotIndex].d}>
-              {points[group.snapshotIndex].d}: {group.buy > 0 ? `매수 ${group.buy}건 ` : ""}
-              {group.sell > 0 ? `매도 ${group.sell}건 ` : ""}({group.symbols.join(", ")})
+              {points[group.snapshotIndex].d}:{" "}
+              {group.buy > 0 ? `매수 ${group.buy}건 ${group.buyShares}주 평단 ${fmtPrice(group.buyAvgPrice, currency)} ` : ""}
+              {group.sell > 0
+                ? `매도 ${group.sell}건 ${group.sellShares}주 평단 ${fmtPrice(group.sellAvgPrice, currency)} 손익 ${moneySigned(group.sellRealizedKrw)} `
+                : ""}
+              ({group.symbols.join(", ")})
             </li>
           ))}
         </ul>

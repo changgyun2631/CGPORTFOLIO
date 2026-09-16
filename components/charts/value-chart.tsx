@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { analyzeSeries, downsample, filterSnapshots, ranges, type RangeKey } from "@/lib/domain/metrics";
-import { groupTradeMarkers } from "@/lib/domain/trade-markers";
+import { groupTradeMarkers, type ChartTrade } from "@/lib/domain/trade-markers";
 import type { Snapshot } from "@/lib/domain/types";
 import { dateLabel, money, moneySigned, percent, percentSigned, shortDateTime } from "@/lib/format";
 
@@ -18,12 +18,7 @@ const WIDTH = 1000;
 const HEIGHT = 300;
 const PAD = { top: 16, right: 44, bottom: 26, left: 44 };
 
-export type ChartTrade = {
-  at: string;
-  side: "buy" | "sell";
-  symbolId: string;
-  shares: number;
-};
+export type { ChartTrade };
 
 export function ValueChart({
   snapshots,

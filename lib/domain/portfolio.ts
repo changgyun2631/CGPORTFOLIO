@@ -91,6 +91,51 @@ export type PortfolioTotals = {
 
 const EPSILON = 1e-9;
 
+/**
+ * 거래 하나가 포지션(이동평균)에 미치는 영향을 계산하고 `position`을 그 자리에서
+ * 갱신한다. `buildPositions`와 `annotateTradesWithRealized`가 이 한 곳의 로직을
+ * 같이 쓴다 — 이동평균·실현손익 계산 규칙이 두 곳에 따로 있으면 한쪽만 고치고
+ * 잊어버리는 사고가 난다.
+ *
+ * @returns 일반 매매(`action: "trade"`)면 그 거래 하나의 실현손익(종목 통화
+ *   기준, 매수는 항상 0), 이체·분할이면 `null`(화면에 매매 타점으로 안 보여줄
+ *   거래라는 뜻).
+ */
+function stepPosition(position: Position, tx: Transaction): number | null {
+  const fee = tx.fee ?? 0;
+  const action = tx.action ?? "trade";
+
+  if (action === "split") {
+    const ratio = tx.splitRatio ?? 1;
+    if (Number.isFinite(ratio) && ratio > 0 && position.shares > EPSILON) {
+      position.shares *= ratio;
+      position.averagePrice = position.costBasis / position.shares;
+    }
+    return null;
+  }
+
+  if (tx.side === "buy") {
+    position.costBasis += tx.shares * tx.price + fee;
+    position.shares += tx.shares;
+    position.averagePrice = position.shares > EPSILON ? position.costBasis / position.shares : 0;
+    return action === "trade" ? 0 : null;
+  }
+
+  // 보유수량보다 많이 팔 수는 없다. 데이터가 어긋나면 보유분까지만 처리한다.
+  const sold = Math.min(tx.shares, position.shares);
+  const costOut = position.averagePrice * sold;
+  const realized = sold * tx.price - costOut - fee;
+  if (action === "trade") position.realized += realized;
+  position.shares -= sold;
+  position.costBasis = Math.max(position.costBasis - costOut, 0);
+  if (position.shares <= EPSILON) {
+    position.shares = 0;
+    position.costBasis = 0;
+    position.averagePrice = 0;
+  }
+  return action === "trade" ? realized : null;
+}
+
 /** 매수/매도를 시간순으로 훑어 계좌×종목 단위 포지션을 만든다. (이동평균법) */
 export function buildPositions(transactions: Transaction[]): Position[] {
   const byKey = new Map<string, Position>();
@@ -102,41 +147,60 @@ export function buildPositions(transactions: Transaction[]): Position[] {
       byKey.get(key) ??
       ({ symbolId: tx.symbolId, accountId: tx.accountId, shares: 0, averagePrice: 0, costBasis: 0, realized: 0 } satisfies Position);
 
-    const fee = tx.fee ?? 0;
-    const action = tx.action ?? "trade";
-
-    if (action === "split") {
-      const ratio = tx.splitRatio ?? 1;
-      if (Number.isFinite(ratio) && ratio > 0 && position.shares > EPSILON) {
-        position.shares *= ratio;
-        position.averagePrice = position.costBasis / position.shares;
-      }
-      byKey.set(key, position);
-      continue;
-    }
-
-    if (tx.side === "buy") {
-      position.costBasis += tx.shares * tx.price + fee;
-      position.shares += tx.shares;
-      position.averagePrice = position.shares > EPSILON ? position.costBasis / position.shares : 0;
-    } else {
-      // 보유수량보다 많이 팔 수는 없다. 데이터가 어긋나면 보유분까지만 처리한다.
-      const sold = Math.min(tx.shares, position.shares);
-      const costOut = position.averagePrice * sold;
-      if (action === "trade") position.realized += sold * tx.price - costOut - fee;
-      position.shares -= sold;
-      position.costBasis = Math.max(position.costBasis - costOut, 0);
-      if (position.shares <= EPSILON) {
-        position.shares = 0;
-        position.costBasis = 0;
-        position.averagePrice = 0;
-      }
-    }
-
+    stepPosition(position, tx);
     byKey.set(key, position);
   }
 
   return [...byKey.values()];
+}
+
+export type AnnotatedTrade = {
+  id: string;
+  at: string;
+  accountId: string;
+  symbolId: string;
+  side: "buy" | "sell";
+  shares: number;
+  price: number;
+  /** 매도 시점 실현손익(종목 통화 기준, 수수료 포함). 매수 거래는 항상 0. */
+  realized: number;
+};
+
+/**
+ * 일반 매매(이체·분할 제외) 거래마다 그 시점의 실현손익을 붙인다. 차트 타점
+ * 툴팁에 "매도 평단·손익"을 보여주려는 용도 — `buildPositions`와 같은
+ * `stepPosition`을 시간순으로 재생해서 만들므로 포지션 계산과 절대 어긋나지
+ * 않는다.
+ */
+export function annotateTradesWithRealized(transactions: Transaction[]): AnnotatedTrade[] {
+  const byKey = new Map<string, Position>();
+  const ordered = [...transactions].sort((a, b) => a.at.localeCompare(b.at));
+  const results: AnnotatedTrade[] = [];
+
+  for (const tx of ordered) {
+    const key = `${tx.accountId}::${tx.symbolId}`;
+    const position =
+      byKey.get(key) ??
+      ({ symbolId: tx.symbolId, accountId: tx.accountId, shares: 0, averagePrice: 0, costBasis: 0, realized: 0 } satisfies Position);
+
+    const realized = stepPosition(position, tx);
+    byKey.set(key, position);
+
+    if (realized !== null) {
+      results.push({
+        id: tx.id,
+        at: tx.at,
+        accountId: tx.accountId,
+        symbolId: tx.symbolId,
+        side: tx.side,
+        shares: tx.shares,
+        price: tx.price,
+        realized,
+      });
+    }
+  }
+
+  return results;
 }
 
 /** 현재 보유분은 증권사 잔고 스냅샷을 기준으로 맞춘다. 과거 원장은 실현손익 이력에만 사용한다. */
