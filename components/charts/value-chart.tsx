@@ -291,6 +291,9 @@ export function ValueChart({
         <div className="pointer-events-none absolute left-0 top-0 rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg">
           <p className="text-faint">{shortDateTime(active.snapshot.at)}</p>
           <p className="tnum mt-0.5 text-sm font-bold">{money(active.snapshot.totalKrw)}</p>
+          {active.snapshot.principalKrw ?? principalKrw ? (
+            <p className="tnum mt-0.5 text-faint">원금 {money(active.snapshot.principalKrw ?? principalKrw)}</p>
+          ) : null}
           {showFx ? <p className="tnum mt-0.5 text-faint">환율 {active.snapshot.fxRate.toFixed(2)}</p> : null}
         </div>
 
