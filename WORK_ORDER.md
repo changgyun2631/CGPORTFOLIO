@@ -91,15 +91,22 @@ npm run build
    착각해 새 실행을 거부할 수 있다** (`Start-ScheduledTask` 결과가 "이미 실행 중" 코드로
    계속 나옴). `Stop-ScheduledTask -TaskName "..."`로 먼저 정리한 뒤 다시 시작할 것.
 10. **`Stop-ScheduledTask`가 작업을 "Ready"로 표시해도 실제 `node.exe`는 안 죽을 수
-    있다** — 특히 그 프로세스가 오래 걸리는 요청(시세 갱신처럼 몇 분짜리)을 처리
-    중이면 종료 신호를 곧바로 못 받는다. 그 상태에서 `Start-ScheduledTask`로 새
-    인스턴스를 띄우면 포트가 이미 물려 있어 `EADDRINUSE`로 즉시 죽고, 재시작 루프가
-    10초마다 그걸 반복해 "짧은 반복 재시작" 구간을 만든다(2026-09-16 09:00경 실제
-    재현, `WORK_ORDER.md` B-0 참고). **`Stop-ScheduledTask` 다음엔 바로
-    `Start-ScheduledTask`를 부르지 말고 `netstat -ano | grep ":3000.*LISTENING"`으로
-    포트가 실제로 비었는지 먼저 확인할 것.** 안 비어 있으면 남은 PID를
-    `taskkill //F //PID <PID>`로 정리한 뒤 시작한다. 시세 갱신 요청이 진행 중일 때는
-    아예 재시작을 미룰 것.
+    있다** — 오래 걸리는 요청(시세 갱신처럼 몇 분짜리)을 처리 중이면 종료 신호를
+    곧바로 못 받는다는 게 최초 가설이었지만, **2026-09-16 09:24에 진행 중인 요청이
+    전혀 없는 상태에서도 같은 일이 또 일어났다** — `Stop-ScheduledTask` 직후
+    `netstat`로 보니 이전 PID가 여전히 `LISTENING` 상태였다. 즉 "느린 요청 때문"은
+    충분조건이 아니라 그럴듯한 사례 하나였을 뿐이고, **이 환경에서
+    `Stop-ScheduledTask`는 일반적으로 신뢰할 수 없다**고 보는 게 안전하다(정확한
+    근본 원인은 못 찾음 — Task Scheduler가 자식 프로세스를 추적하는 방식과 관련
+    있을 가능성). 안 죽은 상태에서 `Start-ScheduledTask`로 새 인스턴스를 띄우면
+    포트가 이미 물려 있어 `EADDRINUSE`로 즉시 죽고, 재시작 루프가 10초마다 그걸
+    반복해 "짧은 반복 재시작" 구간을 만든다(2026-09-16 09:00경 최초 재현,
+    `WORK_ORDER.md` B-0 참고). **`Stop-ScheduledTask` 다음엔 절대 바로
+    `Start-ScheduledTask`를 부르지 말고, 매번 `netstat -ano | grep
+    ":3000.*LISTENING"`으로 포트가 실제로 비었는지 먼저 확인할 것.** 안 비어 있으면
+    남은 PID를 `taskkill //F //PID <PID>`로 정리한 뒤 시작한다(2026-09-16 09:24
+    사례처럼 매번 필요할 수 있다고 가정할 것 — 예외가 아니라 기본 절차로 다룰
+    것). 시세 갱신 요청이 진행 중일 때는 아예 재시작을 미룰 것.
 
 ### 0-5. 시세 API 한도 — 제일 자주 밟는 지뢰
 
