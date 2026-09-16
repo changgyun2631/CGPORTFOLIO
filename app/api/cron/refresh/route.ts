@@ -2,7 +2,8 @@ import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { writeJsonAtomic, withDataLock } from "@/lib/data/atomic-write";
+import { withDataLock } from "@/lib/data/atomic-write";
+import { readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
 import { getFxQuote, getSnapshots, getSymbols } from "@/lib/data/store";
 import { loadPortfolio } from "@/lib/data/views";
 import type { FxRate, Snapshot } from "@/lib/domain/types";
@@ -57,35 +58,50 @@ export async function GET(request: Request) {
     const previous = await loadPortfolio();
     const merged = new Map(previous.quotes.map((quote) => [quote.symbolId, quote]));
     for (const quote of report.quotes) merged.set(quote.symbolId, quote);
+    const mergedQuotes = [...merged.values()];
 
-    // quotes/fx/snapshots 세 파일을 한 잠금 아래 원자적으로 쓴다. 가져오기
-    // 스크립트(--replace)와 겹치면 잠금에서 바로 에러로 걸린다.
     let fx: FxRate = await getFxQuote();
+
+    // quotes/fx/snapshots 세 파일을 한 세대로 묶어 쓴다: 셋 다 쓰기 전에 새 내용을
+    // 전부 메모리에서 준비해 두고(recomputeTotal이 디스크 대신 이 값들을 그대로
+    // 쓴다), 순서대로 원자적 교체한다. 그중 하나라도 실패하면 이미 쓴 파일들을
+    // 실패 직전 원본 바이트로 되돌려, "일부는 새 세대·일부는 이전 세대"로 섞인
+    // 채 남는 걸 막는다(개별 파일 자체가 일부만 쓰이는 것은 writeJsonAtomic이
+    // 이미 막는다 — 이건 그 위에서 파일 "사이"의 일관성을 보장하는 것이다).
     const { totalKrw } = await withDataLock(dataDir, async () => {
-      writeJsonAtomic(join(dataDir, "quotes.json"), `${JSON.stringify([...merged.values()], null, 2)}\n`);
+      const quotesPath = join(dataDir, "quotes.json");
+      const fxPath = join(dataDir, "fx-quote.json");
+      const snapshotsPath = join(dataDir, "snapshots.json");
+      const originals = readOriginals([quotesPath, fxPath, snapshotsPath]);
 
       const fxProvider = buildFxProvider();
       if (fxProvider) {
         try {
           const fetched = await fxProvider.fetchRate("USD", "KRW");
           fx = { pair: "USD/KRW", ...fetched };
-          writeJsonAtomic(join(dataDir, "fx-quote.json"), `${JSON.stringify(fx, null, 2)}\n`);
         } catch (error) {
           report.errors.push({ provider: fxProvider.name, message: (error as Error).message });
         }
       }
 
-      // 갱신된 시세로 평가금액을 다시 계산해 스냅샷 한 점을 남긴다.
-      // 이 점들이 쌓여서 추이 차트와 MDD가 된다.
+      // 갱신된 시세로 평가금액을 다시 계산해 스냅샷 한 점을 만든다. 아직 아무
+      // 파일도 쓰지 않은 상태의 메모리 값으로 계산한다.
       const snapshots = await getSnapshots();
-      const refreshed = await recomputeTotal();
+      const refreshed = await recomputeTotal(previous, mergedQuotes, fx);
       const point: Snapshot = {
         at: new Date().toISOString(),
         totalKrw: refreshed.totalKrw,
         principalKrw: refreshed.principalKrw,
         fxRate: fx.rate,
       };
-      writeJsonAtomic(join(dataDir, "snapshots.json"), `${JSON.stringify([...snapshots, point], null, 2)}\n`);
+
+      const writes = [
+        { path: quotesPath, content: `${JSON.stringify(mergedQuotes, null, 2)}\n` },
+        { path: fxPath, content: `${JSON.stringify(fx, null, 2)}\n` },
+        { path: snapshotsPath, content: `${JSON.stringify([...snapshots, point], null, 2)}\n` },
+      ];
+      writeGenerationOrRollback(writes, originals);
+
       return refreshed;
     });
 
@@ -104,20 +120,15 @@ export async function GET(request: Request) {
 }
 
 /**
- * 방금 저장한 시세를 다시 읽어 총 평가금액을 계산한다.
- * store 의 캐시는 요청 단위라 같은 요청 안에서는 이전 값을 들고 있으므로,
- * 여기서는 파일을 직접 읽는 대신 계산에 필요한 값만 다시 조립한다.
+ * 아직 쓰지 않은 메모리 상의 시세·환율 값으로 평가금액을 계산한다. 예전에는
+ * 파일을 쓴 뒤 다시 읽어 계산했지만, 세대 묶음 쓰기에서는 쓰기 전에 최종 값을
+ * 전부 준비해 둬야 해서 인자로 직접 받는다.
  */
-async function recomputeTotal(): Promise<{ totalKrw: number; principalKrw: number }> {
-  const { readFile } = await import("node:fs/promises");
-  const [quotesRaw, fxRaw] = await Promise.all([
-    readFile(join(dataDir, "quotes.json"), "utf8"),
-    readFile(join(dataDir, "fx-quote.json"), "utf8"),
-  ]);
-  const quotes = JSON.parse(quotesRaw) as { symbolId: string; price: number; currency: "KRW" | "USD" }[];
-  const fx = JSON.parse(fxRaw) as FxRate;
-
-  const portfolio = await loadPortfolio();
+async function recomputeTotal(
+  portfolio: Awaited<ReturnType<typeof loadPortfolio>>,
+  quotes: { symbolId: string; price: number; currency: "KRW" | "USD" }[],
+  fx: FxRate,
+): Promise<{ totalKrw: number; principalKrw: number }> {
   const priceById = new Map(quotes.map((q) => [q.symbolId, q]));
 
   let total = 0;
