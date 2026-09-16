@@ -169,9 +169,11 @@ export default async function DashboardPage() {
       </Section>
 
       {/* 배당·매매·입출금을 한 줄에 나란히 — 배당 차트만 따로 전체폭을 차지하면
-          아래 두 목록에 비해 내용에 비해 세로로 너무 길어진다. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          아래 두 목록에 비해 내용에 비해 세로로 너무 길어진다.
+          세 카드는 내용 길이가 제각각이라 flex로 같은 높이까지 늘려 맞춘다. */}
+      <div className="grid grid-cols-1 items-stretch gap-4 lg:grid-cols-3">
         <Section
+          className="flex h-full flex-col"
           title={`월간 배당 · ${currentYear}년`}
           description={`합계 ${money(dividends.thisYearKrw)} · 연간 예상 ${money(dividends.forecastKrw)}`}
           action={
@@ -180,7 +182,7 @@ export default async function DashboardPage() {
             </Link>
           }
         >
-          <Card>
+          <Card className="flex-1">
             {dividends.byYear.length > 0 ? (
               <>
                 <MonthlyBars months={dividendMonths} symbolOrder={dividends.bySymbol.map((line) => line.symbolId)} />
@@ -199,8 +201,8 @@ export default async function DashboardPage() {
           </Card>
         </Section>
 
-        <Section title="최신 매매 내역">
-          <Card padded={false}>
+        <Section className="flex h-full flex-col" title="최신 매매 내역">
+          <Card padded={false} className="flex-1">
             <ul className="divide-y divide-line">
               {trades.map((tx) => (
                 <li key={tx.id} className="flex items-center gap-3 px-4 py-3">
@@ -233,8 +235,8 @@ export default async function DashboardPage() {
           </Card>
         </Section>
 
-        <Section title="최신 입출금 내역">
-          <Card padded={false}>
+        <Section className="flex h-full flex-col" title="최신 입출금 내역">
+          <Card padded={false} className="flex-1">
             <ul className="divide-y divide-line">
               {cashflows.map((cf) => (
                 <li key={cf.id} className="flex items-center gap-3 px-4 py-3">

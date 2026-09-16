@@ -215,9 +215,10 @@ export function ValueChart({
 
         {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
+            <Legend color={stroke} label="총 평가금액" />
             {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
             {principalPoints.length > 0 ? <Legend color="var(--text-muted)" label="투입 원금" dashed /> : null}
-            {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
+            {showFx ? <Legend color="var(--fx)" label="환율" dashed /> : null}
             {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
             {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
           </div>
@@ -280,7 +281,7 @@ export function ValueChart({
             <polyline points={principalLine} fill="none" stroke="var(--text-muted)" strokeWidth="2.2" strokeDasharray="6 3" opacity="0.9" />
           ) : null}
           {showFx ? (
-            <polyline points={fxLine} fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="4 4" opacity="0.65" />
+            <polyline points={fxLine} fill="none" stroke="var(--fx)" strokeWidth="1.6" strokeDasharray="2 5" strokeLinecap="round" opacity="0.95" />
           ) : null}
           {returnPoints.length > 0 ? (
             <polyline points={returnLine} fill="none" stroke="var(--accent)" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" opacity="0.55" />
@@ -354,25 +355,13 @@ export function ValueChart({
         </div>
       </div>
 
+      {/* 전부 지금 보고 있는 구간(stats)의 값이다 — 기간 탭을 바꾸면 같이 바뀐다. */}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
-        <MiniStat label="구간 수익" value={moneySigned(stats.changeAmount)} sub={percentSigned(stats.changePercent)} tone={rising ? "up" : "down"} />
-        {(active.snapshot.principalKrw ?? principalKrw) ? (
-          <MiniStat
-            label="원금 대비"
-            value={percentSigned(
-              ((active.snapshot.totalKrw - (active.snapshot.principalKrw ?? principalKrw ?? 0)) /
-                (active.snapshot.principalKrw ?? principalKrw ?? 1)) *
-                100,
-            )}
-            sub={`원금 ${money(active.snapshot.principalKrw ?? principalKrw)}`}
-          />
-        ) : (
-          <MiniStat
-            label="최고점"
-            value={money(stats.peak?.totalKrw)}
-            sub={stats.peak ? shortDateTime(stats.peak.at) : undefined}
-          />
-        )}
+        <MiniStat
+          label="최고점"
+          value={money(stats.peak?.totalKrw)}
+          sub={stats.peak ? shortDateTime(stats.peak.at) : undefined}
+        />
         <MiniStat
           label="최저점"
           value={money(stats.trough?.totalKrw)}
@@ -389,6 +378,7 @@ export function ValueChart({
           tone={stats.maxDrawdown < 0 ? "down" : "default"}
         />
         <MiniStat label="현재/최고" value={percent(stats.vsPeakPercent)} sub={`최고 대비 ${moneySigned(stats.vsPeakAmount)}`} />
+        <MiniStat label="현재/최저" value={percent(stats.vsTroughPercent)} sub={`최저 대비 ${moneySigned(stats.vsTroughAmount)}`} />
       </div>
     </div>
   );
@@ -409,6 +399,8 @@ function TradeMarker({
 }) {
   const color = side === "buy" ? "var(--up)" : side === "sell" ? "var(--down)" : "var(--accent)";
   const detail = [buy > 0 ? `매수 ${buy}건` : "", sell > 0 ? `매도 ${sell}건` : ""].filter(Boolean).join(" · ");
+  // 세로선만 그린다. 평가금액 선 위에 타점마다 점을 찍었더니 타점이 수백 개인
+  // 구간에서 그 점들이 이어져 초록색 선처럼 보였고, 정작 평가금액 선이 묻혔다.
   return (
     <g>
       <title>{`${detail} · ${symbols.slice(0, 5).join(", ")}${symbols.length > 5 ? ` 외 ${symbols.length - 5}개` : ""}`}</title>
@@ -420,9 +412,8 @@ function TradeMarker({
         stroke={color}
         strokeWidth="1.2"
         strokeDasharray="3 4"
-        opacity="0.42"
+        opacity="0.28"
       />
-      <circle cx={point.x} cy={point.y} r="3.5" fill={color} stroke="var(--bg)" strokeWidth="1.5" />
     </g>
   );
 }

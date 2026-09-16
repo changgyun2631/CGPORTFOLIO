@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeSeries, downsample, filterSnapshots, rangeStart } from "../metrics";
+import { analyzeSeries, downsample, filterSnapshots, rangeStart, ranges } from "../metrics";
 import type { Snapshot } from "../types";
 
 function snap(at: string, totalKrw: number): Snapshot {
@@ -117,6 +117,65 @@ describe("filterSnapshots", () => {
     expect(result.usedFallback).toBe(true);
     // "7일" 버튼을 눌렀지만 실제 시작일은 8개월도 더 전이다 — 이게 P1-5가 밝히려는 사실.
     expect(result.snapshots[0].at).toBe("2026-01-01T00:00:00Z");
+  });
+});
+
+describe("기간 탭별 지표 카드 — 최고점·최저점·MDD·현재/최고·현재/최저", () => {
+  // 하루 간격 800일: 상승 -> 급락 -> 회복. 어떤 기간 탭을 눌러도 그 구간 안에
+  // 고점·저점·낙폭이 생기도록 일부러 굴곡을 넣는다.
+  const daily: Snapshot[] = Array.from({ length: 800 }, (_, i) => {
+    const at = new Date(Date.UTC(2024, 6, 1 + i, 6, 30)).toISOString();
+    const wave = Math.sin(i / 37) * 18 + Math.sin(i / 11) * 6;
+    return snap(at, Math.round(1000 + i * 1.5 + wave * 10));
+  });
+
+  for (const { key, label } of ranges) {
+    it(`${label} 탭의 다섯 값이 그 구간 스냅샷만으로 다시 계산한 값과 같다`, () => {
+      const { snapshots: filtered } = filterSnapshots(daily, key);
+      const stats = analyzeSeries(filtered);
+
+      // 화면과 같은 입력(구간 스냅샷 전체)을 독립적으로 다시 집계한다.
+      const totals = filtered.map((s) => s.totalKrw);
+      const last = totals[totals.length - 1];
+      const expectedPeak = Math.max(...totals);
+      const expectedTrough = Math.min(...totals);
+
+      let runningPeak = totals[0];
+      let expectedMdd = 0;
+      for (const total of totals) {
+        runningPeak = Math.max(runningPeak, total);
+        expectedMdd = Math.min(expectedMdd, ((total - runningPeak) / runningPeak) * 100);
+      }
+
+      expect(stats.peak?.totalKrw).toBe(expectedPeak);
+      expect(stats.trough?.totalKrw).toBe(expectedTrough);
+      expect(stats.maxDrawdown).toBeCloseTo(expectedMdd, 9);
+      expect(stats.vsPeakPercent).toBeCloseTo((last / expectedPeak) * 100, 9);
+      expect(stats.vsPeakAmount).toBe(last - expectedPeak);
+      expect(stats.vsTroughPercent).toBeCloseTo((last / expectedTrough) * 100, 9);
+      expect(stats.vsTroughAmount).toBe(last - expectedTrough);
+    });
+  }
+
+  it("구간이 좁아질수록 최고점은 낮아지지 않고 최저점은 높아지지 않는다", () => {
+    const all = analyzeSeries(filterSnapshots(daily, "all").snapshots);
+    const year = analyzeSeries(filterSnapshots(daily, "1y").snapshots);
+    const month = analyzeSeries(filterSnapshots(daily, "1m").snapshots);
+
+    expect(all.peak!.totalKrw).toBeGreaterThanOrEqual(year.peak!.totalKrw);
+    expect(year.peak!.totalKrw).toBeGreaterThanOrEqual(month.peak!.totalKrw);
+    expect(all.trough!.totalKrw).toBeLessThanOrEqual(year.trough!.totalKrw);
+    expect(year.trough!.totalKrw).toBeLessThanOrEqual(month.trough!.totalKrw);
+    // 마지막 값은 구간과 무관하게 같으므로 현재/최고는 구간이 좁을수록 100%에 가깝다.
+    expect(month.vsPeakPercent).toBeGreaterThanOrEqual(year.vsPeakPercent);
+  });
+
+  it("현재/최고와 현재/최저는 비율(100% 기준)이지 증감률이 아니다", () => {
+    const stats = analyzeSeries([snap("2026-01-01", 100), snap("2026-01-02", 200), snap("2026-01-03", 150)]);
+    expect(stats.vsPeakPercent).toBeCloseTo(75, 9); // 150/200
+    expect(stats.vsPeakAmount).toBe(-50);
+    expect(stats.vsTroughPercent).toBeCloseTo(150, 9); // 150/100
+    expect(stats.vsTroughAmount).toBe(50);
   });
 });
 
