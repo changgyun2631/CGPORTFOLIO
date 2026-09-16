@@ -66,50 +66,54 @@ export default async function DashboardPage() {
 
       <TickerStrip holdings={holdings} sparklines={sparklines} />
 
-      <div className="grid grid-cols-1 gap-4">
-        <Card>
-          <p className="text-xs font-medium text-muted">총 평가금액</p>
-          <p className="tnum mt-2 text-[34px] font-black leading-none tracking-tight sm:text-[42px]">
-            {moneyBare(totals.totalKrw)}
-            <span className="ml-1 text-lg font-bold text-muted">원</span>
-          </p>
-          <p className="mt-3 flex flex-wrap items-baseline gap-2 text-sm">
-            <span className="text-xs text-muted">전일 대비</span>
-            <Delta amount={totals.dayChangeKrw} percent={totals.dayChangePercent} className="text-[15px] font-bold" />
-          </p>
-          <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 text-xs">
-            <div>
-              <dt className="text-faint">달러 환산</dt>
-              <dd className="tnum mt-0.5 font-semibold">{money(totals.totalUsd, "USD")}</dd>
-            </div>
-            <div>
-              <dt className="text-faint">현재 평가손익</dt>
-              <dd className="mt-0.5 font-semibold">
-                <Delta amount={totals.gainKrw} />
-              </dd>
-            </div>
-          </dl>
-        </Card>
+      {/* 좌: 총평가금액+상위 보유종목(요약), 우: 추이 차트 — 나란히 둬야 자산구성
+          전체 목록(종목 수만큼 세로로 길어짐)이 화면을 다 차지하지 않는다. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr] lg:items-start">
+        <div className="space-y-4">
+          <Card>
+            <p className="text-xs font-medium text-muted">총 평가금액</p>
+            <p className="tnum mt-2 text-[34px] font-black leading-none tracking-tight sm:text-[42px]">
+              {moneyBare(totals.totalKrw)}
+              <span className="ml-1 text-lg font-bold text-muted">원</span>
+            </p>
+            <p className="mt-3 flex flex-wrap items-baseline gap-2 text-sm">
+              <span className="text-xs text-muted">전일 대비</span>
+              <Delta amount={totals.dayChangeKrw} percent={totals.dayChangePercent} className="text-[15px] font-bold" />
+            </p>
+            <dl className="mt-5 grid grid-cols-2 gap-3 border-t border-line pt-4 text-xs">
+              <div>
+                <dt className="text-faint">달러 환산</dt>
+                <dd className="tnum mt-0.5 font-semibold">{money(totals.totalUsd, "USD")}</dd>
+              </div>
+              <div>
+                <dt className="text-faint">현재 평가손익</dt>
+                <dd className="mt-0.5 font-semibold">
+                  <Delta amount={totals.gainKrw} />
+                </dd>
+              </div>
+            </dl>
+          </Card>
 
-        <Card>
-          <div className="mb-4 flex items-baseline justify-between">
-            <h2 className="text-[15px] font-semibold tracking-tight">자산 구성</h2>
-            <Link href="/symbols" className="text-xs text-accent hover:underline">
-              종목 전체
-            </Link>
-          </div>
-          <AllocationBar holdings={holdings} />
-        </Card>
+          <Card>
+            <div className="mb-4 flex items-baseline justify-between">
+              <h2 className="text-[15px] font-semibold tracking-tight">자산 구성</h2>
+              <Link href="/symbols" className="text-xs text-accent hover:underline">
+                종목 전체
+              </Link>
+            </div>
+            <AllocationBar holdings={holdings} limit={8} />
+          </Card>
+        </div>
+
+        <Section
+          title="총 평가금액 및 환율 추이"
+          description="환율 점선과 매수·매도 타점을 함께 볼 수 있습니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
+        >
+          <Card>
+            <ValueChart snapshots={snapshots} principalKrw={totals.principalKrw} trades={chartTrades} />
+          </Card>
+        </Section>
       </div>
-
-      <Section
-        title="총 평가금액 및 환율 추이"
-        description="환율 점선과 매수·매도 타점을 함께 볼 수 있습니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
-      >
-        <Card>
-          <ValueChart snapshots={snapshots} principalKrw={totals.principalKrw} trades={chartTrades} />
-        </Card>
-      </Section>
 
       <Section title="핵심 지표" description="평가손익은 증권사 현재 원가와 예상 매도수수료를 반영합니다.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">

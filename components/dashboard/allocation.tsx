@@ -21,10 +21,19 @@ export function colorFor(index: number) {
   return palette[index % palette.length];
 }
 
-/** 한 줄짜리 누적 막대 + 범례. 총 평가금액 카드 아래에 붙는다. */
-export function AllocationBar({ holdings }: { holdings: Holding[] }) {
+/**
+ * 한 줄짜리 누적 막대 + 범례. 총 평가금액 카드 아래에 붙는다.
+ * `limit`을 주면 비중이 큰 순서로 그만큼만 목록에 나열한다(누적 막대 자체는
+ * 항상 전체 종목으로 그린다) — 대시보드처럼 옆에 차트를 나란히 두는 좁은 칸에서
+ * 보유 종목 수만큼 목록이 한없이 길어지는 걸 막는다. 나머지는 "종목 전체" 링크로.
+ */
+export function AllocationBar({ holdings, limit }: { holdings: Holding[]; limit?: number }) {
   const total = holdings.reduce((sum, h) => sum + h.valueKrw, 0);
   if (total <= 0) return null;
+
+  const sorted = [...holdings].sort((a, b) => b.weight - a.weight);
+  const listed = limit ? sorted.slice(0, limit) : sorted;
+  const hiddenCount = sorted.length - listed.length;
 
   return (
     <div className="space-y-4">
@@ -40,7 +49,7 @@ export function AllocationBar({ holdings }: { holdings: Holding[] }) {
       </div>
 
       <ul className="space-y-2">
-        {holdings.map((holding, index) => (
+        {listed.map((holding, index) => (
           <li key={holding.symbolId}>
             <Link
               href={`/symbols/${encodeURIComponent(holding.symbolId)}`}
@@ -57,6 +66,7 @@ export function AllocationBar({ holdings }: { holdings: Holding[] }) {
           </li>
         ))}
       </ul>
+      {hiddenCount > 0 ? <p className="text-[11px] text-faint">+{hiddenCount}개 종목 더</p> : null}
     </div>
   );
 }
