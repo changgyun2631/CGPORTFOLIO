@@ -9,6 +9,10 @@ import { money, percent, percentSigned } from "@/lib/format";
 
 export const metadata: Metadata = { title: "백테스트" };
 
+// loadBacktests()가 보유 종목·잔고를 반영한 결과라, cron이 시세를 갱신하면
+// 재빌드 없이 다음 요청에서 바로 반영돼야 한다.
+export const dynamic = "force-dynamic";
+
 export default async function BacktestsPage() {
   const results = await loadBacktests();
 

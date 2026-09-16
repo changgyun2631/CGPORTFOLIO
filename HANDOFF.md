@@ -370,12 +370,38 @@ HTTP GET /        → 200
      `position-basis.json`이 만들어지고 쓰기 잠금도 정상 해제되는 것까지 확인.
      `npm test` 124개 전부 통과, `npx tsc --noEmit`·`npx eslint .`·`node --check` 통과.
 
-8. **동적 렌더링 경계 재검토**
+8. **동적 렌더링 경계 재검토** — ✅ 2026-09-16 완료 (Claude) — **실제 버그 2건 발견·수정**
    - 현재 포트폴리오 숫자가 있는 페이지는 `force-dynamic`으로 바꿨지만, 새 페이지를
      추가할 때 빠뜨리기 쉽다. 어떤 페이지가 실데이터에 의존하는지 목록/테스트로 고정하거나
      포트폴리오 레이아웃 경계에서 일관되게 적용할 방법을 검토한다.
    - **완료 조건**: cron 갱신 후 재빌드 없이 각 실데이터 페이지가 새 기준시각을 보이는
      통합 확인 절차가 있다.
+   - **찾은 버그**: 전체 `app/` 페이지를 조사한 결과 `app/backtests/page.tsx`와
+     `app/dividends/page.tsx`가 `loadBacktests`/`loadDividendSummary`·`loadPortfolio`로
+     cron이 갱신하는 시세·잔고 파생값을 쓰면서도 `dynamic = "force-dynamic"`이
+     빠져 있었다 — 스펙이 경고한 "새 페이지 추가 때 빠뜨리기 쉽다"가 실제로
+     일어난 사례다. 둘 다 추가했다. (`calendar`/`reports`/`reports/[slug]`도
+     `dynamic`이 없지만 이쪽은 사용자가 직접 편집하는 콘텐츠 파일이지 cron이
+     갱신하는 포트폴리오 숫자가 아니라서 — 스펙 원문의 "포트폴리오 숫자가 있는
+     페이지" 기준에 맞춰 — 이번 범위에서는 손대지 않았다.)
+   - **재발 방지**: `lib/data/__tests__/dynamic-pages.test.ts`가 `app/**/page.tsx`
+     전체를 스캔해서, `lib/data/views.ts`의 포트폴리오·시세 파생 로더
+     (`loadPortfolio`/`loadAccountSummary`/`loadAssetMap`/`loadDividendSummary`/
+     `loadRecentTrades`/`loadChartTrades`/`loadRecentCashFlows`/`loadBacktests`/
+     `loadBacktest`/`loadSymbolDetail`/`loadSparklines`/`loadPriceHistory`) 중
+     하나라도 쓰는 페이지는 반드시 `dynamic = "force-dynamic"`을 내보내야
+     한다고 소스 텍스트로 고정했다. 완벽한 파서는 아니고(문자열 매칭), 목록도
+     새 로더가 추가되면 같이 갱신해야 하지만, 이 프로젝트 규모에서 "새 페이지가
+     이 규칙을 깜빡했는지" 자동으로 잡기엔 충분하다.
+   - **검증**: 고친 뒤 픽스 전 상태를 일부러 재현해(dividends 페이지의
+     `dynamic` 줄을 임시로 지움 — 워크트리에서만, 커밋 전 원복) 테스트가 정확히
+     그 한 줄을 잡아 실패하는 것까지 확인했다(회귀 감지가 실제로 작동함을
+     증명). "cron 갱신 후 재빌드 없이 반영"의 가장 결정적인 증거는 `npm run
+     build`의 Route 표다 — 고치기 전엔 두 라우트가 표에서 다른 정적 페이지들과
+     구분이 안 됐을 텐데, 지금은 `ƒ /backtests`, `ƒ /dividends`로 명시적으로
+     Dynamic(요청마다 서버 렌더링) 표시가 뜬다. 브라우저로 이 워크트리의 가상
+     데이터를 넣고 두 페이지가 여전히 정상 렌더링되는 것도 확인했다. `npm test`
+     134개 전부 통과(새 테스트 10건 포함), `npx tsc --noEmit`·`npx eslint .` 통과.
 
 ##### P2 — 사용 편의와 운영 품질
 

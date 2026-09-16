@@ -10,6 +10,10 @@ import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "배당" };
 
+// loadDividendSummary/loadPortfolio가 cron이 갱신하는 시세·잔고를 쓰므로,
+// 재빌드 없이 다음 요청에서 바로 반영돼야 한다.
+export const dynamic = "force-dynamic";
+
 export default async function DividendsPage({ searchParams }: { searchParams: Promise<{ year?: string }> }) {
   const [summary, portfolio, params] = await Promise.all([loadDividendSummary(), loadPortfolio(), searchParams]);
 
