@@ -64,6 +64,13 @@ yarn-error.log*
 # 백업 폴더(~/cgportfolio-backups/)와 분리하려고 cwd 안에 둔다(lib/import/paths.ts).
 /.dev-backups
 
+# 증권사에서 내려받은 원본 내역(잔고·계좌수익률·거래내역). 저장소 루트에 그대로
+# 두고 가져오기를 돌리는 경우가 있어서, 화면 번호를 파일명으로 쓴 것까지 포함해
+# 확장자로 막는다 — 안에 계좌 잔고와 보유 수량이 그대로 들어 있다.
+/*.csv
+/*.xlsx
+/*.xls
+
 # vercel
 .vercel
 
