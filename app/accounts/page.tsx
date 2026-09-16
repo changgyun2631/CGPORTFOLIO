@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { colorFor } from "@/components/dashboard/allocation";
+import { colorFor } from "@/components/dashboard/palette";
 import { Card, PageTitle, Section, WeightBar } from "@/components/ui/primitives";
 import { loadAccountSummary, loadPortfolio } from "@/lib/data/views";
 import { buildCashFlowLedger } from "@/lib/domain/portfolio";

@@ -6,23 +6,7 @@ import { useEffect, useState } from "react";
 import type { Holding } from "@/lib/domain/portfolio";
 import { money, percent } from "@/lib/format";
 
-/** 비중 순서대로 색을 돌려 쓴다. 종목 수가 늘어도 인접한 칸이 같은 색이 되지 않게. */
-const palette = [
-  "#4f8cff",
-  "#22c9a8",
-  "#f0a04b",
-  "#9b7bf0",
-  "#f0616d",
-  "#3dc9e8",
-  "#c9d14b",
-  "#e87ab8",
-  "#6b7ae8",
-  "#54b36a",
-];
-
-export function colorFor(index: number) {
-  return palette[index % palette.length];
-}
+import { colorFor } from "./palette";
 
 const PAGE_SIZE = 10;
 const ROTATE_MS = 4000;

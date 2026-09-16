@@ -265,7 +265,7 @@ export function ValueChart({
             />
           ))}
           {principalPoints.length > 0 ? (
-            <polyline points={principalLine} fill="none" stroke="var(--text-faint)" strokeWidth="1.2" strokeDasharray="2 3" opacity="0.7" />
+            <polyline points={principalLine} fill="none" stroke="var(--text-muted)" strokeWidth="2.2" strokeDasharray="6 3" opacity="0.9" />
           ) : null}
           {showFx ? (
             <polyline points={fxLine} fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="4 4" opacity="0.65" />
@@ -313,13 +313,25 @@ export function ValueChart({
           </ul>
         ) : null}
 
-        <div className="pointer-events-none absolute left-0 top-0 rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg">
+        <div className="pointer-events-none absolute left-0 top-0 w-max min-w-[180px] rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg">
           <p className="text-faint">{shortDateTime(active.snapshot.at)}</p>
-          <p className="tnum mt-0.5 text-sm font-bold">{money(active.snapshot.totalKrw)}</p>
-          {active.snapshot.principalKrw ?? principalKrw ? (
-            <p className="tnum mt-0.5 text-faint">원금 {money(active.snapshot.principalKrw ?? principalKrw)}</p>
-          ) : null}
-          {showFx ? <p className="tnum mt-0.5 text-faint">환율 {active.snapshot.fxRate.toFixed(2)}</p> : null}
+          <dl className="mt-1 space-y-0.5">
+            <TooltipRow label="총 평가금액" value={money(active.snapshot.totalKrw)} emphasis />
+            {showFx ? <TooltipRow label="환율" value={active.snapshot.fxRate.toFixed(2)} /> : null}
+            {(() => {
+              const basis = active.snapshot.principalKrw ?? principalKrw;
+              if (!basis || basis <= 0) return null;
+              const gainKrw = active.snapshot.totalKrw - basis;
+              const gainPercent = (gainKrw / basis) * 100;
+              return (
+                <>
+                  <TooltipRow label="투입 원금" value={money(basis)} />
+                  <TooltipRow label="원금 대비 수익률" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
+                  <TooltipRow label="원금 대비 이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
+                </>
+              );
+            })()}
+          </dl>
           {activeTradeMarker ? (
             <p className="mt-1 border-t border-line pt-1 text-[11px] leading-4">
               {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
@@ -332,7 +344,7 @@ export function ValueChart({
         {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
           <div className="pointer-events-none absolute right-1 top-1 flex flex-col items-end gap-1 text-[10px] text-muted">
             {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
-            {principalPoints.length > 0 ? <Legend color="var(--text-faint)" label="원금" dashed /> : null}
+            {principalPoints.length > 0 ? <Legend color="var(--text-muted)" label="투입 원금" dashed /> : null}
             {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
             {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
             {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
@@ -424,6 +436,26 @@ function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; 
         {label}
       </text>
     </g>
+  );
+}
+
+function TooltipRow({
+  label,
+  value,
+  emphasis = false,
+  tone,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+  tone?: "up" | "down";
+}) {
+  const color = tone === "up" ? "text-up" : tone === "down" ? "text-down" : undefined;
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-faint">{label}</dt>
+      <dd className={`tnum ${emphasis ? "text-sm font-bold" : "font-semibold"} ${color ?? ""}`}>{value}</dd>
+    </div>
   );
 }
 

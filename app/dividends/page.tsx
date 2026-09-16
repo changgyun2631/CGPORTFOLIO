@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { MonthlyBars } from "@/components/charts/monthly-bars";
-import { colorFor } from "@/components/dashboard/allocation";
+import { colorFor } from "@/components/dashboard/palette";
 import { Card, Empty, PageTitle, Section, Stat, WeightBar } from "@/components/ui/primitives";
 import { loadDividendSummary, loadPortfolio } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";

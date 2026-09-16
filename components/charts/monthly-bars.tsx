@@ -1,4 +1,4 @@
-import { colorFor } from "@/components/dashboard/allocation";
+import { colorFor } from "@/components/dashboard/palette";
 import { money } from "@/lib/format";
 
 /**
