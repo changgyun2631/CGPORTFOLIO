@@ -206,7 +206,7 @@ HTTP GET /        → 200
      재시작 패턴의 실제 메커니즘 하나를 확인한 계기가 됐다 — 자세한 내용과 교훈은
      `WORK_ORDER.md` B-0과 0-4절(함정 10번)에 기록했다.
 
-3. **백업 복원 훈련과 절차 문서화**
+3. **백업 복원 훈련과 절차 문서화** — ✅ 2026-09-16 완료 (Claude)
    - 백업 생성은 검증했지만 실제 복원은 아직 검증하지 않았다. 최신 백업을 임시 폴더에
      풀어 JSON 파싱·필수 파일·참조 무결성을 검사하는 `--verify` 또는 복원 점검 스크립트가
      필요하다.
@@ -214,6 +214,40 @@ HTTP GET /        → 200
      확인 단계를 둔다.
    - **완료 조건**: 원본을 건드리지 않는 복원 리허설 성공 기록과 수동 복원 명령이 이
      문서에 남아 있다.
+   - **한 것**: `scripts/verify-backup.mjs`(`npm run backup:verify`)를 만들었다.
+     지정한 백업(생략 시 `~/cgportfolio-backups/`의 최신)을 **임시 폴더에 복사한
+     뒤에만** 검사한다 — 원본 백업 폴더는 읽기만 하고 절대 쓰지 않는다. 필수 파일
+     8종(`accounts/symbols/transactions/cashflows/dividends/snapshots/quotes/
+     fx-quote.json`) 존재 확인, JSON 파싱, 그리고 P0-1에서 만든 `validateAll`로
+     참조 무결성까지 검사한다. 검사 후 임시 폴더는 지운다(`--keep-temp`로 남길 수
+     있음). 자동 복원 기능은 일부러 만들지 않았고, 아래 수동 절차를 따르게 했다.
+   - **검증**: `scripts/lib/__tests__/verify-backup.test.mjs` 4건 — 정상 백업
+     통과(+검사 전후 원본 백업 폴더 파일 목록이 그대로인 것까지 확인), 필수 파일
+     누락·JSON 손상·참조 무결성 위반(존재하지 않는 계좌) 각각 실패. 실제
+     `~/cgportfolio-backups/`의 최신 백업으로도 돌려서 통과 확인(6절 참고).
+     `npm test` 90개 전부 통과, `npx tsc --noEmit`·`npx eslint .` 통과.
+
+   **수동 복원 절차** (자동화하지 않음 — 사람이 매 단계 확인하고 진행할 것):
+   ```powershell
+   # 1. 복원으로 지금 상태를 잃지 않게 먼저 현재 data/ 를 백업한다.
+   npm run backup
+
+   # 2. 복원하려는 백업이 실제로 정상인지 리허설로 먼저 확인한다.
+   npm run backup:verify -- "<백업 폴더 경로>"
+   # (경로 생략 시 가장 최신 백업을 검사한다)
+
+   # 3. 리허설이 통과하면 서버를 멈춘다.
+   Stop-ScheduledTask -TaskName "CGPORTFOLIO 서버"
+
+   # 4. data/ 를 백업 내용으로 덮어쓴다(기존 data/ 에만 있고 백업엔 없는 파일은
+   #    남는다 — 완전히 똑같이 맞추려면 미리 data/ 를 비우고 복사할 것).
+   Copy-Item -Recurse -Force "<백업 폴더 경로>\*" "C:\Users\ACC-002\Desktop\cgportfolio\data\"
+
+   # 5. 서버를 다시 띄우고 화면이 맞게 보이는지 확인한다. 재시작 전 반드시
+   #    `netstat -ano | grep ":3000.*LISTENING"`로 포트가 비었는지 확인할 것
+   #    (WORK_ORDER.md 0-4절 함정 10번 — 안 그러면 EADDRINUSE 크래시 루프가 난다).
+   Start-ScheduledTask -TaskName "CGPORTFOLIO 서버"
+   ```
 
 4. **시세와 잔고의 신선도 경고 표시**
    - 현재 총평가액은 최신 quote, 매입원가는 마지막 `position-basis`, 원금은 마지막
