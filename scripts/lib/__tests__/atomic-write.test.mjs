@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -51,6 +51,29 @@ describe("writeJsonAtomic", () => {
     // 재시도하면(다음 호출은 실제 renameSync를 쓰므로) 정상적으로 교체된다.
     writeJsonAtomic(target, "NEW");
     expect(readFileSync(target, "utf8")).toBe("NEW");
+  });
+
+  it("rename이 실패해도 임시 파일을 남기지 않는다", () => {
+    // 남은 임시 파일에는 대상과 같은 실제 계좌 데이터가 들어 있어서, 지우지 않으면
+    // 저장소에 미추적 상태로 굴러다닌다(2026-09-17 실제로 한 건 발생).
+    dir = mkdtempSync(join(tmpdir(), "atomic-write-"));
+    const target = join(dir, "data.json");
+    writeFileSync(target, "OLD");
+
+    vi.mocked(fsNode.renameSync).mockImplementationOnce(() => {
+      throw new Error("EPERM: operation not permitted, rename");
+    });
+
+    expect(() => writeJsonAtomic(target, "NEW")).toThrow("EPERM");
+    expect(readdirSync(dir).filter((name) => name.includes(".tmp-"))).toEqual([]);
+    expect(readFileSync(target, "utf8")).toBe("OLD");
+  });
+
+  it("정상 저장 뒤에도 임시 파일이 남지 않는다", () => {
+    dir = mkdtempSync(join(tmpdir(), "atomic-write-"));
+    const target = join(dir, "data.json");
+    writeJsonAtomic(target, "NEW");
+    expect(readdirSync(dir).filter((name) => name.includes(".tmp-"))).toEqual([]);
   });
 });
 

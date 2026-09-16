@@ -26,21 +26,36 @@ import { basename, dirname, join } from "node:path";
 export function writeJsonAtomic(filePath, content) {
   const dir = dirname(filePath);
   const tmpPath = join(dir, `.${basename(filePath)}.tmp-${process.pid}-${Date.now()}`);
-  const fd = openSync(tmpPath, "w");
+  let renamed = false;
   try {
-    writeSync(fd, content, null, "utf8");
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  if (existsSync(filePath)) {
+    const fd = openSync(tmpPath, "w");
     try {
-      copyFileSync(filePath, `${filePath}.bak`);
-    } catch {
-      // 백업 실패로 교체 자체를 막지는 않는다 — 최선의 노력이다.
+      writeSync(fd, content, null, "utf8");
+      fsyncSync(fd);
+    } finally {
+      closeSync(fd);
+    }
+    if (existsSync(filePath)) {
+      try {
+        copyFileSync(filePath, `${filePath}.bak`);
+      } catch {
+        // 백업 실패로 교체 자체를 막지는 않는다 — 최선의 노력이다.
+      }
+    }
+    renameSync(tmpPath, filePath);
+    renamed = true;
+  } finally {
+    // rename이 실패하면(Windows에서 다른 프로세스가 대상 파일을 잠깐 잡으면 EPERM이
+    // 난다) 임시 파일이 그대로 남는다. 그 안에는 대상과 같은 실제 계좌 데이터가
+    // 들어 있으므로 반드시 지운다. 정리 실패가 원래 예외를 덮지 않게 삼킨다.
+    if (!renamed) {
+      try {
+        unlinkSync(tmpPath);
+      } catch {
+        // 이미 없거나 지울 수 없으면 원래 예외를 그대로 올린다.
+      }
     }
   }
-  renameSync(tmpPath, filePath);
 }
 
 const LOCK_STALE_MS = 5 * 60 * 1000; // 정상 작업은 이보다 훨씬 빨리 끝난다.

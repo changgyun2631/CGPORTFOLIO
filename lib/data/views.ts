@@ -6,7 +6,7 @@ import { runBacktest } from "@/lib/domain/backtest";
 import { summarizeComposition, unexplainedPercent } from "@/lib/domain/composition";
 import { summarizeDividends } from "@/lib/domain/dividends";
 import { positionValuesAsOf, qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
-import { analyzeSeries, filterSnapshots } from "@/lib/domain/metrics";
+import { analyzeSeries, cashflowAdjustedDrawdown, filterSnapshots } from "@/lib/domain/metrics";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
 import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
 import type { PointInTime } from "@/lib/domain/weekly-report";
@@ -365,7 +365,9 @@ export const loadWeeklyReportInput = cache(async () => {
 
   // 전체 기간으로 잡으면 계좌를 막 열어 잔고가 거의 0이던 첫 주 때문에 최대낙폭이
   // -99%로 나온다 — 주간 점검에서 볼 숫자가 아니라, 대시보드 기본값과 같은 1년으로 본다.
-  const stats = analyzeSeries(filterSnapshots(snapshots, "1y").snapshots);
+  const yearSnapshots = filterSnapshots(snapshots, "1y").snapshots;
+  const stats = analyzeSeries(yearSnapshots);
+  const performanceDrawdown = cashflowAdjustedDrawdown(yearSnapshots);
 
   return {
     at: new Date().toISOString(),
@@ -386,6 +388,7 @@ export const loadWeeklyReportInput = cache(async () => {
     facts: {
       vsPeakPercent: stats.vsPeakPercent,
       maxDrawdown: stats.maxDrawdown,
+      performanceMaxDrawdown: performanceDrawdown.maxDrawdown,
       peakAt: stats.peak?.at ?? null,
       principalKrw: totals.principalKrw,
       principalGainPercent: totals.principalGainPercent,

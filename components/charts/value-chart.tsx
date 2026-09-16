@@ -378,8 +378,10 @@ export function ValueChart({
           value={money(stats.trough?.totalKrw)}
           sub={stats.trough ? shortDateTime(stats.trough.at) : undefined}
         />
+        {/* 평가액 고점 대비라 입출금이 섞여 있다 — 입출금을 뺀 성과 기준 낙폭은
+            주간 리포트에서 따로 낸다(`cashflowAdjustedDrawdown`). */}
         <MiniStat
-          label="MDD"
+          label="평가액 낙폭"
           value={percent(stats.maxDrawdown)}
           sub={
             stats.drawdownFrom && stats.drawdownTo

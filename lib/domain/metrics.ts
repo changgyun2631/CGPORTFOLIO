@@ -186,6 +186,64 @@ export function analyzeSeries(snapshots: Snapshot[]): SeriesStats {
   };
 }
 
+export type DrawdownResult = {
+  /** 최대낙폭(%) — 음수 */
+  maxDrawdown: number;
+  fromAt: string | null;
+  toAt: string | null;
+};
+
+/**
+ * 입출금 효과를 뺀 최대낙폭.
+ *
+ * `analyzeSeries`의 낙폭은 평가금액 고점 대비로만 재서, 돈을 넣으면 오른 것처럼
+ * 빼면 손실처럼 잡힌다. 성과를 보려면 외부 입출금을 제거한 수익지수로 재야 한다.
+ *
+ * **데이터 모델상의 가정**: 스냅샷 사이 `principalKrw`(순입금 누적)의 변화량을 그
+ * 기간의 외부 현금흐름으로 본다. 이 프로젝트에서 `principalKrw`는 계좌수익률
+ * CSV의 입금·출금 누적이므로 이 가정이 성립한다. `principalKrw`가 없는 스냅샷은
+ * 그 구간의 현금흐름을 0으로 본다(추정하지 않는다).
+ *
+ * 구간 수익률 = (기말 평가액 − 그 구간 순입금) ÷ 기초 평가액.
+ * 입출금만 있고 가격이 그대로면 이 값이 1이라 지수가 안 움직이고, 낙폭도 안 깊어진다.
+ */
+export function cashflowAdjustedDrawdown(snapshots: Snapshot[]): DrawdownResult {
+  const ordered = [...snapshots].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  if (ordered.length < 2) return { maxDrawdown: 0, fromAt: null, toAt: null };
+
+  let index = 1;
+  let peakIndex = 1;
+  let peakAt = ordered[0].at;
+  let maxDrawdown = 0;
+  let fromAt: string | null = null;
+  let toAt: string | null = null;
+
+  for (let i = 1; i < ordered.length; i += 1) {
+    const previous = ordered[i - 1];
+    const current = ordered[i];
+    // 기초 평가액이 0 이하면 수익률을 정의할 수 없다 — 지수를 끊지 않고 그대로 넘긴다.
+    if (previous.totalKrw > 0) {
+      const flow = (current.principalKrw ?? previous.principalKrw ?? 0) - (previous.principalKrw ?? 0);
+      const growth = (current.totalKrw - flow) / previous.totalKrw;
+      // 음수 성장률(= 입출금 가정이 깨진 구간)은 지수를 뒤집으므로 반영하지 않는다.
+      if (Number.isFinite(growth) && growth > 0) index *= growth;
+    }
+
+    if (index > peakIndex) {
+      peakIndex = index;
+      peakAt = current.at;
+    }
+    const drawdown = ((index - peakIndex) / peakIndex) * 100;
+    if (drawdown < maxDrawdown) {
+      maxDrawdown = drawdown;
+      fromAt = peakAt;
+      toAt = current.at;
+    }
+  }
+
+  return { maxDrawdown, fromAt, toAt };
+}
+
 /**
  * 차트에 그릴 점이 너무 많으면 균등 간격으로 솎아낸다.
  * 최고점과 최저점은 어떤 경우에도 살려서 모양이 뭉개지지 않게 한다.

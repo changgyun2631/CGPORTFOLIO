@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeSeries, downsample, filterSnapshots, rangeStart, ranges } from "../metrics";
+import { analyzeSeries, cashflowAdjustedDrawdown, downsample, filterSnapshots, rangeStart, ranges } from "../metrics";
 import type { Snapshot } from "../types";
 
 function snap(at: string, totalKrw: number): Snapshot {
@@ -231,5 +231,95 @@ describe("downsample", () => {
     const items = Array.from({ length: 50 }, (_, i) => i);
     const result = downsample(items, 5, (item) => item === 33);
     expect(result).toContain(33);
+  });
+});
+
+describe("cashflowAdjustedDrawdown", () => {
+  function snapWith(at: string, totalKrw: number, principalKrw: number): Snapshot {
+    return { at, totalKrw, principalKrw, fxRate: 1300 };
+  }
+
+  it("점이 2개 미만이면 낙폭이 없다", () => {
+    expect(cashflowAdjustedDrawdown([])).toEqual({ maxDrawdown: 0, fromAt: null, toAt: null });
+    expect(cashflowAdjustedDrawdown([snapWith("2026-01-01", 100, 100)]).maxDrawdown).toBe(0);
+  });
+
+  it("입금만 있고 가격이 그대로면 낙폭이 생기지 않는다", () => {
+    // 100 -> (+100 입금) -> 200. 평가액 기준으로는 상승이지만 성과는 그대로다.
+    const result = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 100, 100),
+      snapWith("2026-01-02", 200, 200),
+      snapWith("2026-01-03", 300, 300),
+    ]);
+    expect(result.maxDrawdown).toBeCloseTo(0, 9);
+  });
+
+  it("출금만 있어도 낙폭으로 잡지 않는다 — 평가액 기준과 갈리는 지점", () => {
+    const series = [
+      snapWith("2026-01-01", 200, 200),
+      snapWith("2026-01-02", 100, 100), // 100 출금, 가격 변동 없음
+    ];
+    expect(cashflowAdjustedDrawdown(series).maxDrawdown).toBeCloseTo(0, 9);
+    // 평가액 기준으로는 반토막으로 보인다.
+    expect(analyzeSeries(series).maxDrawdown).toBeCloseTo(-50, 9);
+  });
+
+  it("순수 하락은 그대로 낙폭으로 잡는다", () => {
+    const result = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 100, 100),
+      snapWith("2026-01-02", 80, 100),
+    ]);
+    expect(result.maxDrawdown).toBeCloseTo(-20, 9);
+    expect(result.fromAt).toBe("2026-01-01");
+    expect(result.toAt).toBe("2026-01-02");
+  });
+
+  it("하락 뒤 입금이 들어와도 회복으로 치지 않는다", () => {
+    // 100 -> 80 (-20%) -> 입금 100 -> 180. 성과는 여전히 -20%다.
+    const result = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 100, 100),
+      snapWith("2026-01-02", 80, 100),
+      snapWith("2026-01-03", 180, 200),
+    ]);
+    expect(result.maxDrawdown).toBeCloseTo(-20, 9);
+  });
+
+  it("회복하면 낙폭은 최악값으로 남고 이후 신고점부터 다시 잰다", () => {
+    const result = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 100, 100),
+      snapWith("2026-01-02", 50, 100), // -50%
+      snapWith("2026-01-03", 120, 100),
+    ]);
+    expect(result.maxDrawdown).toBeCloseTo(-50, 9);
+  });
+
+  it("시각이 뒤섞여 들어와도 정렬해서 계산한다", () => {
+    const sorted = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 100, 100),
+      snapWith("2026-01-02", 80, 100),
+    ]);
+    const shuffled = cashflowAdjustedDrawdown([
+      snapWith("2026-01-02", 80, 100),
+      snapWith("2026-01-01", 100, 100),
+    ]);
+    expect(shuffled.maxDrawdown).toBeCloseTo(sorted.maxDrawdown, 9);
+  });
+
+  it("평가액이 0 이하인 구간이 있어도 던지지 않는다", () => {
+    const result = cashflowAdjustedDrawdown([
+      snapWith("2026-01-01", 0, 0),
+      snapWith("2026-01-02", 100, 100),
+      snapWith("2026-01-03", 90, 100),
+    ]);
+    expect(Number.isFinite(result.maxDrawdown)).toBe(true);
+    expect(result.maxDrawdown).toBeLessThanOrEqual(0);
+  });
+
+  it("principalKrw가 없으면 그 구간 현금흐름을 0으로 본다", () => {
+    const result = cashflowAdjustedDrawdown([
+      { at: "2026-01-01", totalKrw: 100, fxRate: 1300 },
+      { at: "2026-01-02", totalKrw: 80, fxRate: 1300 },
+    ]);
+    expect(result.maxDrawdown).toBeCloseTo(-20, 9);
   });
 });

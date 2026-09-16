@@ -6,6 +6,10 @@ import { getReports } from "@/lib/data/store";
 
 export const metadata: Metadata = { title: "리포트" };
 
+// 예약 실행이 만든 주간 리포트가 재빌드 없이 바로 보여야 한다 — 정적으로 굳히면
+// 다음 빌드까지 목록에 안 나타난다(cron이 갱신한 시세를 매 요청에 반영하는 것과 같은 이유).
+export const dynamic = "force-dynamic";
+
 export default async function ReportsPage() {
   const reports = await getReports();
 

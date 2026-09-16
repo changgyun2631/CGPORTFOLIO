@@ -40,7 +40,10 @@ export type HoldingLine = {
 export type SeriesFacts = {
   /** 구간 최고점 대비 현재 비율(%) */
   vsPeakPercent: number;
+  /** 평가액 기준 낙폭 — 입출금이 섞여 있다 */
   maxDrawdown: number;
+  /** 입출금을 제거한 수익지수 기준 낙폭 — 성과를 볼 때 쓴다 */
+  performanceMaxDrawdown: number;
   peakAt: string | null;
   principalKrw: number;
   principalGainPercent: number;
@@ -161,7 +164,8 @@ export function buildWeeklyExposureReport({ at, current, past, holdings, facts }
   L.push("## 관찰");
   L.push("");
   L.push(`- 최근 1년 최고점 대비 ${pct(facts.vsPeakPercent)}${facts.peakAt ? ` (최고 ${facts.peakAt.slice(0, 10)})` : ""}`);
-  L.push(`- 최근 1년 최대낙폭 ${pct(facts.maxDrawdown)}`);
+  L.push(`- 최근 1년 최대낙폭 ${pct(facts.performanceMaxDrawdown)} (입출금 제거한 성과 기준)`);
+  L.push(`- 같은 구간 계좌 평가액 낙폭 ${pct(facts.maxDrawdown)} (입출금 포함)`);
   if (drift !== null) L.push(`- 실효 노출 주간 변화 ${signedPp(drift)}`);
   const cash = current.themes.find((line) => line.theme === "cash");
   if (cash) L.push(`- 현금 비중 ${pct(cash.weightPercent)}`);
@@ -185,6 +189,9 @@ export function buildWeeklyExposureReport({ at, current, past, holdings, facts }
     }
   }
   L.push("- 배수표(`lib/domain/exposure.ts`)에 없는 종목은 전부 0으로 센다. 새 레버리지 상품을 샀다면 표에 먼저 적어야 이 숫자가 맞는다.");
+  L.push(
+    "- 성과 낙폭은 스냅샷 사이 순입금 변화를 그 구간의 외부 현금흐름으로 보고 제거한 수익지수로 잰다. 돈을 넣은 것이 수익처럼, 뺀 것이 손실처럼 잡히지 않게 하려는 것이다.",
+  );
   L.push("- 시황 해석과 매매 권고는 넣지 않는다. 외부 시장 정보를 읽지 않고, 그 판단은 자동 생성이 할 일이 아니다.");
 
   return {

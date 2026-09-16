@@ -6,10 +6,9 @@ import { MarkdownBody } from "@/components/reports/markdown-body";
 import { Card } from "@/components/ui/primitives";
 import { getReportBody, getReports } from "@/lib/data/store";
 
-export async function generateStaticParams() {
-  const reports = await getReports();
-  return reports.map((report) => ({ slug: report.slug }));
-}
+// 목록과 같은 이유로 매 요청에 읽는다. 빌드 시점에 slug를 굳혀 두면 그 뒤에 생긴
+// 주간 리포트가 404가 된다.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/reports/[slug]">): Promise<Metadata> {
   const { slug } = await params;
