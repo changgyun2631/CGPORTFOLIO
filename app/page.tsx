@@ -122,14 +122,6 @@ export default async function DashboardPage() {
         </Section>
       </div>
 
-      <Section
-        title="나스닥100 실효 노출"
-        description="레버리지 배수를 곱해 더한 값입니다. 명목 비중과 달리, 지수가 움직일 때 계좌가 실제로 얼마나 흔들리는지를 봅니다."
-      >
-        <Card>
-          <QqqExposure current={exposure.current} past={exposure.past} />
-        </Card>
-      </Section>
 
       <Section title="핵심 지표" description="평가손익은 증권사 현재 원가와 예상 매도수수료를 반영합니다.">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -339,6 +331,15 @@ export default async function DashboardPage() {
 
       <Section title="종목 랭킹" description="평가금액이 큰 순서입니다.">
         <HoldingsTable holdings={holdings} />
+      </Section>
+
+      <Section
+        title="나스닥100 실효 노출"
+        description="레버리지 배수를 곱해 더한 값입니다. 명목 비중과 달리, 지수가 움직일 때 계좌가 실제로 얼마나 흔들리는지를 봅니다."
+      >
+        <Card>
+          <QqqExposure current={exposure.current} past={exposure.past} />
+        </Card>
       </Section>
     </div>
   );

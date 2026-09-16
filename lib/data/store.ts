@@ -20,6 +20,7 @@ import type {
   Symbol,
   Transaction,
 } from "@/lib/domain/types";
+import type { GeneratedReport } from "@/lib/domain/weekly-report";
 
 /**
  * 읽기 전용 저장소.
@@ -113,13 +114,31 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
   }
 }
 
+/**
+ * 예약 실행이 만든 리포트. 손으로 쓴 `reports.json`/`reports/*.md`는 저장소에
+ * 커밋되지만 이쪽은 실제 평가금액·비중이 들어가므로 `.gitignore`로 막혀 있다.
+ * 그래서 파일이 아직 없는 게 정상이고, 없으면 빈 목록으로 본다.
+ */
+export const getGeneratedReports = () =>
+  readJson<GeneratedReport[]>("weekly-reports.json").catch(() => [] as GeneratedReport[]);
+
 export async function getReports(): Promise<ReportMeta[]> {
-  try {
-    const reports = await readJson<ReportMeta[]>("reports.json");
-    return [...reports].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  } catch {
-    return [];
-  }
+  const [written, generated] = await Promise.all([
+    readJson<ReportMeta[]>("reports.json").catch(() => [] as ReportMeta[]),
+    getGeneratedReports(),
+  ]);
+  // 본문은 목록에 필요 없다 — 통째로 넘기면 화면 payload만 커진다.
+  const merged: ReportMeta[] = [
+    ...written,
+    ...generated.map((report) => ({
+      slug: report.slug,
+      title: report.title,
+      summary: report.summary,
+      publishedAt: report.publishedAt,
+      tags: report.tags,
+    })),
+  ];
+  return merged.sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }
 
 export async function getReportBody(slug: string): Promise<string | null> {
@@ -128,6 +147,7 @@ export async function getReportBody(slug: string): Promise<string | null> {
   try {
     return await readFile(join(dataDir, "reports", `${slug}.md`), "utf8");
   } catch {
-    return null;
+    const generated = await getGeneratedReports();
+    return generated.find((report) => report.slug === slug)?.body ?? null;
   }
 }

@@ -57,6 +57,9 @@ yarn-error.log*
 /data/fx.json
 # 가져오기 스크립트의 검토용 출력에도 실제 계좌 데이터가 들어간다.
 /data/out-*.json
+# 예약 실행이 만드는 주간 리포트. 손으로 쓴 reports.json/reports/*.md 와 달리
+# 그때그때의 실제 비중·평가금액이 본문에 들어간다.
+/data/weekly-reports.json
 # 원자적 쓰기가 남기는 이전 버전 백업과 쓰기 잠금 파일.
 /data/*.bak
 /data/.write.lock
