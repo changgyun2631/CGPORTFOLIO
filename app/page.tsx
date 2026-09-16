@@ -16,7 +16,6 @@ import {
   loadPortfolio,
   loadRecentCashFlows,
   loadRecentTrades,
-  loadSparklines,
 } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
 import { assessFreshness, earliestAsOf } from "@/lib/domain/freshness";
@@ -26,9 +25,8 @@ import { money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [portfolio, sparklines, accounts, assetMap, dividends, trades, cashflows, chartTrades] = await Promise.all([
+  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades] = await Promise.all([
     loadPortfolio(),
-    loadSparklines(),
     loadAccountSummary(),
     loadAssetMap(),
     loadDividendSummary(),
@@ -64,7 +62,7 @@ export default async function DashboardPage() {
         <FreshnessBadges checks={freshness} />
       </div>
 
-      <TickerStrip holdings={holdings} sparklines={sparklines} />
+      <TickerStrip holdings={holdings} />
 
       {/* 좌: 총평가금액+상위 보유종목(요약), 우: 추이 차트 — 나란히 둬야 자산구성
           전체 목록(종목 수만큼 세로로 길어짐)이 화면을 다 차지하지 않는다. */}
