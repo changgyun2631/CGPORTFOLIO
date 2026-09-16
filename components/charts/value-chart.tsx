@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { analyzeSeries, downsample, filterSnapshots, ranges, type RangeKey } from "@/lib/domain/metrics";
 import type { Snapshot } from "@/lib/domain/types";
-import { money, moneySigned, percent, percentSigned, shortDateTime } from "@/lib/format";
+import { dateLabel, money, moneySigned, percent, percentSigned, shortDateTime } from "@/lib/format";
 
 /**
  * 총 평가금액 추이.
@@ -48,8 +48,8 @@ export function ValueChart({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const { points, stats, fxPoints, returnPoints, series, min, max, returnMin, returnMax } = useMemo(() => {
-    const filtered = filterSnapshots(snapshots, range);
+  const { points, stats, fxPoints, returnPoints, series, min, max, returnMin, returnMax, usedFallback } = useMemo(() => {
+    const { snapshots: filtered, usedFallback } = filterSnapshots(snapshots, range);
     const stats = analyzeSeries(filtered);
     // 점이 많으면 솎아내되 최고점과 최저점은 반드시 남긴다.
     const series = downsample(filtered, 260, (s) => s.at === stats.peak?.at || s.at === stats.trough?.at);
@@ -98,7 +98,7 @@ export function ValueChart({
       }));
     }
 
-    return { points, stats, fxPoints, returnPoints, series, min, max, fxMin, fxMax, returnMin, returnMax };
+    return { points, stats, fxPoints, returnPoints, series, min, max, fxMin, fxMax, returnMin, returnMax, usedFallback };
   }, [snapshots, range, principalKrw]);
 
   if (points.length === 0) {
@@ -203,9 +203,18 @@ export function ValueChart({
           >
             {fullscreen ? "전체화면 닫기" : "차트 전체화면"}
           </button>
-          <span className="text-xs text-faint">{series.length}개 스냅샷</span>
         </div>
       </div>
+
+      <p className="text-xs text-faint">
+        {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
+        {series.length}개 스냅샷
+        {usedFallback ? (
+          <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
+            자료 공백으로 최근 관측값 표시 — {ranges.find((r) => r.key === range)?.label} 구간을 다 못 채웠습니다
+          </span>
+        ) : null}
+      </p>
 
       <div className="relative">
         <svg

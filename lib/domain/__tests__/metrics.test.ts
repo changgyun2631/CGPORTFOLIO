@@ -61,20 +61,34 @@ describe("filterSnapshots", () => {
     snap("2024-01-01T00:00:00+09:00", 120),
   ];
 
-  it("빈 배열이면 빈 배열을 반환한다", () => {
-    expect(filterSnapshots([], "1y")).toEqual([]);
+  it("빈 배열이면 빈 배열을 반환하고 fallback은 아니다", () => {
+    expect(filterSnapshots([], "1y")).toEqual({ snapshots: [], usedFallback: false });
   });
 
-  it("all 범위는 전체를 반환한다", () => {
-    expect(filterSnapshots(snapshots, "all")).toHaveLength(3);
+  it("all 범위는 전체를 반환하고 fallback은 아니다", () => {
+    const result = filterSnapshots(snapshots, "all");
+    expect(result.snapshots).toHaveLength(3);
+    expect(result.usedFallback).toBe(false);
   });
 
-  it("1일 범위에 실제 점이 부족하면 마지막 두 관측값을 반환한다", () => {
+  it("1일 범위에 실제 점이 부족하면 마지막 두 관측값을 fallback으로 반환한다", () => {
     const result = filterSnapshots(snapshots, "1d");
-    expect(result).toEqual(snapshots.slice(-2));
+    expect(result.snapshots).toEqual(snapshots.slice(-2));
+    expect(result.usedFallback).toBe(true);
   });
 
-  it("짧은 달력 구간이 비어도 기간별로 서로 다른 실제 관측값 수를 쓴다", () => {
+  it("달력 구간에 점이 2개 이상 있으면 fallback이 아니다", () => {
+    const dense = [
+      snap("2024-06-01T00:00:00+09:00", 100),
+      snap("2024-06-05T00:00:00+09:00", 105),
+      snap("2024-06-10T00:00:00+09:00", 110),
+    ];
+    const result = filterSnapshots(dense, "1y");
+    expect(result.usedFallback).toBe(false);
+    expect(result.snapshots).toHaveLength(3);
+  });
+
+  it("짧은 달력 구간이 비어도 기간별로 서로 다른 실제 관측값 수를 쓰고, 전부 fallback으로 표시한다", () => {
     const sparse = [
       ...Array.from({ length: 40 }, (_, index) =>
         snap(new Date(Date.UTC(2026, 6, index + 1)).toISOString(), 100 + index),
@@ -82,9 +96,27 @@ describe("filterSnapshots", () => {
       snap("2026-09-15T00:00:00.000Z", 150),
     ];
 
-    expect(filterSnapshots(sparse, "1d")).toHaveLength(2);
-    expect(filterSnapshots(sparse, "7d")).toHaveLength(7);
-    expect(filterSnapshots(sparse, "1m")).toHaveLength(30);
+    const oneDay = filterSnapshots(sparse, "1d");
+    const sevenDay = filterSnapshots(sparse, "7d");
+    const oneMonth = filterSnapshots(sparse, "1m");
+
+    expect(oneDay.snapshots).toHaveLength(2);
+    expect(oneDay.usedFallback).toBe(true);
+    expect(sevenDay.snapshots).toHaveLength(7);
+    expect(sevenDay.usedFallback).toBe(true);
+    expect(oneMonth.snapshots).toHaveLength(30);
+    expect(oneMonth.usedFallback).toBe(true);
+  });
+
+  it("fallback으로 반환된 관측값의 실제 시작일은 화면이 직접 읽을 수 있다 — 달력 구간과 다를 수 있음", () => {
+    const sparse = [
+      snap("2026-01-01T00:00:00Z", 100),
+      snap("2026-09-15T00:00:00Z", 150),
+    ];
+    const result = filterSnapshots(sparse, "7d");
+    expect(result.usedFallback).toBe(true);
+    // "7일" 버튼을 눌렀지만 실제 시작일은 8개월도 더 전이다 — 이게 P1-5가 밝히려는 사실.
+    expect(result.snapshots[0].at).toBe("2026-01-01T00:00:00Z");
   });
 });
 

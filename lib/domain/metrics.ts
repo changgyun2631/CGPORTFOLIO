@@ -51,14 +51,25 @@ export function rangeStart(range: RangeKey, reference: Date): Date | null {
   }
 }
 
-export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): Snapshot[] {
-  if (snapshots.length === 0) return [];
+export type FilteredSnapshots = {
+  snapshots: Snapshot[];
+  /**
+   * 달력 구간에 실제 점이 2개 미만이라 마지막 N개 실제 관측값으로 대체했으면
+   * true. 화면은 이걸로 "○일" 버튼이 실제로는 그 기간을 못 채웠다는 걸
+   * 이용자에게 밝혀야 한다 — 계산(여기)과 표시(컴포넌트)가 같은 사실을 보게
+   * 하려고 값 자체가 아니라 이 플래그를 공유한다.
+   */
+  usedFallback: boolean;
+};
+
+export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): FilteredSnapshots {
+  if (snapshots.length === 0) return { snapshots: [], usedFallback: false };
   const latest = new Date(snapshots[snapshots.length - 1].at);
   const start = rangeStart(range, latest);
-  if (!start) return snapshots;
+  if (!start) return { snapshots, usedFallback: false };
   const startIso = start.toISOString();
   const filtered = snapshots.filter((s) => new Date(s.at).toISOString() >= startIso);
-  if (filtered.length >= 2) return filtered;
+  if (filtered.length >= 2) return { snapshots: filtered, usedFallback: false };
 
   // 실제 일별 기록이 듬성듬성한 구간에서도 기간 버튼끼리 같은 두 점만
   // 반복하지 않도록, 가짜 날짜를 만들지 않고 마지막 N개 실제 관측값을 쓴다.
@@ -73,7 +84,7 @@ export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): Snapsho
     "5y": 1_825,
   };
   const count = fallbackObservations[range] ?? 2;
-  return snapshots.slice(-Math.min(count, snapshots.length));
+  return { snapshots: snapshots.slice(-Math.min(count, snapshots.length)), usedFallback: true };
 }
 
 export type SeriesStats = {
