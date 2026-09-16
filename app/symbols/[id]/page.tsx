@@ -64,10 +64,20 @@ export default async function SymbolDetailPage({ params }: PageProps<"/symbols/[
         <Empty title="보유하지 않은 종목입니다" description="거래 내역이 없어 평가 정보를 만들 수 없습니다." />
       )}
 
-      {history.length > 1 ? (
-        <Section title="가격 추이" description={`${history.length}거래일`}>
+      {!isCash ? (
+        <Section
+          title="가격 추이"
+          description={history.length > 1 ? `${history.length}거래일` : undefined}
+        >
           <Card>
-            <PriceHistory points={history} currency={symbol.currency} />
+            {history.length > 1 ? (
+              <PriceHistory points={history} currency={symbol.currency} trades={trades} />
+            ) : (
+              <Empty
+                title="가격 이력이 없습니다"
+                description="현재 data/prices.json에는 일부 종목만 과거 종가가 들어 있습니다(실제 장기 데이터로 교체 예정 — WORK_ORDER B-4)."
+              />
+            )}
           </Card>
         </Section>
       ) : null}

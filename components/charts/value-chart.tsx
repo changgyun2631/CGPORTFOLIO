@@ -49,25 +49,39 @@ export function ValueChart({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
-  const { points, stats, fxPoints, returnPoints, series, min, max, returnMin, returnMax, usedFallback } = useMemo(() => {
+  const { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, returnMin, returnMax, usedFallback } =
+    useMemo(() => {
     const { snapshots: filtered, usedFallback } = filterSnapshots(snapshots, range);
     const stats = analyzeSeries(filtered);
     // 점이 많으면 솎아내되 최고점과 최저점은 반드시 남긴다.
     const series = downsample(filtered, 260, (s) => s.at === stats.peak?.at || s.at === stats.trough?.at);
 
     const values = series.map((s) => s.totalKrw);
-    const min = Math.min(...values);
-    const max = Math.max(...values);
+    // 원금(순입금 누적)도 같은 축에 선으로 그리므로, 원금이 평가금액 범위를 벗어나면
+    // (예: 하락장에서 평가금액이 원금 아래로 내려가면) 축 자체를 넓혀서 잘리지 않게 한다.
+    const principalValues = series.map((s) => s.principalKrw ?? principalKrw).filter((v): v is number => v != null && v > 0);
+    const min = Math.min(...values, ...principalValues);
+    const max = Math.max(...values, ...principalValues);
     const span = max - min || 1;
     const innerW = WIDTH - PAD.left - PAD.right;
     const innerH = HEIGHT - PAD.top - PAD.bottom;
     const xAt = (i: number) => PAD.left + (series.length === 1 ? innerW / 2 : (i / (series.length - 1)) * innerW);
+    const yAt = (value: number) => PAD.top + innerH - ((value - min) / span) * innerH;
 
     const points = series.map((s, i) => ({
       x: xAt(i),
-      y: PAD.top + innerH - ((s.totalKrw - min) / span) * innerH,
+      y: yAt(s.totalKrw),
       snapshot: s,
     }));
+
+    // 원금은 날짜별로 기록이 없으면(최근 자동 스냅샷 등) 현재 순입금 원금을 대체값으로 쓴다 —
+    // "원금 대비 수익률" 선과 같은 기준이다.
+    const principalPoints = series
+      .map((s, i) => {
+        const basis = s.principalKrw ?? principalKrw;
+        return basis && basis > 0 ? { x: xAt(i), y: yAt(basis) } : null;
+      })
+      .filter((point): point is { x: number; y: number } => point !== null);
 
     const fxValues = series.map((s) => s.fxRate);
     const fxMin = Math.min(...fxValues);
@@ -99,7 +113,7 @@ export function ValueChart({
       }));
     }
 
-    return { points, stats, fxPoints, returnPoints, series, min, max, fxMin, fxMax, returnMin, returnMax, usedFallback };
+    return { points, stats, fxPoints, returnPoints, principalPoints, series, min, max, fxMin, fxMax, returnMin, returnMax, usedFallback };
   }, [snapshots, range, principalKrw]);
 
   if (points.length === 0) {
@@ -112,6 +126,7 @@ export function ValueChart({
   const area = `${line} ${points[points.length - 1].x.toFixed(1)},${HEIGHT - PAD.bottom} ${points[0].x.toFixed(1)},${HEIGHT - PAD.bottom}`;
   const fxLine = fxPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const returnLine = returnPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const principalLine = principalPoints.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
   const innerH = HEIGHT - PAD.top - PAD.bottom;
   const valueAtY = (t: number) => min + (1 - t) * (max - min);
   const axisUnit = max >= 100_000_000 ? 100_000_000 : 10_000;
@@ -136,6 +151,11 @@ export function ValueChart({
         symbols: group.symbols,
         side: group.side,
       }));
+
+  // 마우스가 매매 타점과 같은 스냅샷에 가장 가까우면(= active 포인트와 일치하면)
+  // 그 거래 내역을 호버 툴팁에도 같이 보여준다 — 세로 점선만으로는 어떤 종목인지
+  // 알 수 없다는 피드백을 반영했다.
+  const activeTradeMarker = tradeMarkers.find((marker) => marker.point.snapshot.at === active.snapshot.at) ?? null;
 
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
@@ -242,6 +262,9 @@ export function ValueChart({
               symbols={marker.symbols}
             />
           ))}
+          {principalPoints.length > 0 ? (
+            <polyline points={principalLine} fill="none" stroke="var(--text-faint)" strokeWidth="1.2" strokeDasharray="2 3" opacity="0.7" />
+          ) : null}
           {showFx ? (
             <polyline points={fxLine} fill="none" stroke="var(--accent)" strokeWidth="1.2" strokeDasharray="4 4" opacity="0.65" />
           ) : null}
@@ -295,11 +318,19 @@ export function ValueChart({
             <p className="tnum mt-0.5 text-faint">원금 {money(active.snapshot.principalKrw ?? principalKrw)}</p>
           ) : null}
           {showFx ? <p className="tnum mt-0.5 text-faint">환율 {active.snapshot.fxRate.toFixed(2)}</p> : null}
+          {activeTradeMarker ? (
+            <p className="mt-1 border-t border-line pt-1 text-[11px] leading-4">
+              {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
+              {activeTradeMarker.sell > 0 ? <span className="font-semibold text-down">매도 {activeTradeMarker.sell}건 </span> : null}
+              <span className="text-muted">{activeTradeMarker.symbols.join(", ")}</span>
+            </p>
+          ) : null}
         </div>
 
-        {returnPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
+        {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
           <div className="pointer-events-none absolute right-1 top-1 flex flex-col items-end gap-1 text-[10px] text-muted">
             {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
+            {principalPoints.length > 0 ? <Legend color="var(--text-faint)" label="원금" dashed /> : null}
             {showFx ? <Legend color="var(--accent)" label="환율" dashed /> : null}
             {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
             {tradeMarkers.some((marker) => marker.sell > 0) ? <Legend color="var(--down)" label="매도" dashed /> : null}
