@@ -159,7 +159,10 @@ export function ValueChart({
   };
 
   return (
-    <div ref={containerRef} className={`space-y-4 ${fullscreen ? "flex h-screen flex-col justify-center bg-bg p-6" : ""}`}>
+    <div
+      ref={containerRef}
+      className={`flex flex-col gap-4 ${fullscreen ? "h-screen justify-center bg-bg p-6" : "h-full"}`}
+    >
       <div className="flex flex-wrap items-center gap-1.5">
         {ranges.map((r) => (
           <button
@@ -231,11 +234,13 @@ export function ValueChart({
         ) : null}
       </div>
 
-      <div className="relative">
+      {/* 카드가 옆 칸 높이에 맞춰 늘어나면 차트도 같이 커진다. 높이가 정해지지
+          않은 곳(백테스트 상세)에서는 min-h가 예전 고정 높이 역할을 한다. */}
+      <div className="relative min-h-[240px] flex-1 sm:min-h-[300px]">
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           preserveAspectRatio="none"
-          className={fullscreen ? "h-[70vh] w-full" : "h-[240px] w-full sm:h-[300px]"}
+          className={fullscreen ? "h-[70vh] w-full" : "h-full min-h-[240px] w-full sm:min-h-[300px]"}
           role="img"
           aria-label={`총 평가금액 추이, ${ranges.find((r) => r.key === range)?.label} 구간, ${percentSigned(stats.changePercent)}`}
           onMouseLeave={() => setHover(null)}

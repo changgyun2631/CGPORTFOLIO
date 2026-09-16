@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type { Holding } from "@/lib/domain/portfolio";
-import { money, percent } from "@/lib/format";
+import { percent } from "@/lib/format";
 
 import { colorFor } from "./palette";
 
@@ -62,12 +62,11 @@ export function AllocationBar({ holdings, paginate = false }: { holdings: Holdin
                 className="flex items-center gap-3 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-surface-hover"
               >
                 <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colorFor(colorIndex) }} />
-                <span className="w-[62px] shrink-0 text-[12px] font-bold tracking-tight">{holding.symbolId}</span>
+                <span className="w-[58px] shrink-0 text-[12px] font-bold tracking-tight">{holding.symbolId}</span>
+                {/* 종목명이 이 줄의 우선순위다 — 나머지 칸은 고정 폭이라, 남는 폭을
+                    전부 이름에 준다. 평가금액은 아래 종목 랭킹 표에 그대로 있다. */}
                 <span className="min-w-0 flex-1 truncate text-[11px] text-muted">{holding.name}</span>
-                <span className="tnum w-[52px] shrink-0 text-right text-[12px] font-semibold">{percent(holding.weight, 1)}</span>
-                <span className="tnum hidden w-[124px] shrink-0 text-right text-[12px] text-muted sm:block">
-                  {money(holding.valueKrw)}
-                </span>
+                <span className="tnum w-[48px] shrink-0 text-right text-[12px] font-semibold">{percent(holding.weight, 1)}</span>
               </Link>
             </li>
           );

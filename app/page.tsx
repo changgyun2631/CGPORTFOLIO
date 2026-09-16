@@ -19,7 +19,7 @@ import {
 } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
 import { assessFreshness, earliestAsOf } from "@/lib/domain/freshness";
-import { money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
+import { dateTimeLabel, money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 
 // cron이 갱신한 시세·스냅샷을 재빌드 없이 매 요청에 반영한다.
 export const dynamic = "force-dynamic";
@@ -58,7 +58,10 @@ export default async function DashboardPage() {
         title="대시보드"
         description={`보유 자산 ${totals.symbolCount}개 · ${totals.accountCount}개 계좌 · ${shortDateTime(fx.asOf)} 기준`}
       />
-      <div className="-mt-4 mb-6">
+      <div className="-mt-4 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <p className="tnum text-xs font-semibold tracking-wide text-muted">
+          UPDATE : <span className="text-text">{dateTimeLabel(fx.asOf)}</span>
+        </p>
         <FreshnessBadges checks={freshness} />
       </div>
 
@@ -66,8 +69,10 @@ export default async function DashboardPage() {
 
       {/* 좌: 총평가금액+상위 보유종목(요약), 우: 추이 차트 — 나란히 둬야 자산구성
           전체 목록(종목 수만큼 세로로 길어짐)이 화면을 다 차지하지 않는다. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[360px_1fr] lg:items-start">
-        <div className="space-y-4">
+      {/* 두 칸이 같은 높이로 끝나게 둔다 — 왼쪽(요약+자산구성)이 내용상 더 길어서
+          그쪽이 줄 높이를 정하고, 차트가 남는 높이를 채워 커진다. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[440px_1fr]">
+        <div className="flex flex-col gap-4">
           <Card>
             <p className="text-xs font-medium text-muted">총 평가금액</p>
             <p className="tnum mt-2 text-[34px] font-black leading-none tracking-tight sm:text-[42px]">
@@ -104,10 +109,11 @@ export default async function DashboardPage() {
         </div>
 
         <Section
+          className="flex h-full flex-col"
           title="총 평가금액 및 환율 추이"
           description="환율 점선과 매수·매도 타점을 함께 볼 수 있습니다. 기간을 바꾸면 아래 지표도 그 구간 기준으로 다시 계산됩니다."
         >
-          <Card>
+          <Card className="flex flex-1 flex-col">
             <ValueChart snapshots={snapshots} principalKrw={totals.principalKrw} trades={chartTrades} />
           </Card>
         </Section>

@@ -59,6 +59,13 @@ export function dateLabel(iso: string) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+/** "2026-09-17 02:07" — 날짜와 분까지. 화면 상단 UPDATE 표기에 쓴다. */
+export function dateTimeLabel(iso: string) {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function trendOf(value: number | null | undefined): "up" | "down" | "flat" {
   if (value === null || value === undefined || !Number.isFinite(value) || value === 0) return "flat";
   return value > 0 ? "up" : "down";
