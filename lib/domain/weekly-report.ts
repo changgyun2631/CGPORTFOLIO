@@ -59,14 +59,13 @@ export function buildWeeklyExposureReport({ at, current, past }: WeeklyReportInp
   );
   lines.push("");
 
+  // 리포트 렌더러(`lib/markdown.ts`)는 표를 모른다 — 목록으로 적는다.
   lines.push("## 실효 노출");
   lines.push("");
-  lines.push("| 시점 | 실효 노출 | 지난 시점 대비 |");
-  lines.push("| --- | --- | --- |");
-  lines.push(`| 현재 | ${pct(current.effectivePercent)} | — |`);
+  lines.push(`- **현재** — ${pct(current.effectivePercent)}`);
   for (const point of past) {
     const diff = current.effectivePercent - point.summary.effectivePercent;
-    lines.push(`| ${point.label} | ${pct(point.summary.effectivePercent)} | ${signedPct(diff)} |`);
+    lines.push(`- ${point.label} — ${pct(point.summary.effectivePercent)} (지금은 ${signedPct(diff)})`);
   }
   lines.push("");
   lines.push(`명목 비중 합은 ${pct(current.nominalPercent)}다.`);
@@ -77,11 +76,9 @@ export function buildWeeklyExposureReport({ at, current, past }: WeeklyReportInp
   if (current.lines.length === 0) {
     lines.push("배수가 잡힌 보유 종목이 없다.");
   } else {
-    lines.push("| 종목 | 배수 | 비중 | 실효 노출 |");
-    lines.push("| --- | --- | --- | --- |");
     for (const line of current.lines) {
       lines.push(
-        `| ${line.symbolId} | ${line.leverage}x | ${pct(line.weightPercent)} | ${pct(line.exposurePercent)} |`,
+        `- **${line.symbolId}** ${line.leverage}배 — 비중 ${pct(line.weightPercent)}, 실효 노출 ${pct(line.exposurePercent)}`,
       );
     }
     lines.push("");

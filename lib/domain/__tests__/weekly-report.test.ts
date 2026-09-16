@@ -42,11 +42,16 @@ describe("buildWeeklyExposureReport", () => {
     expect(report.summary).toContain("-5.0%p");
   });
 
-  it("본문에 시점 표와 종목 표가 들어간다", () => {
+  it("본문에 시점별 값과 종목별 내역이 들어간다", () => {
     const report = buildWeeklyExposureReport({ at: "2026-09-17T02:00:00+09:00", current: exposure(35), past });
-    expect(report.body).toContain("| 현재 | 35.0% |");
-    expect(report.body).toContain("| 1주 전 | 30.0% | +5.0%p |");
-    expect(report.body).toContain("| QLD | 2x |");
+    expect(report.body).toContain("- **현재** — 35.0%");
+    expect(report.body).toContain("- 1주 전 — 30.0% (지금은 +5.0%p)");
+    expect(report.body).toContain("- **QLD** 2배 — 비중 17.5%, 실효 노출 35.0%");
+  });
+
+  it("렌더러가 못 읽는 표 문법은 쓰지 않는다", () => {
+    const report = buildWeeklyExposureReport({ at: "2026-09-17T02:00:00+09:00", current: exposure(35), past });
+    expect(report.body).not.toMatch(/^\|/m);
   });
 
   it("비교할 과거 시점이 없어도 만들어진다", () => {
