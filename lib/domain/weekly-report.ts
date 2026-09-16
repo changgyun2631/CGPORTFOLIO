@@ -160,8 +160,8 @@ export function buildWeeklyExposureReport({ at, current, past, holdings, facts }
   // 5. 관찰 (사실만)
   L.push("## 관찰");
   L.push("");
-  L.push(`- 최고점 대비 ${pct(facts.vsPeakPercent)}${facts.peakAt ? ` (최고 ${facts.peakAt.slice(0, 10)})` : ""}`);
-  L.push(`- 이 구간 최대낙폭 ${pct(facts.maxDrawdown)}`);
+  L.push(`- 최근 1년 최고점 대비 ${pct(facts.vsPeakPercent)}${facts.peakAt ? ` (최고 ${facts.peakAt.slice(0, 10)})` : ""}`);
+  L.push(`- 최근 1년 최대낙폭 ${pct(facts.maxDrawdown)}`);
   if (drift !== null) L.push(`- 실효 노출 주간 변화 ${signedPp(drift)}`);
   const cash = current.themes.find((line) => line.theme === "cash");
   if (cash) L.push(`- 현금 비중 ${pct(cash.weightPercent)}`);

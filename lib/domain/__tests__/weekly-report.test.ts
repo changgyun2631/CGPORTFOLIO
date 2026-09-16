@@ -83,8 +83,8 @@ describe("buildWeeklyExposureReport", () => {
 
   it("관찰에는 사실만 적고 매매 판단은 넣지 않는다", () => {
     const body = buildWeeklyExposureReport(baseInput).body;
-    expect(body).toContain("최고점 대비 85.6%");
-    expect(body).toContain("최대낙폭 -20.2%");
+    expect(body).toContain("최근 1년 최고점 대비 85.6%");
+    expect(body).toContain("최근 1년 최대낙폭 -20.2%");
     expect(body).not.toMatch(/매수 권고|매도 권고|사야|팔아야|추천/);
   });
 
