@@ -90,6 +90,16 @@ npm run build
 9. **`taskkill`로 자식 프로세스만 죽이면 Task Scheduler가 그 작업을 계속 "Running"으로
    착각해 새 실행을 거부할 수 있다** (`Start-ScheduledTask` 결과가 "이미 실행 중" 코드로
    계속 나옴). `Stop-ScheduledTask -TaskName "..."`로 먼저 정리한 뒤 다시 시작할 것.
+10. **`Stop-ScheduledTask`가 작업을 "Ready"로 표시해도 실제 `node.exe`는 안 죽을 수
+    있다** — 특히 그 프로세스가 오래 걸리는 요청(시세 갱신처럼 몇 분짜리)을 처리
+    중이면 종료 신호를 곧바로 못 받는다. 그 상태에서 `Start-ScheduledTask`로 새
+    인스턴스를 띄우면 포트가 이미 물려 있어 `EADDRINUSE`로 즉시 죽고, 재시작 루프가
+    10초마다 그걸 반복해 "짧은 반복 재시작" 구간을 만든다(2026-09-16 09:00경 실제
+    재현, `WORK_ORDER.md` B-0 참고). **`Stop-ScheduledTask` 다음엔 바로
+    `Start-ScheduledTask`를 부르지 말고 `netstat -ano | grep ":3000.*LISTENING"`으로
+    포트가 실제로 비었는지 먼저 확인할 것.** 안 비어 있으면 남은 PID를
+    `taskkill //F //PID <PID>`로 정리한 뒤 시작한다. 시세 갱신 요청이 진행 중일 때는
+    아예 재시작을 미룰 것.
 
 ### 0-5. 시세 API 한도 — 제일 자주 밟는 지뢰
 
@@ -305,6 +315,30 @@ node -e "const fs=require('fs'); const s=JSON.parse(fs.readFileSync('C:\\Users\\
   아무 이벤트가 없다 (재부팅도 아니고 앱 크래시 로그도 없음). 재부팅 직후 첫
   기동 구간에 몰려 있는 걸 보면 부팅 직후 무언가(포트 해제 지연 등)와 관련이
   있을 가능성이 있으나 확인하지 못했다.
+
+**2026-09-16 오전 두 번째 업데이트 — 같은 종류의 사고를 실제로 재현하고 원인을
+확정함(위 "포트 해제 지연" 추측을 뒷받침)**: P0-2(원자적 쓰기) 검증을 위해
+`Stop-ScheduledTask "CGPORTFOLIO 서버"` → `Start-ScheduledTask`로 서버를
+재시작했는데, 마침 그 직전에 오래 걸리는 `/api/cron/refresh` 요청(레이트리밋
+때문에 ~3분 소요)을 그 서버에 보내 둔 상태였다. **`Stop-ScheduledTask`가 그
+요청을 처리 중이던 `node.exe`(pid 256)를 실제로는 죽이지 못했다** — Task
+Scheduler는 작업을 "Ready"로 표시했지만 프로세스는 포트 3000을 계속 물고
+있었다. 그 뒤 `Start-ScheduledTask`가 새로 띄운 `next start`는 매번
+`EADDRINUSE: address already in use :::3000`로 즉시 죽었고, 재시작 루프가
+10초마다 그걸 반복해 08:57~09:01 사이 다시 짧은 반복 재시작 구간이 생겼다.
+`taskkill /F /PID 256`으로 좀비 프로세스를 강제 종료하자 바로 정상 기동됐다.
+
+**결론**: "부팅 직후 포트 해제 지연"이라는 추측이 실제 메커니즘으로
+확인됐다 — 다만 원인은 "부팅"이 아니라 **"이전 서버 프로세스가 느린 요청을
+처리 중이어서 종료 신호에 곧바로 반응하지 못하는 것"**이다. Windows Update
+재부팅 직후 첫 기동(04:12)도 마찬가지로 무언가(초기화 지연이든, 이전
+프로세스의 뒤늦은 정리든) 때문에 포트가 바로 안 풀렸을 가능성이 높다.
+**교훈**: `Stop-ScheduledTask` 직후 바로 `Start-ScheduledTask`를 부르지 말고,
+`netstat -ano | grep ":3000.*LISTENING"`으로 포트가 실제로 비었는지 확인한
+뒤 시작할 것. 안 비어 있으면 남은 PID를 `taskkill //F //PID <PID>`로
+정리하고 나서 시작한다. 특히 **시세 갱신 요청이 진행 중일 때는 서버를
+재시작하지 말 것** — 최대 3분 넘게 걸리는 요청이 끝나기 전에 종료 신호를
+보내면 이 사고가 재현된다.
 - **적용한 조치**: `scripts/refresh-quotes.mjs`에 연결 실패 시 "CGPORTFOLIO 서버"
   작업 스케줄러 상태를 확인해 `Running`이 아니면 `Start-ScheduledTask`로 직접
   기동을 시도하는 로직(`tryRecoverServerTask`)을 추가했다. OS 재부팅으로
