@@ -713,6 +713,48 @@ QLD 상장일(2006-06)부터 받으면 2008년 금융위기 구간이 들어와�
 
 ---
 
+### B-4a. 과거 환율(fx.json) 실데이터 교체 — ✅ 2026-09-16 완료
+
+사용자가 대시보드 차트의 환율선을 보고 "usd 환율이 최근에 1550원까지도
+간적이 있는데"라고 지적. 처음엔 참조 사이트(서울외국환중개
+`www.smbs.biz/ExRate/StdExRate.jsp`)의 기본 1개월 화면만 보고 "1550원 간
+기록 없다"고 잘못 답함 — 사용자가 "실제 차트에서 보여주는 기간과
+일치시켜야지"라고 지적해서 같은 1년 구간(2025-09-16~2026-09-16)으로
+다시 확인하니 실제로 2026-07-02에 1,554.40원까지 간 기록이 있었다.
+`data/fx.json`을 뜯어보니 B-4의 `prices.json`과 같은 문제 —
+`scripts/seed.mjs`가 만든 가짜 랜덤워크(2024-01-02~2026-09-15, 매끈하게
+1317.93~1352.60 사이)였고, CSV로 만든 과거 스냅샷들의 `fxRate`도 여기서
+날짜별로 가져와서 같이 틀려 있었다.
+
+**한 것**: `scripts/fetch-fx-history.mjs`(신규, B-4의
+`scripts/lib/price-history.mjs` 파서 재사용)로 Twelve Data `time_series`에서
+`USD/KRW` 실제 일별 종가 5000일(2007-11-16~2026-09-16)을 받아
+`data/fx.json`을 대체(구조는 그대로 `{ "d": "YYYY-MM-DD", "rate": 환율 }[]`).
+이어서 `scripts/fix-snapshot-fx.mjs`(신규, `scripts/lib/fix-snapshot-fx.mjs`의
+`fixSnapshotFxRates()`가 기존 `fxRateAt()` 조회 재사용)로 `data/snapshots.json`
+591개 전부의 `fxRate`만 새 `fx.json` 기준으로 다시 계산해 덮어썼다.
+`totalKrw`/`principalKrw`는 계좌수익률 CSV의 예탁자산을 그대로 쓴 값이라
+원래도 정확했고 이번에도 손대지 않았다.
+
+**검증**: `scripts/lib/__tests__/fix-snapshot-fx.test.mjs` 3건(날짜별 조회,
+없는 날짜는 직전 값 사용, 정렬 안 된 입력도 처리). 2026-07-02 스냅샷을
+전후 대조 — `fxRate` 1350.04 → 1539.79(Twelve Data 그날 종가, 공식
+1,554.40원 고점과 근접), `totalKrw`·`principalKrw`는 변화 없음 확인. 로컬
+빈 포트(3204)에서 실제 데이터로 대시보드를 열어 6월 말~7월 초 구간을
+호버 — 환율이 1509~1545원대로 실제 변동성을 보여줌(이전엔 1350원대
+평탄선). `tsc`·`eslint`·`npm test`(전체 279건)·`next build` 전부 통과.
+`git push origin HEAD:main`(6300760)로 반영, 운영 서버 재시작 후
+`localhost:3000`에서도 동일하게 확인.
+
+**범위 밖으로 남긴 것**: 없음 — `USD/KRW`는 Twelve Data 무료 플랜이 지원하는
+통화쌍이라 B-4의 `491620`(국내 상장 ETF) 같은 예외가 없다.
+
+재실행하려면 `node scripts/fetch-fx-history.mjs [--replace]`로 fx.json을
+먼저 교체한 뒤, `node scripts/fix-snapshot-fx.mjs [--replace]`로 스냅샷을
+다시 계산한다(둘 다 기본은 검토용 `out-*.json`에 먼저 쓴다).
+
+---
+
 ### B-5. ETF 구성종목 자동 수집
 
 `data/lookthrough.json`을 수동 갱신하고 있다. 발행사가 공시하는 보유내역(CSV/API)을
