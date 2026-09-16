@@ -49,13 +49,17 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 포트 3200은 건드리지 말 것 (사용자나 다른 세션의 작업일 수 있다). 다만 **두 서버가 같은
 `data/`를 공유**하므로, 3200에서 본 화면과 3000에서 본 화면이 다르면 그것 때문이다.
 
-**등록된 Windows 작업 스케줄러 작업 3개** (`Get-ScheduledTask -TaskName "CGPORTFOLIO*"`):
+**등록된 Windows 작업 스케줄러 작업 4개** (`Get-ScheduledTask -TaskName "CGPORTFOLIO*"`):
 
 | 작업 이름 | 주기 | 하는 일 |
 |---|---|---|
-| `CGPORTFOLIO 서버` | 매일 04:00 | `scripts/start-server.cmd` → `npm start` (포트 3000) |
-| `CGPORTFOLIO 시세 갱신` | 6시간마다 (02/08/14/20시) | `scripts/refresh-quotes.mjs` → `/api/cron/refresh` 호출 |
+| `CGPORTFOLIO 서버` | 매일 04:00 + **로그온 시(30초 지연)** | `scripts/start-server.cmd` → `npm start` (포트 3000) |
+| `CGPORTFOLIO 시세 갱신` | 6시간마다 (02/08/14/20시) | `scripts/refresh-quotes.mjs` → `/api/cron/refresh` 접수 후 상태 조회 |
 | `CGPORTFOLIO 데이터 백업` | 매일 03:00 | `scripts/backup-data.mjs` → `~/cgportfolio-backups/` |
+| `CGPORTFOLIO 주간 리포트` | 매주 월 09:00 | `scripts/generate-weekly-report.mjs` → `/api/cron/weekly-report` 호출 |
+
+로그온 트리거는 "재부팅하면 다음 날 새벽 4시까지 서버가 안 뜬다"를 막으려고 추가했다.
+다만 이 작업은 "로그인한 사용자로 실행"이라 **부팅만 하고 로그인을 안 하면 안 뜬다** — 수용 위험.
 
 프로덕션 빌드라 **소스를 고쳐도 화면에 반영되지 않는다.** 반영하려면:
 
@@ -118,8 +122,55 @@ npm run build
 그래서 `/api/cron/refresh` 한 번이 **약 3분 10초** 걸린다. 느린 게 아니라 정상이다.
 타임아웃을 짧게 잡고 "실패했다"고 오판하지 말 것.
 
-- 하루 한도 800크레딧. 현재 하루 4회 × 30심볼 = 120크레딧 사용 (여유 있음)
+- 하루 한도 800크레딧. 현재 하루 4회 × 63심볼 = 252크레딧 사용 (여유 있음)
 - 테스트한다고 반복 호출하면 분당 한도에 걸려 한동안 아무것도 안 된다
+
+### 0-5a. 시세 갱신 프로토콜 — 왜 접수/조회로 나뉘어 있나
+
+보유 종목이 늘어 한 번 갱신에 **약 7분**이 걸린다. 예전에는 호출 스크립트가 그 시간 내내
+응답 하나를 붙잡고 기다렸는데, **Undici의 `headersTimeout`이 5분**이고 요청 옵션으로 못
+늘린다. 그래서 정상 성공한 갱신도 `UND_ERR_HEADERS_TIMEOUT`으로 끊겨 작업 스케줄러에는
+`LastTaskResult=1`(실패)로 남았다(2026-09-16 23:00 UTC 실행 기록이 그 예다: 스크립트는
+23:05에 끊겼고 서버는 23:07:19에 정상 완료). `AbortSignal`을 늘리는 건 해결이 아니다.
+
+**지금 구조**
+
+| 단계 | 주소 | 응답 |
+|---|---|---|
+| 접수 | `GET /api/cron/refresh` | 즉시 `202 {jobId}` — 작업은 서버 안에서 계속 돈다 |
+| 조회 | `GET /api/cron/refresh/status?jobId=…` | 즉시 `{job}` |
+
+- 요청 타임아웃 30초, 조회 간격 15초, 작업 한도 20분(넘기면 매달림으로 보고 실패).
+- **중복 실행 방지**: 이미 도는 작업이 있으면 접수가 `409 code=duplicate`. `withDataLock`은
+  쓰기 단계만 막으므로, 그 앞의 외부 API 호출까지 두 벌 도는 것을 이 단일 실행이 막는다.
+- **성공 판정**: 작업이 `done`이고 **`quotes.json`·`fx-quote.json`·`snapshots.json` 세 파일의
+  mtime이 작업 시작 이후**여야 exit 0. "완료 보고"만으로는 성공으로 치지 않는다.
+- **종료 코드**(`scripts/lib/refresh-diagnostics.mjs`의 `REFRESH_EXIT`): 0 성공 / 1 서버 문제 /
+  2 시세 공급자 실패 / 3 시간 초과 / 4 중복 / 5 완료 보고했으나 데이터 그대로.
+- 작업 상태 파일은 `~/cgportfolio-logs/refresh-job.json`. 단계·건수·소요시간·원인 코드만
+  쓰고 평가금액 같은 값은 쓰지 않는다. 서버가 중간에 죽으면 조회가 `failed`로 답한다.
+
+### 0-5b. 그 밖에 확정된 운영 규칙
+
+- **리포트 라우트는 동적이다.** `/reports`와 `/reports/[slug]` 모두 `force-dynamic` —
+  예약 실행이 만든 주간 리포트가 **재빌드 없이** 바로 보여야 하기 때문이다.
+- **주간 리포트 흐름**: 월요일 09:00 → `scripts/generate-weekly-report.mjs` →
+  `/api/cron/weekly-report` → `lib/data/views.ts`의 `loadWeeklyReportInput()`(화면과 같은
+  계산) → `data/weekly-reports.json`(**gitignored**, 본문에 실제 비중이 들어간다).
+  같은 주에 다시 돌리면 그 주 글을 덮어쓴다. 쓰기 실패 시 5초 뒤 1회 재시도.
+- **QQQ 실효 노출**: 배수표는 `lib/domain/exposure.ts`(QLD 2, TQQQ 3, QQQ 1, 나머지 0).
+  표에 없는 종목은 조용히 0이 되므로, 새 레버리지 상품을 사면 여기에 먼저 적어야 한다.
+  과거 시점은 거래를 다시 돌려 그날 종가·환율로 평가하고, 비중의 분모는 그날 스냅샷의
+  실제 예탁자산을 쓴다.
+- **낙폭(MDD)은 두 가지다.** 화면 카드의 `평가액 낙폭`은 평가금액 고점 대비라 입출금이
+  섞여 있다. 주간 리포트의 낙폭은 `cashflowAdjustedDrawdown` — 스냅샷 사이 `principalKrw`
+  변화를 외부 현금흐름으로 보고 제거한 수익지수 기준이다. 실데이터에서 두 값은 눈에 띄게
+  다르다(납입을 계속하는 계좌라 그렇다). **둘을 섞어 쓰지 말 것.** 실제 수치가 필요하면
+  로컬에서 직접 계산할 것 — 이 문서는 커밋되므로 성과 수치를 적지 않는다.
+- **임시 파일**: `writeJsonAtomic`은 rename이 실패해도 임시 파일을 지운다. 이중 안전장치로
+  `.gitignore`에 `/data/.*.tmp-*`도 넣어 뒀다(내용이 대상 파일과 같아 계좌 데이터가 들어간다).
+- **LAN 공개·무인증은 수용 위험이다.** `0.0.0.0:3000`으로 열려 있고 인증이 없다 —
+  2026-09-16에 사용자가 "그냥 다 오픈된 페이지여도 상관없다"고 명시적으로 선택했다.
 
 ### 0-6. 자주 쓰는 명령
 
