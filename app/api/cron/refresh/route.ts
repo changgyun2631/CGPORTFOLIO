@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 
 import { withDataLock } from "@/lib/data/atomic-write";
 import { logCronStage } from "@/lib/data/cron-log";
-import { readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
+import { GenerationWriteError, readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
 import { getSymbols } from "@/lib/data/store";
 import { loadRawUncached, makeFxLookup } from "@/lib/data/views";
 import { buildPortfolio } from "@/lib/domain/portfolio";
@@ -151,6 +151,15 @@ export async function GET(request: Request) {
       elapsedMs: Date.now() - startedAt,
     });
   } catch (error) {
+    if (error instanceof GenerationWriteError && !error.rollbackOk) {
+      // 롤백 자체가 실패해 quotes/fx-quote/snapshots 상태가 불확실하다 — 그냥
+      // "실패"로만 남기면 다음 담당자가 파일이 이전 세대 그대로라고 오해할 수
+      // 있으니 로그에 명시적으로 남긴다(WORK_ORDER B-0A-4).
+      logCronStage(
+        `오류로 중단 + 롤백도 실패 — data/quotes.json·fx-quote.json·snapshots.json 상태가 불확실합니다. 직접 확인 필요: ${error.writeError.message}`,
+      );
+      return NextResponse.json({ ok: false, error: error.message, rollbackOk: false }, { status: 500 });
+    }
     logCronStage(`오류로 중단 — ${(error as Error).message}`);
     return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
   }

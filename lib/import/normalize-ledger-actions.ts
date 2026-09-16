@@ -7,7 +7,7 @@ import { backupData } from "../../scripts/lib/backup.mjs";
 import { normalizeLedger } from "../../scripts/lib/ledger-normalize.mjs";
 import { validateCashFlows, validateTransactions } from "../../scripts/lib/validate.mjs";
 import { withDataLock } from "../data/atomic-write";
-import { readOriginals, writeGenerationOrRollback } from "../data/generation-write";
+import { GenerationWriteError, readOriginals, writeGenerationOrRollback } from "../data/generation-write";
 import type { CashFlow, Transaction } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
 import { backupRoot, dataDir } from "./paths";
@@ -116,6 +116,19 @@ export async function applyNormalizeLedger(token: string): Promise<ApplyResult> 
       return { ok: true, message: `거래 ${staged.transactions.length}건과 현금흐름 ${staged.cashflows.length}건을 반영했습니다.` };
     });
   } catch (error) {
+    if (error instanceof GenerationWriteError && !error.rollbackOk) {
+      // 롤백 자체가 실패해 transactions.json/cashflows.json 상태가 불확실하다 —
+      // "데이터는 안 바뀜"이라고 거짓 안내하지 않고, 자동 재시도(retryToken)도
+      // 주지 않는다. 사람이 직접 확인하고 필요하면 최신 자동 백업에서 복원해야
+      // 한다(WORK_ORDER B-0A-4).
+      return {
+        ok: false,
+        errors: [
+          `반영 중 오류가 발생했고, 되돌리기까지 실패했습니다: ${error.writeError.message}. ` +
+            `data/transactions.json·cashflows.json 상태를 직접 확인하고, 필요하면 최신 자동 백업(npm run backup:verify)에서 복원하세요.`,
+        ],
+      };
+    }
     const retryToken = stageImport(KIND, staged);
     return {
       ok: false,

@@ -11,10 +11,10 @@ vi.mock("server-only", () => ({}));
 // 실제 renameSync 그대로라 mockImplementationOnce를 걸지 않은 호출은 정상 동작한다.
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("node:fs")>();
-  return { ...actual, renameSync: vi.fn(actual.renameSync) };
+  return { ...actual, renameSync: vi.fn(actual.renameSync), readFileSync: vi.fn(actual.readFileSync) };
 });
 
-const { readOriginals, writeGenerationOrRollback } = await import("../generation-write");
+const { readOriginals, writeGenerationOrRollback, GenerationWriteError } = await import("../generation-write");
 const fsNode = await import("node:fs");
 const actual = await vi.importActual<typeof import("node:fs")>("node:fs");
 
@@ -24,6 +24,7 @@ describe("readOriginals / writeGenerationOrRollback", () => {
   afterEach(() => {
     if (dir) rmSync(dir, { recursive: true, force: true });
     vi.mocked(fsNode.renameSync).mockClear();
+    vi.mocked(fsNode.readFileSync).mockClear();
   });
 
   it("전부 성공하면 파일 모두 새 내용으로 교체된다", () => {
@@ -119,5 +120,62 @@ describe("readOriginals / writeGenerationOrRollback", () => {
 
     writeGenerationOrRollback([{ path: a, content: "NEW" }], originals);
     expect(readFileSync(a, "utf8")).toBe("NEW");
+  });
+
+  it("readOriginals: 파일이 없어서(ENOENT)가 아니라 못 읽은 것(예: 권한 오류)이면 삼키지 않고 던진다", () => {
+    dir = mkdtempSync(join(tmpdir(), "generation-write-"));
+    const a = join(dir, "a.json");
+    writeFileSync(a, "OLD");
+
+    vi.mocked(fsNode.readFileSync).mockImplementationOnce(() => {
+      const error = new Error("권한이 없습니다") as NodeJS.ErrnoException;
+      error.code = "EACCES";
+      throw error;
+    });
+
+    expect(() => readOriginals([a])).toThrow("권한이 없습니다");
+  });
+
+  it("두 번째 쓰기 실패에 이어 롤백 쓰기까지 실패하면, 두 오류를 모두 담은 GenerationWriteError를 던지고 rollbackOk는 false다", () => {
+    dir = mkdtempSync(join(tmpdir(), "generation-write-"));
+    const a = join(dir, "a.json");
+    const b = join(dir, "b.json");
+    writeFileSync(a, "OLD_A");
+    writeFileSync(b, "OLD_B");
+
+    const originals = readOriginals([a, b]);
+
+    // 1번째(a) 쓰기는 정상 통과, 2번째(b) 쓰기는 실패 → a를 롤백하려는 3번째
+    // renameSync 호출도 실패시켜 "롤백 자체가 실패하는" 상황을 재현한다.
+    let call = 0;
+    vi.mocked(fsNode.renameSync).mockImplementation((...args: Parameters<typeof fsNode.renameSync>) => {
+      call += 1;
+      if (call === 2) throw new Error("두 번째 파일 쓰기 실패");
+      if (call === 3) throw new Error("롤백 쓰기도 실패");
+      return actual.renameSync(...args);
+    });
+
+    let thrown: unknown;
+    try {
+      writeGenerationOrRollback(
+        [
+          { path: a, content: "NEW_A" },
+          { path: b, content: "NEW_B" },
+        ],
+        originals,
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toBeInstanceOf(GenerationWriteError);
+    const error = thrown as InstanceType<typeof GenerationWriteError>;
+    expect(error.rollbackOk).toBe(false);
+    expect(error.writeError.message).toBe("두 번째 파일 쓰기 실패");
+    expect(error.rollbackErrors).toHaveLength(1);
+    expect(error.rollbackErrors[0].path).toBe(a);
+    expect(error.rollbackErrors[0].error.message).toBe("롤백 쓰기도 실패");
+    // a는 롤백이 실패했으니 쓰인 새 값 그대로 남아 있다 — "안 바뀌었다"고 자동으로 믿으면 안 되는 이유다.
+    expect(readFileSync(a, "utf8")).toBe("NEW_A");
   });
 });
