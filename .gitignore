@@ -60,6 +60,9 @@ yarn-error.log*
 # 원자적 쓰기가 남기는 이전 버전 백업과 쓰기 잠금 파일.
 /data/*.bak
 /data/.write.lock
+# 워크트리에서 서버 액션(가져오기 등)을 테스트할 때 생기는 로컬 백업. 운영
+# 백업 폴더(~/cgportfolio-backups/)와 분리하려고 cwd 안에 둔다(lib/import/paths.ts).
+/.dev-backups
 
 # vercel
 .vercel
