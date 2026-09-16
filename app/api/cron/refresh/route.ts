@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { withDataLock } from "@/lib/data/atomic-write";
 import { logCronStage } from "@/lib/data/cron-log";
 import { GenerationWriteError, readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
+import { beginJob, failJob, finishJob, markStage, runningJob } from "@/lib/data/refresh-job";
 import { getSymbols } from "@/lib/data/store";
 import { loadRawUncached, makeFxLookup } from "@/lib/data/views";
 import { buildPortfolio } from "@/lib/domain/portfolio";
@@ -38,17 +39,44 @@ function authorize(request: Request): boolean {
   return request.headers.get("authorization") === `Bearer ${secret}`;
 }
 
+/**
+ * 갱신을 접수만 하고 바로 `jobId`를 돌려준다. 실제 작업은 응답을 보낸 뒤 이
+ * 프로세스 안에서 계속 돌고, 호출한 쪽은 `/api/cron/refresh/status`로 확인한다.
+ * 긴 응답 하나를 기다리면 Undici `headersTimeout`(5분)에 걸려 성공한 갱신도
+ * 실패로 보고되던 문제를 구조로 없앤 것이다(`lib/data/refresh-job.ts` 참고).
+ */
 export async function GET(request: Request) {
   if (!authorize(request)) {
     return NextResponse.json({ ok: false, error: "인증 실패" }, { status: 401 });
   }
 
+  const running = runningJob();
+  if (running) {
+    logCronStage(`중복 호출 무시 — 이미 ${running.jobId} 진행 중(${running.stage})`);
+    return NextResponse.json(
+      { ok: false, error: "이미 갱신이 진행 중입니다.", code: "duplicate", jobId: running.jobId },
+      { status: 409 },
+    );
+  }
+
+  const job = beginJob();
+  if (!job) {
+    return NextResponse.json({ ok: false, error: "작업을 시작하지 못했습니다.", code: "duplicate" }, { status: 409 });
+  }
+
+  // 응답을 먼저 보내고 작업은 뒤에서 계속 돌린다.
+  void runRefresh(job.jobId);
+  return NextResponse.json({ ok: true, jobId: job.jobId, status: "running" }, { status: 202 });
+}
+
+async function runRefresh(jobId: string): Promise<void> {
   const startedAt = Date.now();
-  logCronStage("시작");
+  logCronStage(`시작 — job ${jobId}`);
 
   try {
     // 느린 외부 호출(시세·환율 조회)은 전부 잠금 밖에서 끝낸다 — data/.write.lock을
     // 잡은 채로 네트워크 응답을 기다리면, 그동안 다른 가져오기 작업이 전부 막힌다.
+    markStage(jobId, "종목 조회");
     const symbols = await getSymbols();
     const tQuotes = Date.now();
     const report = await fetchAllQuotes(symbols);
@@ -58,10 +86,12 @@ export async function GET(request: Request) {
 
     if (report.quotes.length === 0) {
       logCronStage("중단 — 시세를 한 건도 받지 못함");
-      return NextResponse.json(
-        { ok: false, error: "시세를 한 건도 받지 못해 저장하지 않았습니다.", missing: report.missing, errors: report.errors },
-        { status: 502 },
-      );
+      failJob(jobId, {
+        code: "provider",
+        provider: report.errors[0]?.provider,
+        message: "시세를 한 건도 받지 못해 저장하지 않았습니다.",
+      });
+      return;
     }
 
     let liveFx: FxRate | null = null;
@@ -91,8 +121,9 @@ export async function GET(request: Request) {
     // `loadPortfolio()`류 함수를 다시 불러 봐야 외부 API를 기다리는 동안
     // 다른 프로세스가 바꿔 놓았을 수 있는 최신 값이 아니라 요청 시작 시점의
     // 값을 그대로 돌려받는다(WORK_ORDER B-0A-3).
+    markStage(jobId, "파일 세대 쓰기");
     const tWrite = Date.now();
-    const { totalKrw, fxRate } = await withDataLock(dataDir, async () => {
+    await withDataLock(dataDir, async () => {
       const quotesPath = join(dataDir, "quotes.json");
       const fxPath = join(dataDir, "fx-quote.json");
       const snapshotsPath = join(dataDir, "snapshots.json");
@@ -135,20 +166,14 @@ export async function GET(request: Request) {
         { path: snapshotsPath, content: `${JSON.stringify([...raw.snapshots, point], null, 2)}\n` },
       ];
       writeGenerationOrRollback(writes, originals);
-
-      return { totalKrw: portfolio.totals.totalKrw, fxRate: fx.rate };
     });
     logCronStage(`파일 세대 쓰기 완료 — ${Date.now() - tWrite}ms`);
-    logCronStage(`전체 완료 — ${Date.now() - startedAt}ms`);
+    logCronStage(`전체 완료 — job ${jobId}, ${Date.now() - startedAt}ms`);
 
-    return NextResponse.json({
-      ok: true,
+    finishJob(jobId, {
       updated: report.quotes.length,
-      missing: report.missing,
-      errors: report.errors,
-      totalKrw,
-      fxRate,
-      elapsedMs: Date.now() - startedAt,
+      missingCount: report.missing.length,
+      errorCount: report.errors.length,
     });
   } catch (error) {
     if (error instanceof GenerationWriteError && !error.rollbackOk) {
@@ -158,9 +183,10 @@ export async function GET(request: Request) {
       logCronStage(
         `오류로 중단 + 롤백도 실패 — data/quotes.json·fx-quote.json·snapshots.json 상태가 불확실합니다. 직접 확인 필요: ${error.writeError.message}`,
       );
-      return NextResponse.json({ ok: false, error: error.message, rollbackOk: false }, { status: 500 });
+      failJob(jobId, { code: "write", message: `${error.message} (롤백 실패)` });
+      return;
     }
-    logCronStage(`오류로 중단 — ${(error as Error).message}`);
-    return NextResponse.json({ ok: false, error: (error as Error).message }, { status: 500 });
+    logCronStage(`오류로 중단 — job ${jobId}, ${(error as Error).message}`);
+    failJob(jobId, { code: "unknown", message: (error as Error).message });
   }
 }

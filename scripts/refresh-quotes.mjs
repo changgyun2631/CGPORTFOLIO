@@ -21,13 +21,13 @@
  * 새벽 4시 DAILY 트리거까지 방치되는데, 이 스크립트가 6시간마다 도니 최악의 경우도
  * 6시간 안에는 복구된다 (WORK_ORDER.md B-0 참고).
  */
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 import { trimLogFile } from "./lib/log-rotate.mjs";
-import { classifyFetchError, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
+import { REFRESH_EXIT, classifyFetchError, classifyJobOutcome, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
 
 const SERVER_TASK_NAME = "CGPORTFOLIO 서버";
 const HEALTHCHECK_TIMEOUT_MS = 5_000;
@@ -126,10 +126,39 @@ function trimLogs() {
   trimLogFile(join(logDir, "server.log"), MAX_LOG_LINES);
 }
 
-// 정상 응답은 대개 3~4분(30종목 * 8개씩 분당 청크 + API 대기) 걸린다
-// (WORK_ORDER 0-5절). 그보다 훨씬 넉넉한 여유를 둬서, 정상적인 대기를
-// "죽었다"로 오판하지 않으면서도 진짜 매달림은 유한 시간 안에 실패로 끝낸다.
-const REFRESH_TIMEOUT_MS = 10 * 60 * 1000;
+/**
+ * 접수 요청과 상태 조회는 둘 다 즉시 끝나야 정상이다. 예전처럼 갱신이 끝날 때까지
+ * 응답 하나를 붙잡고 기다리지 않으므로, Undici `headersTimeout`(5분, 옵션으로 못
+ * 늘린다)에 걸려 성공을 실패로 보고하던 문제가 구조적으로 사라진다.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+/** 상태를 물어보는 간격. 갱신은 보통 7분쯤 걸린다. */
+const POLL_INTERVAL_MS = 15_000;
+/** 여기를 넘기면 매달린 것으로 보고 실패로 끝낸다. */
+const JOB_TIMEOUT_MS = 20 * 60 * 1000;
+
+const statusUrl = new URL(url);
+statusUrl.pathname = `${statusUrl.pathname.replace(/\/$/, "")}/status`;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * 세 파일이 작업 시작 이후에 실제로 갱신됐는지 본다. 작업이 `done`이라고 해도
+ * 데이터가 안 바뀌었으면 성공으로 치지 않는다.
+ */
+function dataFilesTouchedSince(startedAtMs) {
+  const dataDir = join(process.cwd(), "data");
+  const files = ["quotes.json", "fx-quote.json", "snapshots.json"];
+  const stale = [];
+  for (const name of files) {
+    try {
+      if (statSync(join(dataDir, name)).mtimeMs + 1000 < startedAtMs) stale.push(name);
+    } catch {
+      stale.push(name);
+    }
+  }
+  return stale;
+}
 
 async function main() {
   const headers = {};
@@ -139,41 +168,92 @@ async function main() {
 
   let response;
   try {
-    response = await fetch(url, { headers, signal: AbortSignal.timeout(REFRESH_TIMEOUT_MS) });
+    response = await fetch(url, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
   } catch (error) {
     const cause = classifyFetchError(error);
     const origin = new URL(url).origin;
     const healthy = await checkServerHealth(origin);
     if (healthy) {
-      // 연결/요청은 실패했지만 서버(origin)는 실제로 응답한다 — "서버 사망"이
-      // 아니라 /api/cron/refresh 처리 중 문제(느린 외부 API, 이 요청 자체의
-      // timeout 등)로 좁혀서 보고한다. 살아있는 서버를 재시작 시도 대상으로
-      // 삼지 않는다.
-      log(`실패: 갱신 요청이 실패했지만(${cause}: ${error.message}) 서버(${origin})는 응답합니다 — /api/cron/refresh 처리 중 문제로 보입니다.`);
+      log(`실패: 접수 요청이 실패했지만(${cause}: ${error.message}) 서버(${origin})는 응답합니다.`);
     } else {
       log(`실패: 서버에 연결하지 못했습니다 (${cause}: ${error.message}). 서버(${origin}) 헬스체크도 실패했습니다.`);
       await tryRecoverServerTask(origin);
     }
     trimLogs();
-    process.exitCode = 1;
+    process.exitCode = REFRESH_EXIT.server;
     return;
   }
 
-  const body = await response.json().catch(() => null);
+  const accepted = await response.json().catch(() => null);
 
-  if (!response.ok || !body?.ok) {
-    log(`실패: HTTP ${response.status} ${JSON.stringify(body)}`);
+  if (response.status === 409) {
+    log(`건너뜀: 이미 갱신이 진행 중입니다 (job ${accepted?.jobId ?? "?"}). 중복 실행하지 않습니다.`);
     trimLogs();
-    process.exitCode = 1;
+    process.exitCode = REFRESH_EXIT.duplicate;
+    return;
+  }
+  if (!response.ok || !accepted?.jobId) {
+    log(`실패: 접수 거부 HTTP ${response.status} ${JSON.stringify(accepted)}`);
+    trimLogs();
+    process.exitCode = REFRESH_EXIT.server;
     return;
   }
 
-  // 총액(개인 금융 데이터)은 로그에 남기지 않는다 — 건수·소요시간만 남긴다.
-  log(
-    `성공: 갱신 ${body.updated}건, 누락 ${body.missing.length}건${body.missing.length ? ` (${body.missing.join(",")})` : ""}, ` +
-      `오류 ${body.errors.length}건, ${body.elapsedMs}ms`,
-  );
+  const jobId = accepted.jobId;
+  const startedAtMs = Date.now();
+  log(`접수됨: job ${jobId} — 상태를 ${POLL_INTERVAL_MS / 1000}초마다 확인합니다`);
+
+  const pollUrl = new URL(statusUrl);
+  pollUrl.searchParams.set("jobId", jobId);
+
+  while (Date.now() - startedAtMs < JOB_TIMEOUT_MS) {
+    await sleep(POLL_INTERVAL_MS);
+
+    let job = null;
+    try {
+      const poll = await fetch(pollUrl, { headers, signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      job = (await poll.json().catch(() => null))?.job ?? null;
+    } catch (error) {
+      // 조회 한 번 실패는 치명적이지 않다 — 다음 주기에 다시 묻는다.
+      log(`상태 조회 실패(계속 대기) — ${classifyFetchError(error)}: ${error.message}`);
+      continue;
+    }
+
+    if (!job) {
+      log(`실패: job ${jobId} 상태를 알 수 없습니다 — 서버가 재시작됐을 수 있습니다.`);
+      trimLogs();
+      process.exitCode = REFRESH_EXIT.server;
+      return;
+    }
+    if (job.status === "running") continue;
+
+    // "완료 보고"만으로 성공 처리하지 않는다 — 세 파일이 실제로 갱신됐는지까지 본다.
+    const staleFiles = job.status === "done" ? dataFilesTouchedSince(startedAtMs) : [];
+    const outcome = classifyJobOutcome({ job, staleFiles });
+    const failure = job.failure ?? {};
+
+    // 총액(개인 금융 데이터)은 로그에 남기지 않는다 — 건수·소요시간·원인만 남긴다.
+    if (outcome.code === REFRESH_EXIT.ok) {
+      log(
+        `성공: job ${jobId} — 갱신 ${job.updated}건, 누락 ${job.missingCount}건, 오류 ${job.errorCount}건, ${job.elapsedMs}ms`,
+      );
+    } else if (outcome.reason === "stale-data") {
+      log(`실패(${outcome.reason}): job ${jobId}는 완료로 보고됐지만 갱신되지 않은 파일이 있습니다 — ${staleFiles.join(", ")}`);
+    } else {
+      log(
+        `실패(${outcome.reason}): job ${jobId} 단계 ${job.stage}` +
+          `${failure.provider ? ` · provider ${failure.provider}` : ""}: ${failure.message ?? ""} · ${job.elapsedMs ?? "?"}ms`,
+      );
+    }
+
+    trimLogs();
+    process.exitCode = outcome.code;
+    return;
+  }
+
+  log(`실패: job ${jobId}가 ${JOB_TIMEOUT_MS / 60000}분 안에 끝나지 않았습니다 — 매달린 것으로 봅니다.`);
   trimLogs();
+  process.exitCode = REFRESH_EXIT.timeout;
 }
 
 main();

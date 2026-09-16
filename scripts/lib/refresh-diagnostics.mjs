@@ -45,3 +45,40 @@ export function describeRecoveryDecision(taskState, healthy) {
   }
   return { action: "start", message: `서버 작업이 "${taskState}" 상태 — Start-ScheduledTask로 기동 시도` };
 }
+
+/**
+ * 갱신 호출의 종료 코드. 작업 스케줄러에 남는 `LastTaskResult`가 이 값이라,
+ * 원인별로 다르게 끝나야 로그를 안 봐도 무슨 일인지 구분된다.
+ */
+export const REFRESH_EXIT = {
+  ok: 0,
+  /** 서버에 못 붙었거나, 접수/상태 조회가 거부됐다 */
+  server: 1,
+  /** 시세 공급자가 한 건도 주지 못했다 */
+  provider: 2,
+  /** 정해진 시간 안에 작업이 안 끝났다 */
+  timeout: 3,
+  /** 이미 갱신이 돌고 있어 이번 호출은 아무것도 하지 않았다 */
+  duplicate: 4,
+  /** 완료로 보고됐지만 데이터 파일이 그대로다 */
+  stale: 5,
+};
+
+/**
+ * 작업 상태와 파일 확인 결과로 종료 코드를 정한다. "완료 보고"만으로 성공 처리하지
+ * 않고 데이터가 실제로 바뀌었는지까지 본다 — 예전에는 반대로 성공한 갱신이 실패로
+ * 기록됐고, 그 반대(실패인데 성공으로 끝나는 것)도 막아야 한다.
+ *
+ * @param {{job: object|null, staleFiles?: string[], timedOut?: boolean}} input
+ */
+export function classifyJobOutcome({ job, staleFiles = [], timedOut = false }) {
+  if (timedOut) return { code: REFRESH_EXIT.timeout, reason: "timeout" };
+  if (!job) return { code: REFRESH_EXIT.server, reason: "unknown-job" };
+  if (job.status === "running") return { code: REFRESH_EXIT.timeout, reason: "still-running" };
+  if (job.status === "failed") {
+    const cause = job.failure?.code;
+    return { code: cause === "provider" ? REFRESH_EXIT.provider : REFRESH_EXIT.server, reason: cause ?? "unknown" };
+  }
+  if (staleFiles.length > 0) return { code: REFRESH_EXIT.stale, reason: "stale-data" };
+  return { code: REFRESH_EXIT.ok, reason: "done" };
+}
