@@ -12,8 +12,9 @@ describe("parseServerLog", () => {
     ].join("\n");
     const summary = parseServerLog(text, new Date("2026-09-16T10:30:00Z"));
     expect(summary.events).toHaveLength(4);
-    expect(summary.events[0]).toEqual({ at: "2026-09-16T04:15:39.180Z", type: "starting" });
-    expect(summary.lastStartedAt).toBe("2026-09-16T10:24:13.610Z");
+    // 로그의 "2026-09-16 4:15:39.18"는 KST 벽시계 시각이라 진짜 UTC로는 9시간 전날이다.
+    expect(summary.events[0]).toEqual({ at: "2026-09-15T19:15:39.180Z", type: "starting" });
+    expect(summary.lastStartedAt).toBe("2026-09-16T01:24:13.610Z");
   });
 
   it("24시간 안의 재시작만 센다", () => {
@@ -121,21 +122,25 @@ describe("parseRefreshLog", () => {
 });
 
 describe("nextScheduledRun", () => {
-  const hours = [2, 8, 14, 20];
+  const hoursKst = [2, 8, 14, 20];
+  // 테스트 전용 헬퍼: KST(UTC+9) 벽시계 시각을 진짜 UTC ISO로 바꾼다. 실행 머신의
+  // 로컬 타임존과 무관하게 결과가 동일해야 하므로 구현과 같은 방식(-9시간)으로 계산한다.
+  const kst = (y: number, m: number, d: number, h: number, mi = 0) =>
+    new Date(Date.UTC(y, m - 1, d, h, mi) - 9 * 60 * 60 * 1000);
 
   it("같은 날 다음 시각을 고른다", () => {
-    expect(nextScheduledRun(new Date("2026-09-16T05:00:00Z"), hours)).toBe("2026-09-16T08:00:00.000Z");
+    expect(nextScheduledRun(kst(2026, 9, 16, 5, 0), hoursKst)).toBe(kst(2026, 9, 16, 8, 0).toISOString());
   });
 
   it("마지막 시각을 지났으면 다음날 첫 시각을 고른다", () => {
-    expect(nextScheduledRun(new Date("2026-09-16T21:00:00Z"), hours)).toBe("2026-09-17T02:00:00.000Z");
+    expect(nextScheduledRun(kst(2026, 9, 16, 21, 0), hoursKst)).toBe(kst(2026, 9, 17, 2, 0).toISOString());
   });
 
   it("정각 그 순간엔 다음 시각으로 넘어간다(같은 시각을 다시 고르지 않음)", () => {
-    expect(nextScheduledRun(new Date("2026-09-16T08:00:00.000Z"), hours)).toBe("2026-09-16T14:00:00.000Z");
+    expect(nextScheduledRun(kst(2026, 9, 16, 8, 0), hoursKst)).toBe(kst(2026, 9, 16, 14, 0).toISOString());
   });
 
   it("정렬 안 된 입력도 정렬해서 처리한다", () => {
-    expect(nextScheduledRun(new Date("2026-09-16T05:00:00Z"), [20, 2, 14, 8])).toBe("2026-09-16T08:00:00.000Z");
+    expect(nextScheduledRun(kst(2026, 9, 16, 5, 0), [20, 2, 14, 8])).toBe(kst(2026, 9, 16, 8, 0).toISOString());
   });
 });

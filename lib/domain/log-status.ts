@@ -3,11 +3,15 @@
  * 읽지 않는 순수 함수라 테스트에 실제 파일이 필요 없다 — 읽기는 `lib/status/`가
  * 담당한다.
  *
- * 두 로그 모두 시스템 로컬 시계를 쓰는데, 이 운영 환경에서는 그 시계 자체가
- * "UTC"로 취급된다(WORK_ORDER.md 0-4절 참고) — `server.log`의 `%date% %time%`
- * 형식도 `Date.UTC`로 만들어서 `refresh.log`의 ISO(진짜 UTC) 타임스탬프와 같은
- * 축에서 비교되게 한다.
+ * `server.log`의 `%date% %time%`(cmd.exe가 씀)는 시스템 로컬 시계, 즉 KST
+ * (Asia/Seoul, UTC+9, 서머타임 없음)다. 반면 `refresh.log`는 Node의
+ * `new Date().toISOString()`로 써서 진짜 UTC다. 이 파일은 둘을 같은 축(UTC)에서
+ * 비교할 수 있게 KST 오프셋을 명시적으로 빼서 변환한다 — 실행 중인 프로세스의
+ * 로컬 타임존에 기대면 테스트 환경(CI 등)이 KST가 아닐 때 결과가 달라지므로
+ * 상수로 고정한다.
  */
+
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 
 export type ServerLogEvent = { at: string; type: "starting" | "exited" };
 
@@ -25,10 +29,8 @@ const SERVER_LOG_LINE = /^(\d{4})-(\d{2})-(\d{2})\s+(\d{1,2}):(\d{2}):(\d{2})\.(
 
 function toUtcIso(year: string, month: string, day: string, hour: string, minute: string, second: string, centisecond: string): string {
   const ms = Number(centisecond) * 10;
-  const date = new Date(
-    Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second), ms),
-  );
-  return date.toISOString();
+  const kstWallClockMs = Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second), ms);
+  return new Date(kstWallClockMs - KST_OFFSET_MS).toISOString();
 }
 
 export function parseServerLog(text: string, now: Date): ServerLogSummary {
@@ -112,19 +114,22 @@ export function parseRefreshLog(text: string): RefreshLogSummary {
 }
 
 /**
- * 등록된 고정 시각(UTC 시) 스케줄 중 `now` 다음으로 오는 시각을 계산한다.
+ * 등록된 고정 시각(KST 시) 스케줄 중 `now` 다음으로 오는 시각을 계산한다.
  * 작업 스케줄러를 조회하지 않는 순수 계산이다 — 문서화된 스케줄(WORK_ORDER
- * 0-3절: 시세 갱신 02/08/14/20시, 서버 기동 04시)을 그대로 반영한다. 스케줄이
- * 바뀌면 이 값도 같이 고쳐야 한다.
+ * 0-3절: 시세 갱신 02/08/14/20시, 서버 기동 04시)을 그대로 반영한다. Task
+ * Scheduler 트리거는 로컬(KST) 시각으로 등록돼 있으므로, 이 함수도 KST 달력일
+ * 기준으로 계산한다(실행 중인 프로세스의 로컬 타임존에 기대지 않도록 KST
+ * 오프셋을 명시적으로 적용). 스케줄이 바뀌면 이 값도 같이 고쳐야 한다.
  */
-export function nextScheduledRun(now: Date, hoursUtc: number[]): string {
-  const sorted = [...hoursUtc].sort((a, b) => a - b);
-  const base = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+export function nextScheduledRun(now: Date, hoursKst: number[]): string {
+  const sorted = [...hoursKst].sort((a, b) => a - b);
+  const nowKst = new Date(now.getTime() + KST_OFFSET_MS);
+  const kstMidnightUtcMs = Date.UTC(nowKst.getUTCFullYear(), nowKst.getUTCMonth(), nowKst.getUTCDate()) - KST_OFFSET_MS;
   for (const hour of sorted) {
-    const candidate = new Date(base.getTime() + hour * 60 * 60 * 1000);
-    if (candidate.getTime() > now.getTime()) return candidate.toISOString();
+    const candidateMs = kstMidnightUtcMs + hour * 60 * 60 * 1000;
+    if (candidateMs > now.getTime()) return new Date(candidateMs).toISOString();
   }
-  // 오늘 남은 시각이 없으면 내일 첫 시각.
-  const tomorrow = new Date(base.getTime() + 24 * 60 * 60 * 1000);
-  return new Date(tomorrow.getTime() + sorted[0] * 60 * 60 * 1000).toISOString();
+  // 오늘(KST 달력일) 남은 시각이 없으면 다음날 첫 시각.
+  const tomorrowMidnightUtcMs = kstMidnightUtcMs + 24 * 60 * 60 * 1000;
+  return new Date(tomorrowMidnightUtcMs + sorted[0] * 60 * 60 * 1000).toISOString();
 }

@@ -6,8 +6,8 @@ import { readRefreshLogSummary, readServerLogSummary } from "@/lib/status/read-l
 import { nextScheduledRun } from "@/lib/domain/log-status";
 import { shortDateTime } from "@/lib/format";
 
-/** WORK_ORDER 0-3절에 등록된 고정 스케줄. 실제 작업 스케줄러 등록을 바꾸면 여기도 같이 고칠 것. */
-const REFRESH_SCHEDULE_HOURS_UTC = [2, 8, 14, 20];
+/** WORK_ORDER 0-3절에 등록된 고정 스케줄(KST 시각). 실제 작업 스케줄러 등록을 바꾸면 여기도 같이 고칠 것. */
+const REFRESH_SCHEDULE_HOURS_KST = [2, 8, 14, 20];
 
 export const metadata: Metadata = { title: "운영 상태" };
 
@@ -28,7 +28,7 @@ export default function StatusPage() {
   const now = new Date();
   const server = readServerLogSummary(now);
   const refresh = readRefreshLogSummary();
-  const nextRefreshAt = nextScheduledRun(now, REFRESH_SCHEDULE_HOURS_UTC);
+  const nextRefreshAt = nextScheduledRun(now, REFRESH_SCHEDULE_HOURS_KST);
 
   const serverHealthy = server.restartsLast24h <= 1 && !server.rapidRestartWarning;
   const refreshHealthy = refresh.lastFailure === null || (refresh.lastSuccess && refresh.lastSuccess.at > refresh.lastFailure.at);

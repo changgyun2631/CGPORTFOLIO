@@ -274,7 +274,9 @@ not supported, exiting the process immediately.`로 **스크립트 자체가 죽
 
 **할 일 — 계속 관찰**
 
-1. 로그를 본다 (시각은 UTC라 +9시간 해서 읽을 것):
+1. 로그를 본다 (`server.log`는 시스템 로컬 시각(KST)을, `refresh.log`는 진짜 UTC를
+   쓴다 — 서로 섞어 읽지 말 것. `/status` 페이지는 이 둘을 자동으로 KST로 맞춰
+   보여준다):
 
 ```bash
 cat "C:\Users\ACC-002\cgportfolio-logs\refresh.log"
@@ -310,8 +312,14 @@ node -e "const fs=require('fs'); const s=JSON.parse(fs.readFileSync('C:\\Users\\
 위 대응 중 하나를 적용한다.
 
 **2026-09-16 오전 업데이트 — 원인의 절반을 특정함**: `server.log`가 04:12부터
-08:17까지(시스템 로컬 시각 = 이 환경의 "UTC") 약 9회 재시작을 기록했다. 이 중
-하나는 이제 원인을 알 수 있다.
+08:17까지(시스템 로컬 시각, 즉 KST) 약 9회 재시작을 기록했다. 이 중 하나는 이제
+원인을 알 수 있다.
+
+**2026-09-16 후속 정정**: 이전 인계서들이 "이 환경의 로컬 시각 = UTC"라고 적었던
+건 틀렸다. `Get-TimeZone`으로 직접 확인한 결과 이 PC의 로컬 타임존은 실제로
+Asia/Seoul(KST, UTC+9, 서머타임 없음)이다. `/status` 페이지가 `server.log`의
+로컬 시각을 UTC로 잘못 라벨링해서 화면에 9시간이 이중으로 더해지던 버그를
+고쳤다(`lib/domain/log-status.ts`) — 위 절의 로그 시각들도 실제로는 KST다.
 
 - **Windows Update 자동 재부팅이 최소 1건의 "원인 불명" 사망을 설명한다.**
   `wevtutil`/`Get-WinEvent`로 Task Scheduler·Application 로그를 봐도 여전히
