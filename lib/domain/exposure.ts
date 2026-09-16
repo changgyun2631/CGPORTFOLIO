@@ -101,39 +101,44 @@ export type ExposureAtInput = {
 };
 
 /**
- * 과거 한 시점의 실효 노출. 스냅샷에는 종목별 구성이 없어서, 그 시점까지의
- * 거래를 다시 돌려 보유 수량을 구하고 그날 종가·환율로 평가한다. 분모인
- * 계좌 전체 금액은 추정하지 않고 스냅샷의 실제 예탁자산을 그대로 쓴다.
+ * 과거 한 시점의 종목별 평가금액(원). 스냅샷에는 종목별 구성이 없어서, 그
+ * 시점까지의 거래를 다시 돌려 보유 수량을 구하고 그날 종가·환율로 평가한다.
+ *
+ * 그날 종가를 모르는 종목은 **추정하지 않고 뺀다** — 그래서 이 값들의 합은
+ * 스냅샷의 실제 예탁자산보다 작을 수 있다. 비중을 낼 때 분모는 항상 스냅샷의
+ * 실제 금액을 쓸 것(합계로 나누면 없는 종목만큼 비중이 부풀려진다).
  */
-export function qqqExposureAt({
+export function positionValuesAsOf({
   at,
   transactions,
   priceHistory,
   fxHistory,
-  totalKrw,
   currencyOf,
-}: ExposureAtInput): ExposureSummary {
+}: Omit<ExposureAtInput, "totalKrw">): { symbolId: string; shares: number; valueKrw: number }[] {
   const date = at.slice(0, 10);
   const upTo = transactions.filter((tx) => tx.at <= at);
 
   const sharesBySymbol = new Map<string, number>();
   for (const position of buildPositions(upTo)) {
-    if (qqqLeverageOf(position.symbolId) === 0 || position.shares <= 0) continue;
+    if (position.shares <= 0) continue;
     sharesBySymbol.set(position.symbolId, (sharesBySymbol.get(position.symbolId) ?? 0) + position.shares);
   }
 
-  const rate = valueOnOrBefore(
-    fxHistory.map((point) => ({ d: point.d, rate: point.rate })),
-    date,
-  )?.rate;
+  const rate = valueOnOrBefore(fxHistory, date)?.rate;
 
-  const entries: { symbolId: string; valueKrw: number }[] = [];
+  const values: { symbolId: string; shares: number; valueKrw: number }[] = [];
   for (const [symbolId, shares] of sharesBySymbol) {
     const close = valueOnOrBefore(priceHistory[symbolId], date)?.c;
-    if (close == null) continue; // 그 시점 종가를 모르면 추정하지 않고 뺀다.
+    if (close == null) continue;
     const inKrw = currencyOf(symbolId) === "USD" ? (rate ?? 0) : 1;
-    entries.push({ symbolId, valueKrw: shares * close * inKrw });
+    values.push({ symbolId, shares, valueKrw: shares * close * inKrw });
   }
+  return values;
+}
 
-  return summarizeQqqExposure(at, totalKrw, entries);
+/**
+ * 과거 한 시점의 실효 노출. 분모는 추정하지 않고 스냅샷의 실제 예탁자산을 쓴다.
+ */
+export function qqqExposureAt(input: ExposureAtInput): ExposureSummary {
+  return summarizeQqqExposure(input.at, input.totalKrw, positionValuesAsOf(input));
 }

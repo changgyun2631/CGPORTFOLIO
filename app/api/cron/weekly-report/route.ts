@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { NextResponse } from "next/server";
 
 import { writeJsonAtomic, withDataLock } from "@/lib/data/atomic-write";
-import { loadQqqExposure } from "@/lib/data/views";
+import { loadWeeklyReportInput } from "@/lib/data/views";
 import {
   buildWeeklyExposureReport,
   upsertWeeklyReport,
@@ -47,8 +47,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const { current, past } = await loadQqqExposure();
-    const report = buildWeeklyExposureReport({ at: new Date().toISOString(), current, past });
+    const report = buildWeeklyExposureReport(await loadWeeklyReportInput());
 
     const saved = await withDataLock(dataDir, async () => {
       const next = upsertWeeklyReport(await readExisting(), report);

@@ -3,10 +3,13 @@ import "server-only";
 import { cache } from "react";
 
 import { runBacktest } from "@/lib/domain/backtest";
+import { summarizeComposition, unexplainedPercent } from "@/lib/domain/composition";
 import { summarizeDividends } from "@/lib/domain/dividends";
-import { qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
+import { positionValuesAsOf, qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
+import { analyzeSeries } from "@/lib/domain/metrics";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
 import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
+import type { PointInTime } from "@/lib/domain/weekly-report";
 
 import {
   getAccounts,
@@ -305,4 +308,85 @@ export const loadQqqExposure = cache(async () => {
   });
 
   return { current, past };
+});
+
+/**
+ * 주간 리포트가 쓸 재료 전부 — 실효 노출·성격별 구성·종목별·시계열 사실을
+ * 같은 시점 기준으로 묶는다. 과거 시점은 거래를 다시 돌려 재구성하되, 비중의
+ * 분모는 그날 스냅샷의 실제 예탁자산을 쓴다(`positionValuesAsOf` 주석 참고).
+ */
+export const loadWeeklyReportInput = cache(async () => {
+  const [{ holdings, totals, transactions, symbols, snapshots, fxHistory, fx }, priceHistory] = await Promise.all([
+    loadPortfolio(),
+    getPriceHistory(),
+  ]);
+
+  const symbolById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
+  const currencyOf = (symbolId: string) => symbolById.get(symbolId)?.currency ?? "USD";
+  const kindOf = (symbolId: string) => symbolById.get(symbolId)?.kind ?? "stock";
+
+  const currentEntries = holdings.map((holding) => ({
+    symbolId: holding.symbolId,
+    kind: holding.kind,
+    valueKrw: holding.valueKrw,
+  }));
+
+  const current: PointInTime = {
+    label: "현재",
+    at: fx.asOf,
+    totalKrw: totals.totalKrw,
+    exposure: summarizeQqqExposure(fx.asOf, totals.totalKrw, currentEntries),
+    themes: summarizeComposition(currentEntries, totals.totalKrw),
+    unexplainedPercent: unexplainedPercent(currentEntries, totals.totalKrw),
+  };
+
+  const latestAt = snapshots.at(-1)?.at ?? fx.asOf;
+  const past = [
+    { label: "1주 전", days: 7 },
+    { label: "4주 전", days: 28 },
+  ].flatMap(({ label, days }) => {
+    const cutoff = new Date(Date.parse(latestAt) - days * 86_400_000).toISOString();
+    const snapshot = [...snapshots].reverse().find((s) => new Date(s.at).toISOString() <= cutoff);
+    if (!snapshot) return [];
+
+    const values = positionValuesAsOf({ at: snapshot.at, transactions, priceHistory, fxHistory, currencyOf });
+    const entries = values.map((value) => ({ ...value, kind: kindOf(value.symbolId) }));
+    return [
+      {
+        label,
+        at: snapshot.at,
+        totalKrw: snapshot.totalKrw,
+        exposure: summarizeQqqExposure(snapshot.at, snapshot.totalKrw, values),
+        themes: summarizeComposition(entries, snapshot.totalKrw),
+        unexplainedPercent: unexplainedPercent(values, snapshot.totalKrw),
+      } satisfies PointInTime,
+    ];
+  });
+
+  const stats = analyzeSeries(snapshots);
+
+  return {
+    at: new Date().toISOString(),
+    current,
+    past,
+    holdings: [...holdings]
+      .filter((holding) => holding.kind !== "cash")
+      .sort((a, b) => b.valueKrw - a.valueKrw)
+      .map((holding) => ({
+        symbolId: holding.symbolId,
+        name: holding.name,
+        shares: holding.shares,
+        valueKrw: holding.valueKrw,
+        weightPercent: holding.weight,
+        totalGainPercent: holding.totalGainPercent,
+        totalGainKrw: holding.totalGainKrw,
+      })),
+    facts: {
+      vsPeakPercent: stats.vsPeakPercent,
+      maxDrawdown: stats.maxDrawdown,
+      peakAt: stats.peak?.at ?? null,
+      principalKrw: totals.principalKrw,
+      principalGainPercent: totals.principalGainPercent,
+    },
+  };
 });
