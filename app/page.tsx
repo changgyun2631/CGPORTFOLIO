@@ -101,7 +101,7 @@ export default async function DashboardPage() {
                 종목 전체
               </Link>
             </div>
-            <AllocationBar holdings={holdings} limit={8} />
+            <AllocationBar holdings={holdings} paginate />
           </Card>
         </div>
 
@@ -170,35 +170,37 @@ export default async function DashboardPage() {
         </div>
       </Section>
 
-      <Section
-        title={`월간 배당 · ${currentYear}년`}
-        description={`합계 ${money(dividends.thisYearKrw)} · 연간 예상 ${money(dividends.forecastKrw)}`}
-        action={
-          <Link href="/dividends" className="text-xs text-accent hover:underline">
-            배당 전체
-          </Link>
-        }
-      >
-        <Card>
-          {dividends.byYear.length > 0 ? (
-            <>
-              <MonthlyBars months={dividendMonths} symbolOrder={dividends.bySymbol.map((line) => line.symbolId)} />
-              <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px]">
-                {dividends.bySymbol.slice(0, 6).map((line) => (
-                  <li key={line.symbolId} className="flex items-baseline gap-1.5">
-                    <span className="font-bold tracking-tight">{line.symbolId}</span>
-                    <span className="tnum text-muted">{money(line.totalKrw)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <Empty title="배당 기록이 없습니다" description="배당 내역이 쌓이면 월별로 집계됩니다." />
-          )}
-        </Card>
-      </Section>
+      {/* 배당·매매·입출금을 한 줄에 나란히 — 배당 차트만 따로 전체폭을 차지하면
+          아래 두 목록에 비해 내용에 비해 세로로 너무 길어진다. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <Section
+          title={`월간 배당 · ${currentYear}년`}
+          description={`합계 ${money(dividends.thisYearKrw)} · 연간 예상 ${money(dividends.forecastKrw)}`}
+          action={
+            <Link href="/dividends" className="text-xs text-accent hover:underline">
+              배당 전체
+            </Link>
+          }
+        >
+          <Card>
+            {dividends.byYear.length > 0 ? (
+              <>
+                <MonthlyBars months={dividendMonths} symbolOrder={dividends.bySymbol.map((line) => line.symbolId)} />
+                <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px]">
+                  {dividends.bySymbol.slice(0, 6).map((line) => (
+                    <li key={line.symbolId} className="flex items-baseline gap-1.5">
+                      <span className="font-bold tracking-tight">{line.symbolId}</span>
+                      <span className="tnum text-muted">{money(line.totalKrw)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : (
+              <Empty title="배당 기록이 없습니다" description="배당 내역이 쌓이면 월별로 집계됩니다." />
+            )}
+          </Card>
+        </Section>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Section title="최신 매매 내역">
           <Card padded={false}>
             <ul className="divide-y divide-line">
