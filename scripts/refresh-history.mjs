@@ -45,10 +45,10 @@ function log(line) {
 /** 시세 공급자의 분당 제한 때문에 종목 수에 비례해 오래 걸린다. 넉넉히 준다. */
 const STEP_TIMEOUT_MS = 20 * 60 * 1000;
 
-function runStep(label, script) {
-  const args = [join(repoRoot, "scripts", script), "--replace"];
+function runStep(label, script, extra = []) {
+  const args = [join(repoRoot, "scripts", script), "--replace", ...extra];
   if (dryRun) {
-    log(`  ${label}: [모의] ${script} --replace 실행 예정`);
+    log(`  ${label}: [모의] ${script} ${["--replace", ...extra].join(" ")} 실행 예정`);
     return true;
   }
 
@@ -66,7 +66,8 @@ function runStep(label, script) {
 }
 
 log("일별 이력 갱신 시작");
-const priceOk = runStep("가격 이력", "fetch-price-history.mjs");
+// 한 종목이 분당 한도에 걸렸다고 나머지 종목의 하루를 통째로 버리지 않는다.
+const priceOk = runStep("가격 이력", "fetch-price-history.mjs", ["--allow-partial"]);
 const fxOk = runStep("환율 이력", "fetch-fx-history.mjs");
 
 if (priceOk && fxOk) {

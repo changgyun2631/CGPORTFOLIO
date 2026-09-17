@@ -73,6 +73,22 @@ async function fetchOne(symbolId, apiKey) {
   return parseTimeSeriesResponse(symbolId, body);
 }
 
+/**
+ * 분당 한도(429)는 같은 API 키를 쓰는 시세 갱신과 겹칠 때 흔히 난다. 한 박자
+ * 쉬고 한 번만 더 해본다 — 그래도 안 되면 실패로 넘긴다. 다음 날 실행이
+ * 어차피 전체 이력을 다시 받아오므로, 하루 빠진 종목은 저절로 메워진다.
+ */
+async function fetchWithRetry(symbolId, apiKey) {
+  try {
+    return await fetchOne(symbolId, apiKey);
+  } catch (error) {
+    if (!/429/.test(error.message)) throw error;
+    console.warn(`${symbolId}: 분당 한도(429) — 61초 쉬고 한 번 더 시도합니다.`);
+    await sleep(CHUNK_WAIT_MS);
+    return fetchOne(symbolId, apiKey);
+  }
+}
+
 async function main() {
   const flags = parseArgs(process.argv.slice(2));
   const apiKey = process.env.TWELVE_DATA_API_KEY;
@@ -109,7 +125,7 @@ async function main() {
     }
     for (const symbolId of group) {
       try {
-        const series = await fetchOne(symbolId, apiKey);
+        const series = await fetchWithRetry(symbolId, apiKey);
         fetched[symbolId] = series;
         console.log(`${symbolId}: ${series.length}일 확보 (${series[0].d} ~ ${series.at(-1).d})`);
       } catch (error) {
@@ -124,12 +140,23 @@ async function main() {
   const write = () => writeJsonAtomic(target, `${JSON.stringify(merged, null, 2)}\n`);
 
   if (flags.replace) {
-    if (failures.length > 0) {
+    // 처음 한 번 채워 넣을 때는 반쯤 채워진 파일이 남지 않도록 전부 성공해야 반영한다.
+    // 반대로 매일 도는 갱신은 한 종목이 흔들렸다고 나머지 61종목의 하루를 버리면
+    // 안 된다 — 병합이 종목 단위라 성공한 것만 반영해도 나머지는 그대로 남고,
+    // 빠진 종목은 다음 날 실행이 전체 이력을 다시 받아오며 메운다.
+    if (failures.length > 0 && !flags["allow-partial"]) {
       console.error(
         `${failures.length}개 종목 실패 — 반영을 중단합니다: ${failures.map((f) => f.symbolId).join(", ")}. ` +
           "실패한 종목만 --symbols로 다시 시도하거나, 전부 성공할 때까지 --replace 없이 재실행하세요.",
       );
       process.exit(1);
+    }
+    if (failures.length === wanted.length) {
+      console.error("전 종목 실패 — 반영할 것이 없습니다.");
+      process.exit(1);
+    }
+    if (failures.length > 0) {
+      console.warn(`${failures.length}개 종목은 이번에 건너뜀(다음 실행에서 메워짐): ${failures.map((f) => f.symbolId).join(", ")}`);
     }
     backupData(dataDir, backupRoot);
     withDataLock(dataDir, write);
