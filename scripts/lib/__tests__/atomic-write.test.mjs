@@ -3,11 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// renameSync만 실제 구현을 감싼 spy로 바꿔서, 테스트별로 한 번씩 실패를 주입할 수
-// 있게 한다. node:fs는 ESM 네임스페이스라 vi.spyOn으로는 못 바꾸고 vi.mock이 필요하다.
+// renameSync·unlinkSync를 실제 구현을 감싼 spy로 바꿔서, 테스트별로 한 번씩 실패를
+// 주입할 수 있게 한다. node:fs는 ESM 네임스페이스라 vi.spyOn으로는 못 바꾸고 vi.mock이
+// 필요하다.
 vi.mock("node:fs", async (importOriginal) => {
   const actual = await importOriginal();
-  return { ...actual, renameSync: vi.fn(actual.renameSync) };
+  return { ...actual, renameSync: vi.fn(actual.renameSync), unlinkSync: vi.fn(actual.unlinkSync) };
 });
 
 const { withDataLock, writeJsonAtomic } = await import("../atomic-write.mjs");
@@ -15,9 +16,12 @@ const fsNode = await import("node:fs");
 
 describe("writeJsonAtomic", () => {
   let dir;
+  let consoleErrorSpy;
   afterEach(() => {
     if (dir) rmSync(dir, { recursive: true, force: true });
     vi.mocked(fsNode.renameSync).mockRestore?.();
+    vi.mocked(fsNode.unlinkSync).mockRestore?.();
+    consoleErrorSpy?.mockRestore();
   });
 
   it("파일이 없을 때 새로 쓴다", () => {
@@ -74,6 +78,37 @@ describe("writeJsonAtomic", () => {
     const target = join(dir, "data.json");
     writeJsonAtomic(target, "NEW");
     expect(readdirSync(dir).filter((name) => name.includes(".tmp-"))).toEqual([]);
+  });
+
+  it("rename에 이어 unlink까지 실패해도 원래 rename 오류가 유지되고, 정리 실패가 진단으로 남는다", () => {
+    // GPT 3차 검수 12-3: 정리 실패를 삼키기만 하면 임시 파일(=실제 계좌 데이터)이
+    // 남아도 아무도 모른다. rename 오류는 그대로 던지되, 콘솔에 오류 코드·basename만
+    // (경로·내용은 없이) 남기는지 확인한다.
+    dir = mkdtempSync(join(tmpdir(), "atomic-write-"));
+    const target = join(dir, "data.json");
+    writeFileSync(target, "OLD");
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    vi.mocked(fsNode.renameSync).mockImplementationOnce(() => {
+      const error = new Error("rename 실패");
+      error.code = "EPERM";
+      throw error;
+    });
+    vi.mocked(fsNode.unlinkSync).mockImplementationOnce(() => {
+      const error = new Error("unlink 실패");
+      error.code = "EBUSY";
+      throw error;
+    });
+
+    expect(() => writeJsonAtomic(target, "NEW")).toThrow("rename 실패");
+    expect(readFileSync(target, "utf8")).toBe("OLD"); // 대상 파일은 보존된다
+
+    expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+    const logged = consoleErrorSpy.mock.calls[0][0];
+    expect(logged).toContain("EBUSY");
+    expect(logged).toMatch(/\.data\.json\.tmp-\d+-\d+/); // basename만
+    expect(logged).not.toContain(dir); // 전체 경로는 남기지 않는다
+    expect(logged).not.toContain("NEW"); // 파일 내용은 남기지 않는다
   });
 });
 

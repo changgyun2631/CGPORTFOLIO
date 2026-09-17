@@ -201,8 +201,12 @@ export type DrawdownResult = {
  *
  * **데이터 모델상의 가정**: 스냅샷 사이 `principalKrw`(순입금 누적)의 변화량을 그
  * 기간의 외부 현금흐름으로 본다. 이 프로젝트에서 `principalKrw`는 계좌수익률
- * CSV의 입금·출금 누적이므로 이 가정이 성립한다. `principalKrw`가 없는 스냅샷은
- * 그 구간의 현금흐름을 0으로 본다(추정하지 않는다).
+ * CSV의 입금·출금 누적이므로 이 가정이 성립한다. **양쪽 스냅샷 모두
+ * `principalKrw`가 유효한 숫자일 때만** 그 차이를 현금흐름으로 쓴다 — 한쪽만
+ * 있으면(원금 필드 도입 전 구간과 이후 구간이 섞인 경우 등) 그 차이가 실제
+ * 입출금이 아니라 "필드가 생긴 시점"을 반영할 뿐이라 현금흐름으로 오인하면 안
+ * 된다. 그런 구간은 현금흐름을 0으로 보고(추정하지 않는다), 해당 구간 자체는
+ * 평가액 기준 성장률로 넘긴다.
  *
  * 구간 수익률 = (기말 평가액 − 그 구간 순입금) ÷ 기초 평가액.
  * 입출금만 있고 가격이 그대로면 이 값이 1이라 지수가 안 움직이고, 낙폭도 안 깊어진다.
@@ -223,7 +227,11 @@ export function cashflowAdjustedDrawdown(snapshots: Snapshot[]): DrawdownResult 
     const current = ordered[i];
     // 기초 평가액이 0 이하면 수익률을 정의할 수 없다 — 지수를 끊지 않고 그대로 넘긴다.
     if (previous.totalKrw > 0) {
-      const flow = (current.principalKrw ?? previous.principalKrw ?? 0) - (previous.principalKrw ?? 0);
+      // 양쪽 다 유효한 원금일 때만 차이를 현금흐름으로 본다. 한쪽만 있으면(원금
+      // 필드가 중간에 생긴 경계 등) 현재 원금 전체를 그 구간 순입금으로 오인하게
+      // 되므로, 그런 구간은 현금흐름 0으로 보고 평가액 성장률만 반영한다.
+      const bothPrincipalsValid = Number.isFinite(previous.principalKrw) && Number.isFinite(current.principalKrw);
+      const flow = bothPrincipalsValid ? current.principalKrw! - previous.principalKrw! : 0;
       const growth = (current.totalKrw - flow) / previous.totalKrw;
       // 음수 성장률(= 입출금 가정이 깨진 구간)은 지수를 뒤집으므로 반영하지 않는다.
       if (Number.isFinite(growth) && growth > 0) index *= growth;

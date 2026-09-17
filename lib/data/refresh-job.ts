@@ -1,8 +1,10 @@
 import "server-only";
 
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+
+import { writeJsonAtomic } from "./atomic-write";
 
 /**
  * 시세 갱신 작업의 진행 상태.
@@ -45,17 +47,32 @@ let currentJob: RefreshJob | null = null;
 function persist(job: RefreshJob): void {
   try {
     mkdirSync(STATE_DIR, { recursive: true });
-    writeFileSync(STATE_PATH, `${JSON.stringify(job, null, 2)}\n`, "utf8");
+    // 일반 쓰기 도중 프로세스가 죽으면 반쯤 쓰인 JSON이 남을 수 있다 — 상태 파일도
+    // data/*.json과 같은 원자적 쓰기를 쓴다(GPT 3차 검수 12-4).
+    writeJsonAtomic(STATE_PATH, `${JSON.stringify(job, null, 2)}\n`);
   } catch {
     // 상태 파일을 못 써도 갱신 자체는 계속한다 — 메모리 상태로 응답할 수 있다.
   }
 }
 
-function readPersisted(): RefreshJob | null {
+type PersistedRead = { job: RefreshJob | null; corrupted: boolean };
+
+/**
+ * 상태 파일이 아예 없는 것과, 있지만 JSON으로 못 읽는 것을 구분해서 돌려준다.
+ * 원자적 쓰기라 손상은 드물지만, 디스크 문제나 수동 편집으로 생길 수 있다 — 그
+ * 경우를 "모르는 jobId"와 같은 취급으로 조용히 묻지 않는다.
+ */
+function readPersisted(): PersistedRead {
+  let raw: string;
   try {
-    return JSON.parse(readFileSync(STATE_PATH, "utf8")) as RefreshJob;
+    raw = readFileSync(STATE_PATH, "utf8");
   } catch {
-    return null;
+    return { job: null, corrupted: false };
+  }
+  try {
+    return { job: JSON.parse(raw) as RefreshJob, corrupted: false };
+  } catch {
+    return { job: null, corrupted: true };
   }
 }
 
@@ -123,7 +140,7 @@ export function failJob(jobId: string, failure: RefreshJob["failure"]): void {
  */
 export function readJob(jobId: string): RefreshJob | null {
   if (currentJob?.jobId === jobId) return currentJob;
-  const persisted = readPersisted();
+  const { job: persisted } = readPersisted();
   if (persisted?.jobId !== jobId) return null;
   if (persisted.status === "running") {
     return {
@@ -133,4 +150,13 @@ export function readJob(jobId: string): RefreshJob | null {
     };
   }
   return persisted;
+}
+
+/**
+ * `readJob`이 `null`을 돌려줬을 때, 그게 정말 "모르는 jobId"인지 "상태 파일이
+ * 손상돼서 확인할 수 없다"인지 구분한다. 상태 조회 라우트가 404(모르는 작업)와
+ * 500(상태 불확실)을 다르게 응답하는 데 쓴다.
+ */
+export function diagnoseMissingJob(): "not-found" | "corrupted" {
+  return readPersisted().corrupted ? "corrupted" : "not-found";
 }

@@ -322,4 +322,47 @@ describe("cashflowAdjustedDrawdown", () => {
     ]);
     expect(result.maxDrawdown).toBeCloseTo(-20, 9);
   });
+
+  describe("원금 필드가 구간 중간에 생기는 경계 (GPT 3차 검수 12-2)", () => {
+    // 네 조합 전부: 둘 다 있음 / 이전만 없음 / 현재만 없음 / 둘 다 없음.
+    // "이전만 없음"에서 예전 버그는 현재 원금(100) 전체를 그 구간 순입금으로 오인해
+    // growth = (150-100)/50 = 1(변동 없음)로 만들었다 — 실제로는 50 -> 150으로 3배
+    // 뛴 평가액 성장을 현금흐름으로 지워버린 것이다. 지금은 현금흐름을 0으로 보고
+    // 평가액 성장률(150/50=3배)을 그대로 반영해야 한다.
+
+    it("둘 다 있음: 원금 차이를 현금흐름으로 정상 반영한다", () => {
+      const result = cashflowAdjustedDrawdown([
+        { at: "2026-01-01", totalKrw: 100, principalKrw: 100, fxRate: 1300 },
+        { at: "2026-01-02", totalKrw: 150, principalKrw: 100, fxRate: 1300 }, // 입출금 없음, 순수 +50%
+      ]);
+      expect(result.maxDrawdown).toBeCloseTo(0, 9); // 상승만 있으니 낙폭 없음
+    });
+
+    it("이전만 없음: 현재 원금 전체를 현금흐름으로 오인하지 않는다", () => {
+      const result = cashflowAdjustedDrawdown([
+        { at: "2026-01-01", totalKrw: 50, fxRate: 1300 }, // principalKrw 없음
+        { at: "2026-01-02", totalKrw: 150, principalKrw: 100, fxRate: 1300 },
+        { at: "2026-01-03", totalKrw: 100, principalKrw: 100, fxRate: 1300 }, // 150 -> 100, 실제 하락
+      ]);
+      // 첫 구간은 현금흐름 0으로 보고 평가액 성장(50->150, 3배)을 그대로 반영해야
+      // 신고점이 150 기준으로 잡히고, 그다음 100으로 빠진 게 낙폭으로 잡힌다.
+      expect(result.maxDrawdown).toBeCloseTo((100 - 150) / 150 * 100, 9);
+    });
+
+    it("현재만 없음: 다음 구간 원금이 사라져도 현금흐름을 0으로 본다", () => {
+      const result = cashflowAdjustedDrawdown([
+        { at: "2026-01-01", totalKrw: 100, principalKrw: 100, fxRate: 1300 },
+        { at: "2026-01-02", totalKrw: 80, fxRate: 1300 }, // principalKrw 없음
+      ]);
+      expect(result.maxDrawdown).toBeCloseTo(-20, 9); // 순수 평가액 하락으로만 계산
+    });
+
+    it("비정상 숫자값(NaN)도 유효하지 않은 원금으로 취급한다", () => {
+      const result = cashflowAdjustedDrawdown([
+        { at: "2026-01-01", totalKrw: 100, principalKrw: NaN, fxRate: 1300 },
+        { at: "2026-01-02", totalKrw: 80, principalKrw: 100, fxRate: 1300 },
+      ]);
+      expect(result.maxDrawdown).toBeCloseTo(-20, 9);
+    });
+  });
 });

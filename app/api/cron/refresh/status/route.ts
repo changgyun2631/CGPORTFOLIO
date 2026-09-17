@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { readJob, runningJob } from "@/lib/data/refresh-job";
+import { diagnoseMissingJob, readJob, runningJob } from "@/lib/data/refresh-job";
 
 /**
  * 시세 갱신 작업의 상태. `scripts/refresh-quotes.mjs`가 짧은 간격으로 물어본다 —
@@ -29,6 +29,12 @@ export async function GET(request: Request) {
 
   const job = readJob(jobId);
   if (!job) {
+    if (diagnoseMissingJob() === "corrupted") {
+      return NextResponse.json(
+        { ok: false, error: "작업 상태 파일이 손상되어 확인할 수 없습니다.", code: "corrupted-state" },
+        { status: 500 },
+      );
+    }
     return NextResponse.json({ ok: false, error: "모르는 jobId입니다.", code: "unknown-job" }, { status: 404 });
   }
   return NextResponse.json({ ok: true, job });

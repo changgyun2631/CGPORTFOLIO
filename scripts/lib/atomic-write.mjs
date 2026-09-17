@@ -47,12 +47,14 @@ export function writeJsonAtomic(filePath, content) {
   } finally {
     // rename이 실패하면(Windows에서 다른 프로세스가 대상 파일을 잠깐 잡으면 EPERM이
     // 난다) 임시 파일이 그대로 남는다. 그 안에는 대상과 같은 실제 계좌 데이터가
-    // 들어 있으므로 반드시 지운다. 정리 실패가 원래 예외를 덮지 않게 삼킨다.
+    // 들어 있으므로 반드시 지운다. 정리 실패가 원래 예외를 덮지 않게 삼킨다 —
+    // 단, "삼킨다"가 "아무도 모르게 사라진다"가 되면 안 되므로 진단은 남긴다.
+    // 파일 내용·전체 경로는 절대 남기지 않는다(basename과 오류 코드만).
     if (!renamed) {
       try {
         unlinkSync(tmpPath);
-      } catch {
-        // 이미 없거나 지울 수 없으면 원래 예외를 그대로 올린다.
+      } catch (unlinkError) {
+        console.error(`[atomic-write] 임시 파일 정리 실패 (${unlinkError.code ?? "UNKNOWN"}): ${basename(tmpPath)}`);
       }
     }
   }
