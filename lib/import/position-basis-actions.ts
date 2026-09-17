@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 import { backupData } from "../../scripts/lib/backup.mjs";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
-import { decodeEucKr } from "../../scripts/lib/csv.mjs";
+import { decodeBrokerCsv } from "../../scripts/lib/csv.mjs";
 import { crossCheckPositionBasis } from "../../scripts/lib/cross-check.mjs";
 import { parsePositionBasisCsv } from "../../scripts/lib/import-position-basis.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "../../scripts/lib/validate.mjs";
@@ -56,7 +56,7 @@ export async function previewPositionBasis(formData: FormData): Promise<Position
   if (!accountId) throw new Error("계좌 ID를 입력하세요.");
   assertFileWithinLimits(file, "보유종목 CSV");
 
-  const decoded = decodeEucKr(Buffer.from(await file.arrayBuffer()));
+  const decoded = decodeBrokerCsv(Buffer.from(await file.arrayBuffer()));
   const at = new Date(file.lastModified || Date.now()).toISOString();
   const { basis, crossCheckInput } = parsePositionBasisCsv(decoded, { accountId, at });
   assertRowCountWithinLimits(basis.length, "보유종목 CSV");

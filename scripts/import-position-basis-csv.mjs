@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
-import { decodeEucKr } from "./lib/csv.mjs";
+import { decodeBrokerCsv } from "./lib/csv.mjs";
 import { crossCheckPositionBasis } from "./lib/cross-check.mjs";
 import { parsePositionBasisCsv } from "./lib/import-position-basis.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "./lib/validate.mjs";
@@ -39,7 +39,7 @@ const csvPath = positional[0];
 if (!csvPath) throw new Error("보유종목 CSV 경로가 필요합니다.");
 
 const accountId = String(flags["account-id"] ?? "acc-main");
-const decoded = decodeEucKr(readFileSync(csvPath));
+const decoded = decodeBrokerCsv(readFileSync(csvPath));
 const at = String(flags["as-of"] ?? statSync(csvPath).mtime.toISOString());
 const { basis, crossCheckInput } = parsePositionBasisCsv(decoded, { accountId, at });
 

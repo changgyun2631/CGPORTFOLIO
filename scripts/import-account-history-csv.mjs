@@ -13,7 +13,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
-import { decodeEucKr } from "./lib/csv.mjs";
+import { decodeBrokerCsv } from "./lib/csv.mjs";
 import { buildAccountHistorySnapshots, parseAccountHistoryTotals } from "./lib/import-account-history.mjs";
 import { validateSnapshots } from "./lib/validate.mjs";
 
@@ -24,7 +24,7 @@ const replace = args.includes("--replace");
 const paths = args.filter((arg) => !arg.startsWith("--"));
 if (paths.length === 0) throw new Error("계좌수익률 CSV 경로가 필요합니다.");
 
-const decodedTexts = paths.map((path) => decodeEucKr(readFileSync(path)));
+const decodedTexts = paths.map((path) => decodeBrokerCsv(readFileSync(path)));
 const totals = parseAccountHistoryTotals(decodedTexts);
 
 const fxHistory = JSON.parse(readFileSync(join(dataDir, "fx.json"), "utf8"));

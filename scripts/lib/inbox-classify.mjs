@@ -14,7 +14,7 @@
 /** @typedef {"account-history" | "position-basis" | "unknown"} InboxKind */
 
 /**
- * @param {string} decodedText EUC-KR 디코딩이 끝난 CSV 전체 텍스트
+ * @param {string} decodedText 디코딩이 끝난 CSV 전체 텍스트
  * @returns {InboxKind}
  */
 export function classifyInboxCsv(decodedText) {

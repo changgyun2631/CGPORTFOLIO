@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { backupData } from "../../scripts/lib/backup.mjs";
-import { decodeEucKr } from "../../scripts/lib/csv.mjs";
+import { decodeBrokerCsv } from "../../scripts/lib/csv.mjs";
 import { buildAccountHistorySnapshots, parseAccountHistoryTotals } from "../../scripts/lib/import-account-history.mjs";
 import { validateSnapshots } from "../../scripts/lib/validate.mjs";
 import { requireAuthenticatedSession } from "../auth/guard";
@@ -44,7 +44,7 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
   files.forEach((file, index) => assertFileWithinLimits(file, `계좌수익률 CSV #${index + 1}`));
   assertFileCountAndTotalWithinLimits(files, "계좌수익률 CSV");
 
-  const decodedTexts = await Promise.all(files.map(async (file) => decodeEucKr(Buffer.from(await file.arrayBuffer()))));
+  const decodedTexts = await Promise.all(files.map(async (file) => decodeBrokerCsv(Buffer.from(await file.arrayBuffer()))));
   const totals = parseAccountHistoryTotals(decodedTexts);
   assertRowCountWithinLimits(totals.size, "계좌수익률 CSV 병합 결과");
 

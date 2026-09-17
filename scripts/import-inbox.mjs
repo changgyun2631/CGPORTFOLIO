@@ -25,7 +25,7 @@ import { dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { backupData } from "./lib/backup.mjs";
-import { decodeEucKr } from "./lib/csv.mjs";
+import { decodeBrokerCsv } from "./lib/csv.mjs";
 import { classifyInboxCsv, INBOX_KIND_LABEL } from "./lib/inbox-classify.mjs";
 import { trimLogFile } from "./lib/log-rotate.mjs";
 
@@ -141,7 +141,7 @@ function main() {
 
     let kind;
     try {
-      kind = classifyInboxCsv(decodeEucKr(readFileSync(filePath)));
+      kind = classifyInboxCsv(decodeBrokerCsv(readFileSync(filePath)));
     } catch (error) {
       log(`  ${name}: 읽기 실패 — ${error.message}`);
       moveAside(filePath, failedDir, name);
