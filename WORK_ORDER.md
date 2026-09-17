@@ -57,6 +57,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 | `CGPORTFOLIO 시세 갱신` | 6시간마다 (02/08/14/20시) | `scripts/refresh-quotes.mjs` → `/api/cron/refresh` 접수 후 상태 조회 |
 | `CGPORTFOLIO 데이터 백업` | 매일 03:00 | `scripts/backup-data.mjs` → `~/cgportfolio-backups/` |
 | `CGPORTFOLIO 주간 리포트` | 매주 월 09:00 | `scripts/generate-weekly-report.mjs` → `/api/cron/weekly-report` 호출 |
+| `CGPORTFOLIO 받은CSV 가져오기` | 10분마다 | `scripts/import-inbox.mjs` → `~/cgportfolio-inbox`의 증권사 CSV 자동 반영 |
 
 로그온 트리거는 "재부팅하면 다음 날 새벽 4시까지 서버가 안 뜬다"를 막으려고 추가했다.
 다만 이 작업은 "로그인한 사용자로 실행"이라 **부팅만 하고 로그인을 안 하면 안 뜬다** — 수용 위험.
@@ -961,3 +962,33 @@ qld.kr 색상 체계(상승=초록/하락=빨강)로 전체를 다시 칠해 뒀
 - 네이버 공급자가 `marketState`를 항상 `"closed"`로 하드코딩
 - Twelve Data 분당 크레딧 한도로 28종목 일괄 요청이 전부 429 → 8개씩 분할
 - 중첩 워크트리 때문에 lint 683건 오류·테스트 2배 중복 실행
+
+### 0-5c. 받은 CSV 자동 가져오기 (inbox)
+
+매매·잔고는 시세와 달리 자동으로 따라오지 않는다(증권사 API를 쓰지 않으므로). 매번
+`/accounts/import` 화면에서 올리는 수고를 줄이려고, **폴더에 넣어두면 알아서 가져오는**
+경로를 뒀다.
+
+- **넣는 곳**: `~/cgportfolio-inbox` (저장소 밖이다 — 안에 두면 실제 계좌 데이터가 든
+  CSV가 미추적 파일로 남고, 저장소가 Public이라 위험하다)
+- **주기**: 10분마다 (`CGPORTFOLIO 받은CSV 가져오기`)
+- **처리 후**: 성공은 `처리완료/`, 실패·판별불가는 `실패/`로 날짜를 붙여 옮긴다.
+  옮기지 않으면 다음 주기에 같은 파일을 또 가져간다.
+- **로그**: `~/cgportfolio-logs/inbox-import.log` (파일명·종류·건수만, 금액은 안 남긴다)
+
+**판별은 파일 이름이 아니라 헤더로 한다**(`scripts/lib/inbox-classify.mjs`). 증권사
+내보내기 이름은 화면 번호나 무작위 문자열이라 내용과 무관하다 — 실제로 화면 번호로 받은
+파일 세 개가 전부 예상과 다른 내용이었다(HANDOFF 13절 이전 기록 참고).
+
+| 헤더 조건 | 돌리는 가져오기 |
+|---|---|
+| `일자`+`예탁자산`+`입금`+`출금` | 계좌수익률 → `snapshots.json` |
+| `종목명`+`평가손익` | 보유종목(잔고) → `position-basis.json` |
+| 그 외 | **건드리지 않고** `실패/`로 옮김 |
+
+안전장치: 적용 직전 자동 백업, 원자적 쓰기·잠금(기존 importer 그대로), 다운로드 중인
+파일은 크기가 안정될 때까지 건너뜀, CSV가 아니면 거부.
+
+**자동으로 돌리지 않는 것**: `scripts/import-holdings-csv.mjs`(보유종목 → 거래원장
+부트스트랩)는 실제 매매 이력이 아닌 근사 거래를 만들어내므로 자동화 대상에서 뺐다.
+필요하면 사람이 직접 판단해서 돌린다.
