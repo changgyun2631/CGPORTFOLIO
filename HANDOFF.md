@@ -1546,3 +1546,56 @@ GPT가 구현만 하고 중단한 뒤 이어받아 커밋·빌드·배포하고,
    직접 로그인해 확인해야 한다.
 2. 새 빌드 이후 **예약 시세 갱신의 종료 코드 0 확인**은 진행 중이었다(수동 트리거).
 3. 인터넷 공개(포트포워딩·방화벽)는 위 1번이 끝나기 전까지 하지 않는다.
+
+## 14. 인터넷 공개 (2026-09-17, Tailscale Funnel)
+
+사용자가 "휴대폰에서 외부 접속"을 요청해 공개했다. 무료로 **고정 주소 + HTTPS**를 얻는
+방법이 사실상 Tailscale Funnel뿐이라 이걸 골랐다(Cloudflare Tunnel은 도메인이 있어야
+주소가 고정된다. 도메인 없이는 재시작마다 주소가 바뀐다).
+
+### 구성
+
+| 항목 | 값 |
+|---|---|
+| 공개 주소 | `https://cgportfolio.tailab9ee1.ts.net` |
+| 경로 | Funnel → `http://127.0.0.1:3000` (프로덕션 서버) |
+| 머신 이름 | `cgportfolio` |
+| HTTPS | Tailscale이 인증서 자동 발급·갱신 |
+| 공유기 설정 | **불필요** (포트포워딩 없음, 공인 IP 노출 없음) |
+
+`tailscale funnel --bg 3000`으로 켰다. 끄려면 `tailscale funnel --https=443 off`.
+
+### 재부팅 후 유지
+
+- Tailscale 서비스는 `StartType=Automatic`이고, serve/funnel 설정은 노드 상태에 저장돼
+  데몬이 뜨면 자동 복구된다 → **Funnel은 별도 작업 등록이 필요 없다.**
+- 다만 **앱 서버(`CGPORTFOLIO 서버`)는 로그온 트리거**라, 부팅 후 로그인 전에는 서버가
+  안 뜬다. 그동안 공개 주소는 502/연결 실패가 된다. 공개 사이트가 된 지금은 이 제약의
+  체감이 커졌으므로, 필요하면 부팅 시 실행(서비스화)으로 바꾸는 것을 검토할 것.
+
+### 공개에 맞춰 바꾼 것
+
+- `next.config.ts`의 `serverActions.allowedOrigins`에 공개 도메인을 등록했다. Server Action은
+  Origin과 Host를 대조하는 CSRF 검사를 하므로, 없으면 가져오기 6개가 전부 거부된다.
+- 로그인 리다이렉트를 상대 경로로, Secure 쿠키를 프로토콜 기준으로 바꿔 둔 덕분에
+  (13-1 참고) 공개 도메인에서 코드 수정 없이 그대로 동작했다.
+
+### 공개 후 실제 확인
+
+| 확인 | 결과 |
+|---|---|
+| 외부 HTTPS 접속 | 307 → `https://cgportfolio.tailab9ee1.ts.net/login?next=%2F` (localhost로 안 튕김) |
+| TLS 인증서 검증 | 정상(`ssl_verify_result=0`) |
+| 로그인 화면 | 200 |
+| HTTPS에서 Secure 쿠키 | `Secure; HttpOnly; SameSite=lax` 자동 적용 확인 |
+| 외부에서 크론 API | `/api/cron/refresh`·`/status`·`/weekly-report` 전부 **401** |
+
+### 남은 위험
+
+- **로그인 비밀번호가 유일한 방어선이다.** 주소를 알면 누구나 로그인 화면까지 도달한다.
+  비밀번호가 짧거나 재사용된 것이면 `npm run auth:setup`으로 교체할 것.
+- **로그인 실패 제한의 클라이언트 식별이 미확인이다.** `x-real-ip`/`x-forwarded-for`를
+  키로 쓰는데, Funnel이 이 헤더를 어떤 값으로 넣는지 확인하지 않았다. 모든 외부 요청이
+  같은 키로 묶이면 제3자의 실패 시도로 본인이 15분간 잠길 수 있다. 브루트포스가 실제
+  문제가 되면 이것부터 확인할 것.
+- 대역폭은 Tailscale Funnel 무료 한도를 따른다. 개인 용도 수준에서는 문제되지 않는다.
