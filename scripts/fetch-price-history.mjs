@@ -28,6 +28,10 @@ import { fileURLToPath } from "node:url";
 import { withDataLock, writeJsonAtomic } from "./lib/atomic-write.mjs";
 import { backupData } from "./lib/backup.mjs";
 import { mergePriceHistory, parseTimeSeriesResponse } from "./lib/price-history.mjs";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+// 예약 실행은 셸을 거치지 않으므로 .env.local을 직접 읽어야 API 키가 채워진다.
+loadLocalEnv();
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const dataDir = join(root, "data");
