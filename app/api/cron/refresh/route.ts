@@ -2,6 +2,7 @@ import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { authorizeCronRequest } from "@/lib/auth/cron";
 import { withDataLock } from "@/lib/data/atomic-write";
 import { logCronStage } from "@/lib/data/cron-log";
 import { GenerationWriteError, readOriginals, writeGenerationOrRollback } from "@/lib/data/generation-write";
@@ -33,12 +34,6 @@ export const dynamic = "force-dynamic";
 
 const dataDir = join(process.cwd(), "data");
 
-function authorize(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // 비워두면 로컬 개발용으로 열어 둔다.
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 /**
  * 갱신을 접수만 하고 바로 `jobId`를 돌려준다. 실제 작업은 응답을 보낸 뒤 이
  * 프로세스 안에서 계속 돌고, 호출한 쪽은 `/api/cron/refresh/status`로 확인한다.
@@ -46,7 +41,7 @@ function authorize(request: Request): boolean {
  * 실패로 보고되던 문제를 구조로 없앤 것이다(`lib/data/refresh-job.ts` 참고).
  */
 export async function GET(request: Request) {
-  if (!authorize(request)) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ ok: false, error: "인증 실패" }, { status: 401 });
   }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { authorizeCronRequest } from "@/lib/auth/cron";
 import { diagnoseMissingJob, readJob, runningJob } from "@/lib/data/refresh-job";
 
 /**
@@ -10,14 +11,8 @@ import { diagnoseMissingJob, readJob, runningJob } from "@/lib/data/refresh-job"
 
 export const dynamic = "force-dynamic";
 
-function authorize(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true;
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 export async function GET(request: Request) {
-  if (!authorize(request)) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ ok: false, error: "인증 실패" }, { status: 401 });
   }
 

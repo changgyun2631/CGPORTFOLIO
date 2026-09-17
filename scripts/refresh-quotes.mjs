@@ -27,7 +27,10 @@ import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 
 import { trimLogFile } from "./lib/log-rotate.mjs";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { REFRESH_EXIT, classifyFetchError, classifyJobOutcome, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
+
+loadLocalEnv();
 
 const SERVER_TASK_NAME = "CGPORTFOLIO 서버";
 const HEALTHCHECK_TIMEOUT_MS = 5_000;

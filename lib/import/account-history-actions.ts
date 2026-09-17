@@ -7,6 +7,7 @@ import { backupData } from "../../scripts/lib/backup.mjs";
 import { decodeEucKr } from "../../scripts/lib/csv.mjs";
 import { buildAccountHistorySnapshots, parseAccountHistoryTotals } from "../../scripts/lib/import-account-history.mjs";
 import { validateSnapshots } from "../../scripts/lib/validate.mjs";
+import { requireAuthenticatedSession } from "../auth/guard";
 import { withDataLock, writeJsonAtomic } from "../data/atomic-write";
 import type { Snapshot } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
@@ -35,6 +36,7 @@ function readJson<T>(name: string): T {
 }
 
 export async function previewAccountHistory(formData: FormData): Promise<AccountHistoryPreview> {
+  await requireAuthenticatedSession();
   pruneStaleStagedImports();
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File);
@@ -68,6 +70,7 @@ export async function previewAccountHistory(formData: FormData): Promise<Account
 }
 
 export async function applyAccountHistory(token: string): Promise<ApplyResult> {
+  await requireAuthenticatedSession();
   let staged: { snapshots: Snapshot[]; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);

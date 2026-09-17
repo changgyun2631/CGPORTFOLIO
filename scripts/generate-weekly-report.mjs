@@ -17,6 +17,9 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { trimLogFile } from "./lib/log-rotate.mjs";
+import { loadLocalEnv } from "./lib/load-local-env.mjs";
+
+loadLocalEnv();
 
 const REQUEST_TIMEOUT_MS = 60_000;
 

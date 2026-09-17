@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { backupData } from "../../scripts/lib/backup.mjs";
 import { normalizeLedger } from "../../scripts/lib/ledger-normalize.mjs";
 import { validateCashFlows, validateTransactions } from "../../scripts/lib/validate.mjs";
+import { requireAuthenticatedSession } from "../auth/guard";
 import { withDataLock } from "../data/atomic-write";
 import { GenerationWriteError, readOriginals, writeGenerationOrRollback } from "../data/generation-write";
 import type { CashFlow, Transaction } from "../domain/types";
@@ -31,6 +32,7 @@ function readJson<T>(name: string): T {
 
 /** 파일 업로드가 없다 — 기존 원장(transactions.json/cashflows.json)을 다시 정규화한다. */
 export async function previewNormalizeLedger(): Promise<NormalizeLedgerPreview> {
+  await requireAuthenticatedSession();
   pruneStaleStagedImports();
 
   // 입력 읽기 → 정규화 계산 → baseline 생성을 같은 잠금 스냅샷 안에서 한다 —
@@ -70,6 +72,7 @@ export async function previewNormalizeLedger(): Promise<NormalizeLedgerPreview> 
 }
 
 export async function applyNormalizeLedger(token: string): Promise<ApplyResult> {
+  await requireAuthenticatedSession();
   let staged: { transactions: Transaction[]; cashflows: CashFlow[]; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);

@@ -9,6 +9,7 @@ import { decodeEucKr } from "../../scripts/lib/csv.mjs";
 import { crossCheckPositionBasis } from "../../scripts/lib/cross-check.mjs";
 import { parsePositionBasisCsv } from "../../scripts/lib/import-position-basis.mjs";
 import { validateBasisNotRegressing, validatePositionBasis } from "../../scripts/lib/validate.mjs";
+import { requireAuthenticatedSession } from "../auth/guard";
 import type { PositionBasis } from "../domain/types";
 import { diffDataFiles, hashDataFiles } from "./data-version";
 import { assertFileWithinLimits, assertRowCountWithinLimits } from "./limits";
@@ -46,6 +47,7 @@ function readJson<T>(name: string): T {
 
 /** 잔고 CSV를 읽어 미리보기만 만든다. 이 단계에서는 아무 파일도 바뀌지 않는다. */
 export async function previewPositionBasis(formData: FormData): Promise<PositionBasisPreview> {
+  await requireAuthenticatedSession();
   pruneStaleStagedImports();
 
   const file = formData.get("file");
@@ -92,6 +94,7 @@ export async function previewPositionBasis(formData: FormData): Promise<Position
  * 사이(TOCTOU)에 cron이나 다른 가져오기가 끼어들 수 있기 때문이다.
  */
 export async function applyPositionBasis(token: string): Promise<ApplyResult> {
+  await requireAuthenticatedSession();
   let staged: { basis: PositionBasis[]; accountId: string; baseline: Record<string, string> };
   try {
     staged = consumeStagedImport(KIND, token);

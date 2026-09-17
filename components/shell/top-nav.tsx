@@ -27,6 +27,7 @@ export function TopNav() {
 
 function MobileMenu({ pathname }: { pathname: string }) {
   const [open, setOpen] = useState(false);
+  const loginPage = pathname === "/login";
 
   return (
     <>
@@ -38,39 +39,53 @@ function MobileMenu({ pathname }: { pathname: string }) {
           <span className="hidden sm:inline">{site.name}</span>
         </Link>
 
-        <nav aria-label="주요 메뉴" className="hidden flex-1 items-center gap-1 md:flex">
-          {nav.map((item) => {
-            const active = isActive(pathname, item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
-                  active ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-hover hover:text-text"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        {!loginPage ? (
+          <nav aria-label="주요 메뉴" className="hidden flex-1 items-center gap-1 md:flex">
+            {nav.map((item) => {
+              const active = isActive(pathname, item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                    active ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-hover hover:text-text"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        ) : null}
 
         <div className="ml-auto flex items-center gap-1">
           <ThemeToggle />
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            aria-expanded={open}
-            aria-label="메뉴 열기"
-            className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted md:hidden"
-          >
-            메뉴
-          </button>
+          {!loginPage ? (
+            <>
+              <form action="/api/auth/logout" method="post" className="hidden md:block">
+                <button
+                  type="submit"
+                  className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
+                >
+                  로그아웃
+                </button>
+              </form>
+              <button
+                type="button"
+                onClick={() => setOpen((v) => !v)}
+                aria-expanded={open}
+                aria-label="메뉴 열기"
+                className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted md:hidden"
+              >
+                메뉴
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
 
-      {open ? (
+      {open && !loginPage ? (
         <nav aria-label="모바일 메뉴" className="grid grid-cols-2 gap-1 border-t border-line px-4 py-3 md:hidden">
           {nav.map((item) => {
             const active = isActive(pathname, item.href);
@@ -86,6 +101,14 @@ function MobileMenu({ pathname }: { pathname: string }) {
               </Link>
             );
           })}
+          <form action="/api/auth/logout" method="post">
+            <button
+              type="submit"
+              className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-muted hover:bg-surface-hover"
+            >
+              로그아웃
+            </button>
+          </form>
         </nav>
       ) : null}
     </>

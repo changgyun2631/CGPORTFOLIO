@@ -3,6 +3,7 @@ import { join } from "node:path";
 
 import { NextResponse } from "next/server";
 
+import { authorizeCronRequest } from "@/lib/auth/cron";
 import { writeJsonAtomic, withDataLock } from "@/lib/data/atomic-write";
 import { loadWeeklyReportInput } from "@/lib/data/views";
 import {
@@ -27,12 +28,6 @@ export const dynamic = "force-dynamic";
 const dataDir = join(process.cwd(), "data");
 const targetPath = join(dataDir, "weekly-reports.json");
 
-function authorize(request: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return true; // 비워두면 로컬 개발용으로 열어 둔다.
-  return request.headers.get("authorization") === `Bearer ${secret}`;
-}
-
 async function readExisting(): Promise<GeneratedReport[]> {
   try {
     return JSON.parse(await readFile(targetPath, "utf8")) as GeneratedReport[];
@@ -42,7 +37,7 @@ async function readExisting(): Promise<GeneratedReport[]> {
 }
 
 export async function GET(request: Request) {
-  if (!authorize(request)) {
+  if (!authorizeCronRequest(request)) {
     return NextResponse.json({ ok: false, error: "인증 실패" }, { status: 401 });
   }
 
