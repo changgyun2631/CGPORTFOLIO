@@ -5,6 +5,7 @@
     "summary": "레버리지 단일 종목에 1억을 넣고 아무것도 하지 않았을 때. 다른 시나리오를 비교할 기준선으로 쓴다.",
     "allocations": [{ "symbolId": "QLD", "weight": 100 }],
     "initialKrw": 100000000,
+    "start": "2024-01-01",
     "rebalance": "none"
   },
   {
@@ -15,6 +16,7 @@
     "initialKrw": 100000000,
     "monthlyWithdrawalKrw": 2500000,
     "withdrawalTaxRate": 0.22,
+    "start": "2024-01-01",
     "rebalance": "none"
   },
   {
@@ -26,6 +28,7 @@
       { "symbolId": "SCHD", "weight": 40 }
     ],
     "initialKrw": 100000000,
+    "start": "2024-01-01",
     "rebalance": "quarterly"
   },
   {
@@ -38,6 +41,7 @@
     ],
     "initialKrw": 0,
     "monthlyContributionKrw": 3000000,
+    "start": "2024-01-01",
     "rebalance": "none"
   },
   {
@@ -49,6 +53,7 @@
       { "symbolId": "QLD", "weight": 50 }
     ],
     "initialKrw": 100000000,
+    "start": "2024-01-01",
     "rebalance": "none"
   }
 ]
