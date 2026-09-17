@@ -12,5 +12,9 @@ if not exist "%USERPROFILE%\cgportfolio-logs" mkdir "%USERPROFILE%\cgportfolio-l
 echo %date% %time% server starting >> "%USERPROFILE%\cgportfolio-logs\server.log"
 call npm start
 echo %date% %time% server exited, restarting in 10s >> "%USERPROFILE%\cgportfolio-logs\server.log"
-timeout /t 10 /nobreak >nul
+rem Use ping instead of timeout to wait. timeout needs a real console and fails with
+rem "Input redirection is not supported" when the task runs at boot without a logged
+rem on user. That failure returns instantly, which would turn this into a busy restart
+rem loop. ping always waits, console or not.
+ping -n 11 127.0.0.1 >nul
 goto loop
