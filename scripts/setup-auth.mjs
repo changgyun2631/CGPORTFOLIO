@@ -42,7 +42,9 @@ const r = 8;
 const p = 1;
 const salt = randomBytes(16);
 const derived = await scrypt(password, salt, 64, { N: n, r, p, maxmem: 128 * 1024 * 1024 });
-const passwordHash = `scrypt$v1$${n}$${r}$${p}$${salt.toString("base64url")}$${derived.toString("base64url")}`;
+// 구분자는 반드시 `.`다. `$`를 쓰면 dotenv가 `$v1`·`$16384`를 변수로 확장해
+// .env.local에서 읽을 때 해시가 잘린다(lib/auth/password.ts parseHash 주석 참고).
+const passwordHash = `scrypt.v1.${n}.${r}.${p}.${salt.toString("base64url")}.${derived.toString("base64url")}`;
 const existing = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
 const updated = upsertEnv(existing, {
   AUTH_USERNAME: username,

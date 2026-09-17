@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.stubEnv("AUTH_USERNAME", "owner");
   vi.stubEnv(
     "AUTH_PASSWORD_HASH",
-    `scrypt$v1$16384$8$1$${salt.toString("base64url")}$${derived.toString("base64url")}`,
+    `scrypt.v1.16384.8.1.${salt.toString("base64url")}.${derived.toString("base64url")}`,
   );
   vi.stubEnv("SESSION_SECRET", "a-strong-session-secret-with-more-than-32-characters");
 });

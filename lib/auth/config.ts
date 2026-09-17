@@ -11,7 +11,8 @@ export function authConfigurationError(): string | null {
   const sessionSecret = process.env.SESSION_SECRET?.trim();
 
   if (!username) return "AUTH_USERNAME이 설정되지 않았습니다.";
-  if (!passwordHash?.startsWith("scrypt$")) return "AUTH_PASSWORD_HASH가 설정되지 않았거나 형식이 잘못됐습니다.";
+  // 구분자가 `.`인 이유는 lib/auth/password.ts의 parseHash 주석 참고(dotenv 변수확장).
+  if (!passwordHash?.startsWith("scrypt.")) return "AUTH_PASSWORD_HASH가 설정되지 않았거나 형식이 잘못됐습니다.";
   if (!sessionSecret || sessionSecret.length < 32) return "SESSION_SECRET은 32자 이상이어야 합니다.";
   return null;
 }

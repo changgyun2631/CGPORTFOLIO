@@ -6,7 +6,7 @@ import { createSessionToken } from "./session";
 
 beforeEach(() => {
   vi.stubEnv("AUTH_USERNAME", "owner");
-  vi.stubEnv("AUTH_PASSWORD_HASH", "scrypt$v1$configured");
+  vi.stubEnv("AUTH_PASSWORD_HASH", "scrypt.v1.configured");
   vi.stubEnv("SESSION_SECRET", "a-strong-session-secret-with-more-than-32-characters");
 });
 
