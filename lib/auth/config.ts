@@ -21,7 +21,16 @@ export function isAuthConfigured(): boolean {
   return authConfigurationError() === null;
 }
 
-/** HTTPS에서는 항상 Secure 쿠키를 쓴다. 로컬 개발 주소만 HTTP 쿠키를 허용한다. */
-export function shouldUseSecureCookie(url: URL): boolean {
-  return !["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+/**
+ * Secure 쿠키는 **연결이 HTTPS일 때만** 붙인다. 호스트 이름으로 판단하면 안 된다 —
+ * `http://192.168.x.x:3000`처럼 평문 HTTP인데 Secure를 붙이면 브라우저가 쿠키를
+ * 아예 저장하지 않아서, 로그인에 성공해도 곧바로 로그인 화면으로 되돌아온다.
+ *
+ * 리버스 프록시(예: HTTPS 종단) 뒤에 두면 `x-forwarded-proto`가 https로 오므로,
+ * 나중에 HTTPS를 앞에 붙이면 코드 수정 없이 Secure가 켜진다.
+ */
+export function shouldUseSecureCookie(request: Request, fallbackProtocol = "http:"): boolean {
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  if (forwarded) return forwarded === "https";
+  return fallbackProtocol === "https:";
 }

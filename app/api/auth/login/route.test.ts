@@ -35,7 +35,8 @@ describe("POST /api/auth/login", () => {
     );
     const cookie = response.headers.get("set-cookie") ?? "";
     expect(response.status).toBe(303);
-    expect(response.headers.get("location")).toBe("https://portfolio.example/history?range=1y");
+    // 상대 경로여야 한다 — 접속한 호스트를 그대로 따라가게 하려는 것이다.
+    expect(response.headers.get("location")).toBe("/history?range=1y");
     expect(cookie).toContain("cgportfolio_session=");
     expect(cookie).toContain("Max-Age=604800");
     expect(cookie).toContain("Path=/");
@@ -55,7 +56,7 @@ describe("POST /api/auth/login", () => {
     const response = await login(
       request({ username: "owner", password: "very-strong-password", next: "https://evil.example" }),
     );
-    expect(response.headers.get("location")).toBe("https://portfolio.example/");
+    expect(response.headers.get("location")).toBe("/");
   });
 });
 
@@ -66,5 +67,60 @@ describe("POST /api/auth/logout", () => {
     expect(response.status).toBe(303);
     expect(cookie).toContain("cgportfolio_session=");
     expect(cookie).toContain("Max-Age=0");
+  });
+});
+
+describe("휴대폰·LAN 접속 회귀 (2026-09-17)", () => {
+  function requestOn(url: string, fields: Record<string, string>, headers: Record<string, string> = {}) {
+    return new NextRequest(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-real-ip": crypto.randomUUID(),
+        ...headers,
+      },
+      body: new URLSearchParams(fields),
+    });
+  }
+
+  it("리다이렉트는 절대 URL이 아니라 상대 경로다", async () => {
+    // 라우트 핸들러의 request.url은 실제 접속 호스트가 아니라 localhost로 정규화된다.
+    // 절대 URL로 돌려보내면 휴대폰에서 로그인했을 때 휴대폰 자신(localhost)을 가리킨다.
+    const response = await login(
+      requestOn("http://192.168.10.72:3000/api/auth/login", {
+        username: "owner",
+        password: "very-strong-password",
+      }),
+    );
+    const location = response.headers.get("location") ?? "";
+    expect(location.startsWith("/")).toBe(true);
+    expect(location).not.toContain("localhost");
+    expect(location).not.toContain("://");
+  });
+
+  it("평문 HTTP에서는 Secure 쿠키를 붙이지 않는다", async () => {
+    // Secure를 붙이면 브라우저가 HTTP 응답의 쿠키를 저장하지 않아, 로그인해도
+    // 곧바로 로그인 화면으로 되돌아온다.
+    const response = await login(
+      requestOn("http://192.168.10.72:3000/api/auth/login", {
+        username: "owner",
+        password: "very-strong-password",
+      }),
+    );
+    const cookie = response.headers.get("set-cookie") ?? "";
+    expect(cookie).toContain("HttpOnly");
+    expect(cookie).not.toMatch(/;\s*Secure/i);
+  });
+
+  it("x-forwarded-proto가 https면 Secure 쿠키를 붙인다", async () => {
+    // 나중에 HTTPS 리버스 프록시를 앞에 두면 코드 수정 없이 Secure가 켜져야 한다.
+    const response = await login(
+      requestOn(
+        "http://192.168.10.72:3000/api/auth/login",
+        { username: "owner", password: "very-strong-password" },
+        { "x-forwarded-proto": "https" },
+      ),
+    );
+    expect(response.headers.get("set-cookie") ?? "").toMatch(/;\s*Secure/i);
   });
 });
