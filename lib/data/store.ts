@@ -87,6 +87,19 @@ export const getQuotes = () => readJson<Quote[]>("quotes.json");
 export const getFxQuote = () => readJson<FxRate>("fx-quote.json");
 export const getLookthrough = () => readJson<LookthroughTable>("lookthrough.json");
 export const getPriceHistory = () => readJson<Record<string, { d: string; c: number }[]>>("prices.json");
+
+/**
+ * 배당·분할을 반영한 가격. 백테스트만 쓴다 — 화면에 뜨는 종가는 실제 거래가여야
+ * 하므로 `prices.json`과 따로 둔다. 아직 한 번도 받지 않았으면 빈 표를 주고,
+ * 백테스트는 그때 주가 기준으로 돌면서 배당 기여분을 null로 남긴다.
+ */
+export async function getTotalReturnPriceHistory(): Promise<Record<string, { d: string; c: number }[]>> {
+  try {
+    return await readJson<Record<string, { d: string; c: number }[]>>("prices-total-return.json");
+  } catch {
+    return {};
+  }
+}
 export const getFxHistory = () => readJson<{ d: string; rate: number }[]>("fx.json");
 
 export async function getBacktestConfigs(): Promise<BacktestConfig[]> {

@@ -21,6 +21,7 @@ import {
   getLookthrough,
   getPositionBasis,
   getPriceHistory,
+  getTotalReturnPriceHistory,
   getQuotes,
   getSnapshots,
   getSymbols,
@@ -188,13 +189,14 @@ export const loadRecentCashFlows = cache(async (limit = 5) => {
  * 가격 이력이 갱신되면 결과도 따라 갱신된다.
  */
 export const loadBacktests = cache(async () => {
-  const [configs, prices, fxHistory, symbols] = await Promise.all([
+  const [configs, prices, totalReturnPrices, fxHistory, symbols] = await Promise.all([
     getBacktestConfigs(),
     getPriceHistory(),
+    getTotalReturnPriceHistory(),
     getFxHistory(),
     getSymbols(),
   ]);
-  return configs.map((config) => runBacktest(config, prices, fxHistory, symbols));
+  return configs.map((config) => runBacktest(config, prices, fxHistory, symbols, totalReturnPrices));
 });
 
 export const loadBacktest = cache(async (id: string) => {

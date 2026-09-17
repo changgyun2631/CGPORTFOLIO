@@ -34,10 +34,10 @@
   {
     "id": "dca-monthly",
     "title": "적립식 월 300만원 (QLD 70 / 커버드콜 30)",
-    "summary": "일시금 없이 매달 300만원씩만 넣는다. 거치식과 달리 하락 구간이 평균단가를 낮추는 쪽으로 작용한다.",
+    "summary": "일시금 없이 매달 300만원씩만 넣는다. 거치식과 달리 하락 구간이 평균단가를 낮추는 쪽으로 작용한다. 커버드콜은 나스닥100 커버드콜(QYLD)로 본다 — 수익 대부분이 분배금이라 배당을 반영한 가격으로 계산한다.",
     "allocations": [
       { "symbolId": "QLD", "weight": 70 },
-      { "symbolId": "491620", "weight": 30 }
+      { "symbolId": "QYLD", "weight": 30 }
     ],
     "initialKrw": 0,
     "monthlyContributionKrw": 3000000,

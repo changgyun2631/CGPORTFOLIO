@@ -62,7 +62,11 @@ export default async function BacktestDetailPage({ params }: PageProps<"/backtes
           label="순증"
           value={money(result.netGainKrw)}
           tone={result.netGainKrw >= 0 ? "up" : "down"}
-          sub={`투입 ${money(result.investedKrw)}`}
+          sub={
+            result.dividendContributionKrw === null
+              ? `투입 ${money(result.investedKrw)} · 배당 미반영`
+              : `투입 ${money(result.investedKrw)} · 이 중 배당 ${money(result.dividendContributionKrw)}`
+          }
         />
         <Stat label="최대 낙폭" value={percent(stats.maxDrawdown)} tone="down" sub={stats.drawdownFrom && stats.drawdownTo ? `${shortDateTime(stats.drawdownFrom.at)} → ${shortDateTime(stats.drawdownTo.at)}` : undefined} />
         <Stat

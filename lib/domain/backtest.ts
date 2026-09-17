@@ -62,6 +62,13 @@ export type BacktestResult = {
   depletedAt: string | null;
   /** 가격 이력이 없어 제외한 종목 */
   skipped: string[];
+  /**
+   * 배당이 최종 성과에 더한 금액(원). 배당 반영 가격으로 돌린 결과와 주가만으로
+   * 돌린 결과의 차이다 — 배당을 그대로 재투자했다고 볼 때의 기여분이다.
+   * 배당 반영 가격이 없는 종목이 섞여 있으면 null이고, 그때 나머지 수치는
+   * 주가만 반영한 값이라 배당을 많이 주는 종목일수록 실제보다 낮게 나온다.
+   */
+  dividendContributionKrw: number | null;
 };
 
 type PriceTable = Record<string, { d: string; c: number }[]>;
@@ -81,12 +88,17 @@ function lastOnOrBefore(map: Map<string, number>, dates: string[], index: number
   return null;
 }
 
-export function runBacktest(
+/**
+ * 가격표 하나로 한 번 돌린다. 배당 기여분을 뽑으려면 같은 설정을 배당 반영
+ * 가격과 주가로 각각 돌려 비교해야 하므로, 실제 계산은 이 함수에 두고
+ * `runBacktest`가 두 번 부른다.
+ */
+function simulate(
   config: BacktestConfig,
   prices: PriceTable,
   fxHistory: { d: string; rate: number }[],
   symbols: Symbol[],
-): BacktestResult {
+): Omit<BacktestResult, "dividendContributionKrw"> {
   const symbolById = new Map(symbols.map((s) => [s.id, s]));
 
   // 가격 이력이 있는 종목만 남기고, 빠진 만큼 비중을 다시 정규화한다.
@@ -103,7 +115,7 @@ export function runBacktest(
     .filter((d) => (!config.start || d >= config.start) && (!config.end || d <= config.end))
     .sort();
 
-  const empty: BacktestResult = {
+  const empty: Omit<BacktestResult, "dividendContributionKrw"> = {
     config,
     series: [],
     startDate: "",
@@ -300,4 +312,38 @@ export function runBacktest(
     depletedAt,
     skipped,
   };
+}
+
+/**
+ * 배당까지 반영한 결과를 만든다.
+ *
+ * `totalReturnPrices`는 배당을 재투자했다고 보고 조정한 가격이다. 이게 있으면
+ * 그쪽을 본 결과로 삼고, 주가만으로 한 번 더 돌려 차이를 배당 기여분으로 남긴다.
+ * 커버드콜이나 고배당 ETF는 수익 대부분이 분배금으로 나가고 주가는 제자리라,
+ * 주가만 보면 성과가 실제와 전혀 다르게 나온다.
+ *
+ * 한 종목이라도 조정 가격이 없으면 비교가 성립하지 않으므로 주가 기준으로
+ * 돌리고 기여분은 null로 둔다 — 반쪽짜리 숫자를 그럴듯하게 보여주지 않는다.
+ */
+export function runBacktest(
+  config: BacktestConfig,
+  prices: PriceTable,
+  fxHistory: { d: string; rate: number }[],
+  symbols: Symbol[],
+  totalReturnPrices?: PriceTable,
+): BacktestResult {
+  const covered =
+    totalReturnPrices !== undefined &&
+    config.allocations.every((allocation) => (totalReturnPrices[allocation.symbolId]?.length ?? 0) > 1);
+
+  if (!covered) {
+    return { ...simulate(config, prices, fxHistory, symbols), dividendContributionKrw: null };
+  }
+
+  const withDividends = simulate(config, totalReturnPrices!, fxHistory, symbols);
+  const priceOnly = simulate(config, prices, fxHistory, symbols);
+  // 인출 시나리오는 빼 쓴 돈도 성과이므로 최종 평가액만 비교하면 과소평가된다.
+  const total = (result: Omit<BacktestResult, "dividendContributionKrw">) => result.finalKrw + result.withdrawnKrw;
+
+  return { ...withDividends, dividendContributionKrw: total(withDividends) - total(priceOnly) };
 }

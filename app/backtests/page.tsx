@@ -103,6 +103,19 @@ export default async function BacktestsPage() {
                     </div>
                   </dl>
 
+                  {/* 배당을 반영했는지 밝혀 둔다 — 커버드콜·고배당 종목은 주가만 보면
+                      성과가 실제와 크게 달라서, 숫자만 있으면 오해하기 쉽다. */}
+                  {result.dividendContributionKrw === null ? (
+                    <p className="mt-3 text-[11px] text-faint">
+                      배당 미반영 — 배당 비중이 큰 종목이 있으면 실제보다 낮게 나옵니다
+                    </p>
+                  ) : (
+                    <p className="mt-3 text-[11px] text-muted">
+                      순증 중 배당 기여{" "}
+                      <span className="tnum font-semibold text-text">{money(result.dividendContributionKrw)}</span>
+                    </p>
+                  )}
+
                   {result.depletedAt ? (
                     <p className="mt-3 rounded-lg bg-down-soft px-3 py-2 text-[11px] font-medium text-down">
                       {result.depletedAt} 에 목표 인출액을 채우지 못했습니다. 자금이 소진되는 구간입니다.

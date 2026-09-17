@@ -181,3 +181,37 @@ describe("runBacktest — 가격 이력 없는 종목 처리", () => {
     expect(result.finalKrw).toBeGreaterThan(0);
   });
 });
+
+describe("runBacktest — 배당 반영", () => {
+  /** 주가는 제자리인데 배당만 쌓이는 종목. 커버드콜이 실제로 이런 모양이다. */
+  const flatPrice = dailyPrices("2024-01-01", 400, () => 100);
+  const withDividends = dailyPrices("2024-01-01", 400, (i) => 100 * (1 + i * 0.0005));
+  const fx = fxFlat("2024-01-01", 400, 1300);
+
+  it("배당 반영 가격을 주면 그쪽 성과를 쓰고 기여분을 남긴다", () => {
+    const result = runBacktest(baseConfig(), { QLD: flatPrice }, fx, [qld], { QLD: withDividends });
+
+    // 주가만 보면 제자리라 순증이 0 근처여야 하는데, 배당을 반영하면 늘어난다.
+    expect(result.dividendContributionKrw).not.toBeNull();
+    expect(result.dividendContributionKrw!).toBeGreaterThan(0);
+    expect(result.finalKrw).toBeGreaterThan(10_000_000);
+  });
+
+  it("배당 반영 가격이 없으면 주가 기준으로 돌리고 기여분은 null이다", () => {
+    const result = runBacktest(baseConfig(), { QLD: flatPrice }, fx, [qld]);
+    expect(result.dividendContributionKrw).toBeNull();
+  });
+
+  it("일부 종목만 배당 반영 가격이 있으면 섞지 않고 null로 둔다", () => {
+    // 한쪽만 배당을 반영하면 두 종목의 비교가 어긋나므로, 반쪽짜리 숫자를 만들지 않는다.
+    const schd: Symbol = { id: "SCHD", name: "SCHD", kind: "etf", currency: "USD", market: "US" };
+    const config = baseConfig({
+      allocations: [
+        { symbolId: "QLD", weight: 50 },
+        { symbolId: "SCHD", weight: 50 },
+      ],
+    });
+    const result = runBacktest(config, { QLD: flatPrice, SCHD: flatPrice }, fx, [qld, schd], { QLD: withDividends });
+    expect(result.dividendContributionKrw).toBeNull();
+  });
+});

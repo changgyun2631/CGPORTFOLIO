@@ -19,6 +19,14 @@
  * `data/prices.json`을 교체한다(적용 직전 자동 백업).
  *
  *   node scripts/fetch-price-history.mjs [--replace] [--symbols=QLD,SCHD]
+ *
+ * `--total-return`을 붙이면 배당·분할을 반영한 가격을 백테스트에 등장하는
+ * 종목만 받아 `data/prices-total-return.json`에 넣는다. 배당을 대부분 분배금으로
+ * 내보내는 종목(커버드콜·고배당 ETF)은 주가만 보면 성과가 실제와 전혀 달라서,
+ * 백테스트는 이 값을 쓴다. 화면에 뜨는 종가는 실제 거래가여야 하므로
+ * `prices.json`은 조정하지 않은 채로 둔다.
+ *
+ * `--allow-partial`은 일부 종목이 실패해도 받아온 것만 반영한다(매일 도는 갱신용).
  */
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
@@ -60,11 +68,14 @@ function chunk(items, size) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function fetchOne(symbolId, apiKey) {
+async function fetchOne(symbolId, apiKey, adjusted = false) {
   const url = new URL("https://api.twelvedata.com/time_series");
   url.searchParams.set("symbol", symbolId);
   url.searchParams.set("interval", "1day");
   url.searchParams.set("outputsize", String(OUTPUT_SIZE));
+  // 배당·분할을 반영한 값. 과거 종가가 그만큼 낮게 조정되어 나오므로, 이걸로 잰
+  // 상승률이 곧 배당까지 포함한 총수익이 된다.
+  if (adjusted) url.searchParams.set("adjust", "all");
   url.searchParams.set("apikey", apiKey);
 
   const response = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
@@ -78,14 +89,14 @@ async function fetchOne(symbolId, apiKey) {
  * 쉬고 한 번만 더 해본다 — 그래도 안 되면 실패로 넘긴다. 다음 날 실행이
  * 어차피 전체 이력을 다시 받아오므로, 하루 빠진 종목은 저절로 메워진다.
  */
-async function fetchWithRetry(symbolId, apiKey) {
+async function fetchWithRetry(symbolId, apiKey, adjusted = false) {
   try {
-    return await fetchOne(symbolId, apiKey);
+    return await fetchOne(symbolId, apiKey, adjusted);
   } catch (error) {
     if (!/429/.test(error.message)) throw error;
     console.warn(`${symbolId}: 분당 한도(429) — 61초 쉬고 한 번 더 시도합니다.`);
     await sleep(CHUNK_WAIT_MS);
-    return fetchOne(symbolId, apiKey);
+    return fetchOne(symbolId, apiKey, adjusted);
   }
 }
 
@@ -95,21 +106,39 @@ async function main() {
   if (!apiKey) throw new Error("TWELVE_DATA_API_KEY가 없습니다. .env.local을 확인하세요.");
 
   const symbols = JSON.parse(readFileSync(join(dataDir, "symbols.json"), "utf8"));
+  const totalReturn = flags["total-return"] === true;
+
+  // 배당 반영분은 백테스트만 쓰므로 시나리오에 등장하는 종목만 받는다. 화면에
+  // 보이는 종가는 실제 거래가여야 하니 `prices.json`은 조정 없는 값을 유지한다.
+  const backtestSymbols = () => {
+    const configs = JSON.parse(readFileSync(join(dataDir, "backtests.json"), "utf8"));
+    const ids = new Set(configs.flatMap((config) => config.allocations.map((a) => a.symbolId)));
+    const us = new Set(symbols.filter((s) => s.market === "US").map((s) => s.id));
+    // 국내 종목은 공급자가 다루지 않는다 — 조용히 빼고 넘어가면 백테스트가
+    // 배당 반영 없이 도는 걸 눈치채기 어려우므로 남겨서 알린다.
+    const missing = [...ids].filter((id) => !us.has(id));
+    if (missing.length > 0) console.warn(`배당 반영 가격을 받을 수 없는 종목(공급자 미지원): ${missing.join(", ")}`);
+    return [...ids].filter((id) => us.has(id));
+  };
+
   const wanted = flags.symbols
     ? String(flags.symbols)
         .split(",")
         .map((s) => s.trim())
         .filter(Boolean)
-    : symbols.filter((s) => s.market === "US").map((s) => s.id);
+    : totalReturn
+      ? backtestSymbols()
+      : symbols.filter((s) => s.market === "US").map((s) => s.id);
 
   if (wanted.length === 0) {
     console.log("대상 종목이 없습니다.");
     return;
   }
 
+  const liveFile = totalReturn ? "prices-total-return.json" : "prices.json";
   let existing = {};
   try {
-    existing = JSON.parse(readFileSync(join(dataDir, "prices.json"), "utf8"));
+    existing = JSON.parse(readFileSync(join(dataDir, liveFile), "utf8"));
   } catch {
     // 처음 실행이라면 없을 수 있다 — 빈 값에서 시작.
   }
@@ -125,7 +154,7 @@ async function main() {
     }
     for (const symbolId of group) {
       try {
-        const series = await fetchWithRetry(symbolId, apiKey);
+        const series = await fetchWithRetry(symbolId, apiKey, totalReturn);
         fetched[symbolId] = series;
         console.log(`${symbolId}: ${series.length}일 확보 (${series[0].d} ~ ${series.at(-1).d})`);
       } catch (error) {
@@ -136,7 +165,7 @@ async function main() {
   }
 
   const merged = mergePriceHistory(existing, fetched);
-  const target = join(dataDir, flags.replace ? "prices.json" : "out-prices.json");
+  const target = join(dataDir, flags.replace ? liveFile : totalReturn ? "out-prices-total-return.json" : "out-prices.json");
   const write = () => writeJsonAtomic(target, `${JSON.stringify(merged, null, 2)}\n`);
 
   if (flags.replace) {

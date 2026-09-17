@@ -69,10 +69,14 @@ log("일별 이력 갱신 시작");
 // 한 종목이 분당 한도에 걸렸다고 나머지 종목의 하루를 통째로 버리지 않는다.
 const priceOk = runStep("가격 이력", "fetch-price-history.mjs", ["--allow-partial"]);
 const fxOk = runStep("환율 이력", "fetch-fx-history.mjs");
+// 백테스트가 쓰는 배당 반영 가격. 시나리오에 나오는 종목만이라 몇 개 안 된다.
+const totalReturnOk = runStep("배당 반영 가격", "fetch-price-history.mjs", ["--allow-partial", "--total-return"]);
 
-if (priceOk && fxOk) {
+if (priceOk && fxOk && totalReturnOk) {
   log("일별 이력 갱신 완료");
 } else {
-  log(`일별 이력 갱신 일부 실패 — 가격:${priceOk ? "성공" : "실패"} 환율:${fxOk ? "성공" : "실패"}`);
+  log(
+    `일별 이력 갱신 일부 실패 — 가격:${priceOk ? "성공" : "실패"} 환율:${fxOk ? "성공" : "실패"} 배당반영:${totalReturnOk ? "성공" : "실패"}`,
+  );
   process.exitCode = 1;
 }

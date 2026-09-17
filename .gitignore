@@ -54,6 +54,7 @@ yarn-error.log*
 /data/quotes.json
 /data/fx-quote.json
 /data/prices.json
+/data/prices-total-return.json
 /data/fx.json
 # 가져오기 스크립트의 검토용 출력에도 실제 계좌 데이터가 들어간다.
 /data/out-*.json
