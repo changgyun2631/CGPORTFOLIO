@@ -112,6 +112,16 @@ npm run build
     남은 PID를 `taskkill //F //PID <PID>`로 정리한 뒤 시작한다(2026-09-16 09:24
     사례처럼 매번 필요할 수 있다고 가정할 것 — 예외가 아니라 기본 절차로 다룰
     것). 시세 갱신 요청이 진행 중일 때는 아예 재시작을 미룰 것.
+11. **`c54ee4f`(부팅 시 자동 기동)로 바뀐 뒤, 일반 사용자 세션의 `taskkill`/
+    `Stop-Process`로 서버 프로세스를 못 죽일 수 있다.** 부팅 트리거로 뜬
+    `node.exe`는 세션 0(비대화형 서비스 세션)에서 돈다 — `tasklist /FI "PID eq
+    <PID>" /V`로 `Session Name`이 `Services`인지 확인하면 알 수 있다. 이 경우
+    일반 PowerShell/Git Bash에서 `taskkill //F //PID <PID>`를 실행하면 프로세스가
+    실제로 존재하는데도 **"액세스가 거부되었습니다"**로 막힌다(2026-09-21 실제
+    재현 — `Stop-ScheduledTask`도 마찬가지로 소용없었다). **관리자 권한으로 연
+    PowerShell/cmd**에서 `taskkill /F /PID <PID>` → `Start-ScheduledTask
+    -TaskName "CGPORTFOLIO 서버"` 순으로 실행해야 한다. Claude 세션이 일반 권한
+    도구만 쓴다면 이 단계는 사용자에게 직접 요청할 것 — 억지로 우회하려 하지 말 것.
 
 ### 0-5. 시세 API 한도 — 제일 자주 밟는 지뢰
 
