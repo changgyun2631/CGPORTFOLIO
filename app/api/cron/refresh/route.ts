@@ -159,25 +159,22 @@ async function runRefresh(jobId: string): Promise<void> {
       // 점을 찍으면 차트가 인덱스 기준으로 그 구간에 실제 거래일보다 훨씬 넓은
       // 자리를 내줘서, 값이 하나도 안 바뀐 평평한 구간이 화면에서 과도하게 길게
       // 보인다(2026-09-21 사용자 보고). 총액·환율로 비교하면 환율은 주말에도
-      // 수시로 움직여서 오탐이 난다(사용자 지적) — 보유 종목 시세 자체를 봐도,
-      // 공급자가 휴장 중에도 아주 미세하게 값을 다시 찍는 경우가 있어 "직전과
-      // 완전히 같음"만으로는 다 못 잡았다(실제로 주말 내내 조금씩 다른 총액이
-      // 계속 기록된 걸 확인함). 그래서 시세 자체가 같은지 대신, 공급자가 직접
-      // 알려주는 장 상태(`Quote.marketState`)를 우선 본다 — 보유 중인(현금 제외)
-      // 종목이 전부 "open"이 아니면 그 자체로 휴장으로 본다. marketState를 안
-      // 주는 공급자만 시세 동일 여부로 대신 판단한다. quotes/fx는 그대로 갱신해서
-      // 신선도 표시는 최신을 유지한다.
-      const heldSymbolIds = new Set(portfolio.holdings.filter((h) => h.kind !== "cash").map((h) => h.symbolId));
+      // 수시로 움직여서 오탐이 난다(사용자 지적). 공급자의 장 상태 플래그
+      // (`Quote.marketState`)도 시도해봤지만 평일 프리·애프터마켓까지
+      // "open 아님"으로 묶어버려서, 실제로 거래되며 움직이는 시세까지 건너뛰는
+      // 문제가 있었다(사용자 지적 — 프리·애프터마켓은 실거래로 가격이 움직이니
+      // 기록해야 한다). 대신 거래량이 많아 프리·애프터마켓에도 실제로 가격이
+      // 움직이는 기준 종목(엔비디아) 하나의 시세가 직전과 완전히 같은지로
+      // 휴장 여부를 판단한다 — 같으면 어떤 시장도 안 움직이는 것(주말·휴일
+      // 추정), 다르면 정규장이든 프리·애프터든 장이 열려 있다는 뜻으로 본다.
+      // quotes/fx는 그대로 갱신해서 신선도 표시는 최신을 유지한다.
+      const REFERENCE_SYMBOL_ID = "NVDA";
       const previousQuoteById = new Map(raw.quotes.map((quote) => [quote.symbolId, quote]));
-      const isSymbolClosed = (id: string) => {
-        const newQuote = merged.get(id);
-        if (!newQuote) return true; // 이번에도 못 받았으면 새 정보가 없는 것 — 변동 없음으로 본다
-        if (newQuote.marketState) return newQuote.marketState !== "open";
-        return previousQuoteById.get(id)?.price === newQuote.price;
-      };
-      const allHeldClosed = heldSymbolIds.size > 0 && [...heldSymbolIds].every(isSymbolClosed);
-      const unchanged = raw.snapshots.length > 0 && allHeldClosed;
-      if (unchanged) logCronStage("스냅샷 건너뜀 — 보유 종목 전부 휴장(장 상태 또는 시세 동일 기준)");
+      const referencePrev = previousQuoteById.get(REFERENCE_SYMBOL_ID);
+      const referenceNew = merged.get(REFERENCE_SYMBOL_ID);
+      const referenceUnchanged = referencePrev != null && referenceNew != null && referencePrev.price === referenceNew.price;
+      const unchanged = raw.snapshots.length > 0 && referenceUnchanged;
+      if (unchanged) logCronStage(`스냅샷 건너뜀 — 기준 종목(${REFERENCE_SYMBOL_ID}) 시세가 직전과 동일(휴장 추정)`);
       const snapshots = unchanged ? raw.snapshots : [...raw.snapshots, point];
 
       const writes = [

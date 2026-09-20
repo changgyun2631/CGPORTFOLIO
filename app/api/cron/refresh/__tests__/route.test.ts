@@ -56,7 +56,15 @@ function writeFixtures(overrides: { transactions?: unknown[] } = {}) {
   writeFileSync(join(dataDir, "transactions.json"), JSON.stringify(overrides.transactions ?? [baseTx]));
   writeFileSync(join(dataDir, "cashflows.json"), JSON.stringify([]));
   writeFileSync(join(dataDir, "dividends.json"), JSON.stringify([]));
-  writeFileSync(join(dataDir, "quotes.json"), JSON.stringify([{ symbolId: "QLD", price: 100, currency: "USD", asOf: "2024-01-01T00:00:00Z" }]));
+  writeFileSync(
+    join(dataDir, "quotes.json"),
+    JSON.stringify([
+      { symbolId: "QLD", price: 100, currency: "USD", asOf: "2024-01-01T00:00:00Z" },
+      // NVDA는 보유 종목이 아니어도 항상 조회된다(symbols.json 전체를 매번 조회) —
+      // 휴장 판단의 기준 종목으로 쓴다.
+      { symbolId: "NVDA", price: 200, currency: "USD", asOf: "2024-01-01T00:00:00Z" },
+    ]),
+  );
   writeFileSync(
     join(dataDir, "fx-quote.json"),
     JSON.stringify({ pair: "USD/KRW", rate: 1300, prevRate: 1290, asOf: "2024-01-01T00:00:00Z" }),
@@ -185,10 +193,13 @@ describe("GET /api/cron/refresh", () => {
     expect(snapshots).toHaveLength(1); // 한 점만 쌓인다
   });
 
-  it("보유 종목 시세가 직전과 완전히 같으면 새 점을 찍지 않는다(휴장 추정)", async () => {
+  it("기준 종목(NVDA) 시세가 직전과 완전히 같으면 새 점을 찍지 않는다(휴장 추정)", async () => {
     writeFixtures();
-    const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
-    fetchAllQuotes.mockResolvedValue({ quotes: [quote], missing: [], errors: [] });
+    const quotes = [
+      { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+      { symbolId: "NVDA", price: 200, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+    ];
+    fetchAllQuotes.mockResolvedValue({ quotes, missing: [], errors: [] });
 
     const { GET } = await import("../route");
     const { readJob } = await import("@/lib/data/refresh-job");
@@ -205,25 +216,31 @@ describe("GET /api/cron/refresh", () => {
     await waitForJob(readJob, second.jobId);
     const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
 
-    expect(afterSecond).toHaveLength(1); // 값이 안 바뀌었으니 점을 더 찍지 않는다
+    expect(afterSecond).toHaveLength(1); // NVDA 시세가 안 바뀌었으니 점을 더 찍지 않는다
     expect(afterSecond[0]).toEqual(afterFirst[0]);
     expect(logCronStage).toHaveBeenCalledWith(expect.stringContaining("스냅샷 건너뜀"));
   });
 
-  it("공급자가 휴장(marketState!=open)이라고 알려주면, 시세가 미세하게 달라도 새 점을 찍지 않는다", async () => {
+  it("기준 종목(NVDA) 시세가 아주 조금이라도 바뀌면 프리·애프터마켓이어도 새 점을 찍는다", async () => {
     writeFixtures();
-    // 실제 운영에서 주말 내내 총액이 아주 조금씩(소수점 단위) 계속 달라지면서
-    // 점이 계속 찍힌 걸 확인했다 — 공급자가 휴장 중에도 시세를 미세하게 다시
-    // 찍는 경우가 있다는 뜻. marketState가 있으면 시세 일치 여부보다 그걸
-    // 우선해야 이런 경우도 제대로 휴장으로 잡는다.
+    // marketState(장 상태) 플래그를 기준으로 삼았을 때는 평일 프리·애프터마켓까지
+    // "open 아님"으로 묶여서 건너뛰었다 — 프리·애프터마켓엔 실거래로 가격이
+    // 움직이니 그건 기록해야 한다는 지적(2026-09-21)에 따라 시세 변동 자체로
+    // 판단하도록 바꿨다. 정규장 여부와 무관하게 기준 종목 시세가 움직이면 기록된다.
     fetchAllQuotes
       .mockResolvedValueOnce({
-        quotes: [{ symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z", marketState: "closed" }],
+        quotes: [
+          { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+          { symbolId: "NVDA", price: 200, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+        ],
         missing: [],
         errors: [],
       })
       .mockResolvedValueOnce({
-        quotes: [{ symbolId: "QLD", price: 110.0001, currency: "USD", asOf: "2024-01-02T06:00:00Z", marketState: "closed" }],
+        quotes: [
+          { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T06:00:00Z" },
+          { symbolId: "NVDA", price: 200.01, currency: "USD", asOf: "2024-01-02T06:00:00Z" },
+        ],
         missing: [],
         errors: [],
       });
@@ -240,17 +257,16 @@ describe("GET /api/cron/refresh", () => {
     await waitForJob(readJob, second.jobId);
     const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
 
-    expect(afterSecond).toHaveLength(1);
-    expect(afterSecond[0]).toEqual(afterFirst[0]);
-
-    const quotes = JSON.parse(readFileSync(join(root, "data", "quotes.json"), "utf8"));
-    expect(quotes.find((q: { symbolId: string }) => q.symbolId === "QLD").price).toBe(110.0001); // quotes.json 자체는 최신으로 갱신됨
+    expect(afterSecond).toHaveLength(2); // NVDA가 조금이라도 움직였으니 새 점을 찍는다
   });
 
-  it("보유 종목 시세는 그대로인데 환율만 바뀌어도(주말 FX 변동) 새 점을 찍지 않는다", async () => {
+  it("기준 종목 시세는 그대로인데 환율만 바뀌어도(주말 FX 변동) 새 점을 찍지 않는다", async () => {
     writeFixtures();
-    const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
-    fetchAllQuotes.mockResolvedValue({ quotes: [quote], missing: [], errors: [] });
+    const quotes = [
+      { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+      { symbolId: "NVDA", price: 200, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
+    ];
+    fetchAllQuotes.mockResolvedValue({ quotes, missing: [], errors: [] });
 
     let rate = 1300;
     buildFxProvider.mockReturnValue({
@@ -266,7 +282,7 @@ describe("GET /api/cron/refresh", () => {
     const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
     expect(afterFirst).toHaveLength(1);
 
-    // 환율만 바뀐다 — 보유 종목(QLD) 시세 자체는 그대로다. 총액·환율로 비교하면
+    // 환율만 바뀐다 — 기준 종목(NVDA) 시세 자체는 그대로다. 총액·환율로 비교하면
     // 이 경우 "바뀌었다"고 오판해 점을 또 찍었을 것이다(2026-09-21 사용자 지적).
     rate = 1320;
     const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
@@ -278,6 +294,33 @@ describe("GET /api/cron/refresh", () => {
 
     const fxQuote = JSON.parse(readFileSync(join(root, "data", "fx-quote.json"), "utf8"));
     expect(fxQuote.rate).toBe(1320); // fx-quote.json 자체는 최신으로 갱신된다(신선도 유지)
+  });
+
+  it("기준 종목 시세를 아예 조회한 적 없으면, 안전하게 계속 점을 찍는다", async () => {
+    // symbols.json에 NVDA가 없는 배포(또는 아직 한 번도 못 받은 상태)를
+    // 흉내낸다 — 판단할 근거가 없을 땐 "휴장으로 단정"하지 않고 매번 기록해서
+    // 조용히 데이터가 끊기는 걸 막는다.
+    const { dataDir } = writeFixtures();
+    writeFileSync(
+      join(dataDir, "quotes.json"),
+      JSON.stringify([{ symbolId: "QLD", price: 100, currency: "USD", asOf: "2024-01-01T00:00:00Z" }]),
+    );
+    fetchAllQuotes.mockResolvedValue({
+      quotes: [{ symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" }],
+      missing: [],
+      errors: [],
+    });
+
+    const { GET } = await import("../route");
+    const { readJob } = await import("@/lib/data/refresh-job");
+
+    const first = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, first.jobId);
+    const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, second.jobId);
+
+    const snapshots = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+    expect(snapshots).toHaveLength(2);
   });
 
   it("모르는 jobId를 물으면 404로 답한다", async () => {
