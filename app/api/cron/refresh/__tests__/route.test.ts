@@ -183,6 +183,31 @@ describe("GET /api/cron/refresh", () => {
     expect(snapshots).toHaveLength(1); // 한 점만 쌓인다
   });
 
+  it("직전 스냅샷과 총액·환율이 완전히 같으면 새 점을 찍지 않는다(휴장 추정)", async () => {
+    writeFixtures();
+    const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
+    fetchAllQuotes.mockResolvedValue({ quotes: [quote], missing: [], errors: [] });
+
+    const { GET } = await import("../route");
+    const { readJob } = await import("@/lib/data/refresh-job");
+    const { logCronStage } = await import("@/lib/data/cron-log");
+
+    const first = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, first.jobId);
+    const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+    expect(afterFirst).toHaveLength(1);
+
+    // 같은 시세·환율로 다시 갱신 — 주말 6시간 주기 cron이 전날과 똑같은 값을
+    // 다시 받아오는 상황을 흉내낸다.
+    const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, second.jobId);
+    const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+
+    expect(afterSecond).toHaveLength(1); // 값이 안 바뀌었으니 점을 더 찍지 않는다
+    expect(afterSecond[0]).toEqual(afterFirst[0]);
+    expect(logCronStage).toHaveBeenCalledWith(expect.stringContaining("스냅샷 건너뜀"));
+  });
+
   it("모르는 jobId를 물으면 404로 답한다", async () => {
     writeFixtures();
     const { GET } = await import("../status/route");
