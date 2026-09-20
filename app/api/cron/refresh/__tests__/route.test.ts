@@ -210,6 +210,43 @@ describe("GET /api/cron/refresh", () => {
     expect(logCronStage).toHaveBeenCalledWith(expect.stringContaining("스냅샷 건너뜀"));
   });
 
+  it("공급자가 휴장(marketState!=open)이라고 알려주면, 시세가 미세하게 달라도 새 점을 찍지 않는다", async () => {
+    writeFixtures();
+    // 실제 운영에서 주말 내내 총액이 아주 조금씩(소수점 단위) 계속 달라지면서
+    // 점이 계속 찍힌 걸 확인했다 — 공급자가 휴장 중에도 시세를 미세하게 다시
+    // 찍는 경우가 있다는 뜻. marketState가 있으면 시세 일치 여부보다 그걸
+    // 우선해야 이런 경우도 제대로 휴장으로 잡는다.
+    fetchAllQuotes
+      .mockResolvedValueOnce({
+        quotes: [{ symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z", marketState: "closed" }],
+        missing: [],
+        errors: [],
+      })
+      .mockResolvedValueOnce({
+        quotes: [{ symbolId: "QLD", price: 110.0001, currency: "USD", asOf: "2024-01-02T06:00:00Z", marketState: "closed" }],
+        missing: [],
+        errors: [],
+      });
+
+    const { GET } = await import("../route");
+    const { readJob } = await import("@/lib/data/refresh-job");
+
+    const first = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, first.jobId);
+    const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+    expect(afterFirst).toHaveLength(1);
+
+    const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, second.jobId);
+    const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+
+    expect(afterSecond).toHaveLength(1);
+    expect(afterSecond[0]).toEqual(afterFirst[0]);
+
+    const quotes = JSON.parse(readFileSync(join(root, "data", "quotes.json"), "utf8"));
+    expect(quotes.find((q: { symbolId: string }) => q.symbolId === "QLD").price).toBe(110.0001); // quotes.json 자체는 최신으로 갱신됨
+  });
+
   it("보유 종목 시세는 그대로인데 환율만 바뀌어도(주말 FX 변동) 새 점을 찍지 않는다", async () => {
     writeFixtures();
     const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
