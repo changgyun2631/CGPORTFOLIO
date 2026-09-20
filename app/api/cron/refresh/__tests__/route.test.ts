@@ -18,7 +18,9 @@ vi.mock("@/lib/data/cron-log", () => ({ logCronStage: vi.fn() }));
 // 실제 API를 부르지 않는다. fetchAllQuotes는 "외부 조회 중 다른 프로세스가 data/를
 // 바꾼" 상황을 흉내내는 부수효과를 가진 채로 각 테스트에서 다시 정의한다.
 const fetchAllQuotes = vi.fn();
-const buildFxProvider = vi.fn((): null => null);
+const buildFxProvider = vi.fn(
+  (): { name: string; fetchRate: () => Promise<{ rate: number; prevRate: number; asOf: string }> } | null => null,
+);
 vi.mock("@/lib/providers", () => ({
   fetchAllQuotes: (symbols: unknown) => fetchAllQuotes(symbols),
   buildFxProvider: () => buildFxProvider(),
@@ -183,7 +185,7 @@ describe("GET /api/cron/refresh", () => {
     expect(snapshots).toHaveLength(1); // 한 점만 쌓인다
   });
 
-  it("직전 스냅샷과 총액·환율이 완전히 같으면 새 점을 찍지 않는다(휴장 추정)", async () => {
+  it("보유 종목 시세가 직전과 완전히 같으면 새 점을 찍지 않는다(휴장 추정)", async () => {
     writeFixtures();
     const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
     fetchAllQuotes.mockResolvedValue({ quotes: [quote], missing: [], errors: [] });
@@ -197,7 +199,7 @@ describe("GET /api/cron/refresh", () => {
     const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
     expect(afterFirst).toHaveLength(1);
 
-    // 같은 시세·환율로 다시 갱신 — 주말 6시간 주기 cron이 전날과 똑같은 값을
+    // 같은 시세로 다시 갱신 — 주말 6시간 주기 cron이 전날과 똑같은 값을
     // 다시 받아오는 상황을 흉내낸다.
     const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
     await waitForJob(readJob, second.jobId);
@@ -206,6 +208,39 @@ describe("GET /api/cron/refresh", () => {
     expect(afterSecond).toHaveLength(1); // 값이 안 바뀌었으니 점을 더 찍지 않는다
     expect(afterSecond[0]).toEqual(afterFirst[0]);
     expect(logCronStage).toHaveBeenCalledWith(expect.stringContaining("스냅샷 건너뜀"));
+  });
+
+  it("보유 종목 시세는 그대로인데 환율만 바뀌어도(주말 FX 변동) 새 점을 찍지 않는다", async () => {
+    writeFixtures();
+    const quote = { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" };
+    fetchAllQuotes.mockResolvedValue({ quotes: [quote], missing: [], errors: [] });
+
+    let rate = 1300;
+    buildFxProvider.mockReturnValue({
+      name: "test-fx",
+      fetchRate: async () => ({ rate, prevRate: 1290, asOf: "2024-01-02T00:00:00Z" }),
+    });
+
+    const { GET } = await import("../route");
+    const { readJob } = await import("@/lib/data/refresh-job");
+
+    const first = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, first.jobId);
+    const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+    expect(afterFirst).toHaveLength(1);
+
+    // 환율만 바뀐다 — 보유 종목(QLD) 시세 자체는 그대로다. 총액·환율로 비교하면
+    // 이 경우 "바뀌었다"고 오판해 점을 또 찍었을 것이다(2026-09-21 사용자 지적).
+    rate = 1320;
+    const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, second.jobId);
+    const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+
+    expect(afterSecond).toHaveLength(1);
+    expect(afterSecond[0]).toEqual(afterFirst[0]);
+
+    const fxQuote = JSON.parse(readFileSync(join(root, "data", "fx-quote.json"), "utf8"));
+    expect(fxQuote.rate).toBe(1320); // fx-quote.json 자체는 최신으로 갱신된다(신선도 유지)
   });
 
   it("모르는 jobId를 물으면 404로 답한다", async () => {

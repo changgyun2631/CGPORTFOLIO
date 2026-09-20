@@ -158,16 +158,17 @@ async function runRefresh(jobId: string): Promise<void> {
       // 주말·휴장에는 시세가 안 바뀐 채로 6시간마다 그대로 다시 조회된다. 매번
       // 점을 찍으면 차트가 인덱스 기준으로 그 구간에 실제 거래일보다 훨씬 넓은
       // 자리를 내줘서, 값이 하나도 안 바뀐 평평한 구간이 화면에서 과도하게 길게
-      // 보인다(2026-09-21 사용자 보고). 직전 스냅샷과 총액·원금·환율이 전부
-      // 그대로면 "휴장으로 시세 변동 없음"으로 보고 새 점을 찍지 않는다 —
-      // quotes/fx는 그대로 갱신해서 신선도 표시는 최신을 유지한다.
-      const previous = raw.snapshots.at(-1);
-      const unchanged =
-        previous != null &&
-        previous.totalKrw === point.totalKrw &&
-        previous.principalKrw === point.principalKrw &&
-        previous.fxRate === point.fxRate;
-      if (unchanged) logCronStage("스냅샷 건너뜀 — 직전과 총액·환율 동일(휴장 추정)");
+      // 보인다(2026-09-21 사용자 보고). 총액·환율로 비교하면 환율은 주말에도
+      // 수시로 움직여서 오탐이 난다(사용자 지적) — 대신 보유 중인(현금 제외)
+      // 종목의 시세 자체가 직전과 전부 똑같은지만 본다. quotes/fx는 그대로
+      // 갱신해서 신선도 표시는 최신을 유지한다.
+      const heldSymbolIds = new Set(portfolio.holdings.filter((h) => h.kind !== "cash").map((h) => h.symbolId));
+      const previousQuoteById = new Map(raw.quotes.map((quote) => [quote.symbolId, quote]));
+      const quotesUnchanged =
+        heldSymbolIds.size > 0 &&
+        [...heldSymbolIds].every((id) => previousQuoteById.get(id)?.price === merged.get(id)?.price);
+      const unchanged = raw.snapshots.length > 0 && quotesUnchanged;
+      if (unchanged) logCronStage("스냅샷 건너뜀 — 보유 종목 시세 전부 직전과 동일(휴장 추정)");
       const snapshots = unchanged ? raw.snapshots : [...raw.snapshots, point];
 
       const writes = [
