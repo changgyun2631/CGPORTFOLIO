@@ -306,16 +306,48 @@ export function ValueChart({
           <line x1={active.x} y1={PAD.top} x2={active.x} y2={HEIGHT - PAD.bottom} stroke="var(--border-strong)" strokeWidth="1" />
           <circle cx={active.x} cy={active.y} r="4" fill={stroke} stroke="var(--bg)" strokeWidth="2" />
 
-          {returnPoints.length > 0 ? (
-            <>
-              <text x={WIDTH - PAD.right + 6} y={PAD.top + 4} fill="var(--accent)" fontSize="10" opacity="0.85">
-                {percentSigned(returnMax)}
+          {/* 오른쪽 여백에 각 선의 최근값(또는 축 상하한)을 숫자로 적는다 — 호버해야만
+              보이던 걸 항상 보이게 해달라는 요청(2026-09-21). 선끼리 y가 가까우면
+              글자가 겹치므로, 위에서 아래로 정렬한 뒤 최소 간격만큼 밀어낸다. */}
+          {(() => {
+            const RIGHT_X = WIDTH - PAD.right + 6;
+            const MIN_GAP = 11;
+            const labels: { y: number; fill: string; weight?: string; opacity?: string; text: string }[] = [];
+            if (returnPoints.length > 0) {
+              labels.push({ y: PAD.top + 4, fill: "var(--accent)", opacity: "0.85", text: percentSigned(returnMax) });
+              labels.push({ y: HEIGHT - PAD.bottom, fill: "var(--accent)", opacity: "0.85", text: percentSigned(returnMin) });
+            }
+            if (points.length > 0) {
+              const last = points[points.length - 1];
+              labels.push({
+                y: last.y + 3,
+                fill: stroke,
+                weight: "700",
+                text: `${(last.snapshot.totalKrw / axisUnit).toFixed(2)}${axisSuffix}`,
+              });
+            }
+            if (principalPoints.length > 0) {
+              const last = principalPoints[principalPoints.length - 1];
+              const basis = series[series.length - 1].principalKrw ?? principalKrw ?? 0;
+              labels.push({ y: last.y + 3, fill: "var(--text-muted)", text: `${(basis / axisUnit).toFixed(2)}${axisSuffix}` });
+            }
+            if (showFx && fxPoints.length > 0) {
+              const last = fxPoints[fxPoints.length - 1];
+              labels.push({ y: last.y + 3, fill: "var(--fx)", text: series[series.length - 1].fxRate.toFixed(1) });
+            }
+
+            const placed = [...labels].sort((a, b) => a.y - b.y).reduce<typeof labels>((acc, label) => {
+              const prevY = acc.at(-1)?.y ?? -Infinity;
+              acc.push({ ...label, y: Math.max(label.y, prevY + MIN_GAP) });
+              return acc;
+            }, []);
+
+            return placed.map((label, i) => (
+              <text key={i} x={RIGHT_X} y={label.y} fill={label.fill} fontSize="10" fontWeight={label.weight} opacity={label.opacity}>
+                {label.text}
               </text>
-              <text x={WIDTH - PAD.right + 6} y={HEIGHT - PAD.bottom} fill="var(--accent)" fontSize="10" opacity="0.85">
-                {percentSigned(returnMin)}
-              </text>
-            </>
-          ) : null}
+            ));
+          })()}
         </svg>
 
         {tradeMarkers.length > 0 ? (
