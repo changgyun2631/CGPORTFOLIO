@@ -21,7 +21,7 @@
 import { spawnSync } from "node:child_process";
 import { appendFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, extname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { backupData } from "./lib/backup.mjs";
@@ -35,8 +35,32 @@ const backupRoot = join(homedir(), "cgportfolio-backups");
 const logPath = join(homedir(), "cgportfolio-logs", "inbox-import.log");
 const MAX_LOG_LINES = 500;
 
-/** 보유종목 CSV를 넣을 계좌. 계좌가 하나뿐이라 고정해 둔다. */
-const POSITION_BASIS_ACCOUNT_ID = "acc-us-main";
+/**
+ * 보유종목(잔고) CSV가 어느 계좌 것인지는 **파일이 놓인 하위 폴더 이름**으로 정한다.
+ * `~/cgportfolio-inbox/<계좌ID 또는 계좌이름>/잔고.csv` 처럼 넣으면 된다.
+ *
+ * 예전에는 계좌가 하나뿐이라 계좌를 코드에 고정해 뒀는데, 계좌가 늘어난 뒤로는
+ * 그게 위험하다 — 잔고 가져오기는 **대상 계좌의 기준값을 통째로 교체**하므로,
+ * 다른 계좌 CSV를 넣으면 엉뚱한 계좌 잔고를 덮어쓴다. 그래서 폴더로 계좌를
+ * 밝히지 않은 잔고 CSV는 아예 반영하지 않고 실패로 뺀다(짐작하지 않는다).
+ *
+ * 계좌수익률 CSV는 여러 계좌를 날짜별로 합산해 총 평가금액 차트를 만드는 것이라
+ * 계좌 구분이 필요 없다 — inbox 루트에 그냥 둬도 된다.
+ */
+function loadAccounts() {
+  try {
+    return JSON.parse(readFileSync(join(dataDir, "accounts.json"), "utf8"));
+  } catch {
+    return [];
+  }
+}
+
+/** 폴더 이름을 계좌 ID로 바꾼다. 계좌 ID와 계좌 이름 둘 다 받아준다. */
+function resolveAccountId(folderName, accounts) {
+  if (!folderName) return null;
+  const match = accounts.find((account) => account.id === folderName || account.name === folderName);
+  return match?.id ?? null;
+}
 
 function parseArgs(argv) {
   const flags = {};
@@ -97,35 +121,57 @@ function isSettled(filePath) {
   }
 }
 
-function runImporter(kind, filePath) {
+function runImporter(kind, filePath, accountId) {
   const script =
     kind === "account-history"
       ? join(repoRoot, "scripts", "import-account-history-csv.mjs")
       : join(repoRoot, "scripts", "import-position-basis-csv.mjs");
 
   const args = [script, filePath, "--replace"];
-  if (kind === "position-basis") args.push(`--account-id=${POSITION_BASIS_ACCOUNT_ID}`);
+  if (kind === "position-basis") args.push(`--account-id=${accountId}`);
 
   const result = spawnSync(process.execPath, args, { cwd: repoRoot, encoding: "utf8", timeout: 5 * 60 * 1000 });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().split("\n").pop() ?? "";
   return { ok: result.status === 0, detail: output };
 }
 
+/**
+ * inbox 루트와 계좌별 하위 폴더를 한 단계까지 훑는다. 처리완료·실패 폴더는
+ * 이미 처리한 파일을 모아 둔 곳이라 다시 읽지 않는다.
+ */
+function collectEntries() {
+  const RESERVED = new Set(["처리완료", "실패"]);
+  const isTarget = (name) => [".csv", ".xlsx", ".xls"].includes(extname(name).toLowerCase());
+  const found = [];
+
+  for (const entry of readdirSync(inboxDir, { withFileTypes: true })) {
+    if (entry.isFile() && isTarget(entry.name)) {
+      found.push({ name: entry.name, filePath: join(inboxDir, entry.name), folder: null });
+      continue;
+    }
+    if (!entry.isDirectory() || RESERVED.has(entry.name)) continue;
+
+    const subDir = join(inboxDir, entry.name);
+    for (const child of readdirSync(subDir, { withFileTypes: true })) {
+      if (!child.isFile() || !isTarget(child.name)) continue;
+      found.push({ name: `${entry.name}/${child.name}`, filePath: join(subDir, child.name), folder: entry.name });
+    }
+  }
+
+  return found;
+}
+
 function main() {
   mkdirSync(inboxDir, { recursive: true });
 
-  const entries = readdirSync(inboxDir, { withFileTypes: true })
-    .filter((entry) => entry.isFile())
-    .map((entry) => entry.name)
-    .filter((name) => [".csv", ".xlsx", ".xls"].includes(extname(name).toLowerCase()));
-
+  const entries = collectEntries();
   if (entries.length === 0) return;
 
+  const accounts = loadAccounts();
   log(`받은 폴더에 ${entries.length}개 발견 — ${inboxDir}`);
   let applied = 0;
 
-  for (const name of entries) {
-    const filePath = join(inboxDir, name);
+  for (const { name, filePath, folder } of entries) {
 
     if (!isSettled(filePath)) {
       log(`  ${name}: 아직 쓰는 중으로 보여 이번엔 건너뜀`);
@@ -135,7 +181,7 @@ function main() {
     // 엑셀 파일은 파서가 CSV만 다룬다. 조용히 실패시키지 않고 이유를 알려준다.
     if (extname(name).toLowerCase() !== ".csv") {
       log(`  ${name}: CSV가 아니라 처리 불가 — 증권사에서 CSV로 내보내 주세요`);
-      moveAside(filePath, failedDir, name);
+      moveAside(filePath, failedDir, basename(name));
       continue;
     }
 
@@ -144,18 +190,33 @@ function main() {
       kind = classifyInboxCsv(decodeBrokerCsv(readFileSync(filePath)));
     } catch (error) {
       log(`  ${name}: 읽기 실패 — ${error.message}`);
-      moveAside(filePath, failedDir, name);
+      moveAside(filePath, failedDir, basename(name));
       continue;
     }
 
     if (kind === "unknown") {
       log(`  ${name}: 어떤 가져오기인지 판별 못 함 — 건드리지 않고 실패 폴더로 옮김`);
-      moveAside(filePath, failedDir, name);
+      moveAside(filePath, failedDir, basename(name));
       continue;
     }
 
+    // 잔고는 대상 계좌를 통째로 교체하므로, 어느 계좌인지 확실할 때만 반영한다.
+    let accountId = null;
+    if (kind === "position-basis") {
+      accountId = resolveAccountId(folder, accounts);
+      if (!accountId) {
+        const reason = folder
+          ? `"${folder}"에 해당하는 계좌가 없음`
+          : "계좌를 알 수 없음(계좌 폴더에 넣어야 합니다)";
+        log(`  ${name}: 보유종목(잔고) ${reason} — 반영하지 않고 실패 폴더로 옮김`);
+        moveAside(filePath, failedDir, basename(name));
+        continue;
+      }
+    }
+
     if (dryRun) {
-      log(`  ${name}: [모의] ${INBOX_KIND_LABEL[kind]}(으)로 가져올 예정`);
+      const target = accountId ? ` → ${accountId}` : "";
+      log(`  ${name}: [모의] ${INBOX_KIND_LABEL[kind]}(으)로 가져올 예정${target}`);
       continue;
     }
 
@@ -167,13 +228,13 @@ function main() {
       continue;
     }
 
-    const { ok, detail } = runImporter(kind, filePath);
+    const { ok, detail } = runImporter(kind, filePath, accountId);
     if (ok) {
       applied += 1;
-      moveAside(filePath, doneDir, name);
+      moveAside(filePath, doneDir, basename(name));
       log(`  ${name}: ${INBOX_KIND_LABEL[kind]} 반영 완료 — ${detail}`);
     } else {
-      moveAside(filePath, failedDir, name);
+      moveAside(filePath, failedDir, basename(name));
       log(`  ${name}: ${INBOX_KIND_LABEL[kind]} 반영 실패 — ${detail}`);
     }
   }
