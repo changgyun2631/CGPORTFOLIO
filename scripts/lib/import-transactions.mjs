@@ -335,7 +335,14 @@ export function parseTransactionsCsv(decodedText, { accountId }) {
     });
   }
 
-  transactions.sort((a, b) => a.at.localeCompare(b.at));
+  // 같은 시각이면 매수를 먼저 놓는다. 이 CSV의 `처리시간`은 **그날 정산 배치
+  // 시각**이라 하루치 거래가 전부 같은 값을 갖는다 — 체결 순서가 아니다. 그래서
+  // 파일 순서대로 접으면 "판 수량이 보유수량보다 많은" 날이 생기고, 그만큼
+  // 원가가 잘려 실현손익이 틀어진다(키움2 실데이터에서 5건 발생, 이 정렬로 0건).
+  // 하루 안의 진짜 체결 순서는 이 파일로 알 수 없다 — 수량이 음수로 가지 않는
+  // 쪽을 택한 것이다.
+  const sideRank = (tx) => (tx.side === "buy" ? 0 : 1);
+  transactions.sort((a, b) => a.at.localeCompare(b.at) || sideRank(a) - sideRank(b));
   cashflows.sort((a, b) => a.at.localeCompare(b.at));
   dividends.sort((a, b) => a.at.localeCompare(b.at));
 

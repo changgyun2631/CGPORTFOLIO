@@ -198,6 +198,16 @@ describe("parseTransactionsCsv", () => {
     expect([coverage.from.slice(0, 10), coverage.to.slice(0, 10)]).toEqual(["2025-01-02", "2025-03-04"]);
   });
 
+  it("같은 시각이면 매수를 먼저 놓는다 — 처리시간이 그날 정산 배치 시각이라 하루치가 같은 값이다", () => {
+    const text = csv(
+      record({ symbolId: "QLD", shares: 3, price: 10, grossFx: 30, note: "매도" }),
+      record({ symbolId: "QLD", shares: 5, price: 10, grossFx: 50, note: "매수" }),
+    );
+    const { transactions } = parseTransactionsCsv(text, options);
+    // 파일 순서대로 두면 보유수량보다 많이 판 것처럼 접혀 원가가 잘린다.
+    expect(transactions.map((tx) => tx.side)).toEqual(["buy", "sell"]);
+  });
+
   it("계좌를 안 주면 거부한다 — 계좌를 짐작하면 엉뚱한 원장을 덮어쓴다", () => {
     expect(() => parseTransactionsCsv(csv(record({})), { accountId: "" })).toThrow("어느 계좌");
   });
