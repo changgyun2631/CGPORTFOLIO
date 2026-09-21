@@ -160,21 +160,20 @@ async function runRefresh(jobId: string): Promise<void> {
       // 자리를 내줘서, 값이 하나도 안 바뀐 평평한 구간이 화면에서 과도하게 길게
       // 보인다(2026-09-21 사용자 보고). 총액·환율로 비교하면 환율은 주말에도
       // 수시로 움직여서 오탐이 난다(사용자 지적). 공급자의 장 상태 플래그
-      // (`Quote.marketState`)도 시도해봤지만 평일 프리·애프터마켓까지
-      // "open 아님"으로 묶어버려서, 실제로 거래되며 움직이는 시세까지 건너뛰는
-      // 문제가 있었다(사용자 지적 — 프리·애프터마켓은 실거래로 가격이 움직이니
-      // 기록해야 한다). 대신 거래량이 많아 프리·애프터마켓에도 실제로 가격이
-      // 움직이는 기준 종목(엔비디아) 하나의 시세가 직전과 완전히 같은지로
-      // 휴장 여부를 판단한다 — 같으면 어떤 시장도 안 움직이는 것(주말·휴일
-      // 추정), 다르면 정규장이든 프리·애프터든 장이 열려 있다는 뜻으로 본다.
-      // quotes/fx는 그대로 갱신해서 신선도 표시는 최신을 유지한다.
-      const REFERENCE_SYMBOL_ID = "NVDA";
+      // (`Quote.marketState`)나 미국 기준 종목 하나만 보는 방식도 시도해봤지만,
+      // 전자는 평일 프리·애프터마켓까지 "닫힘"으로 묶고, 후자는 미국장이 닫힌
+      // 시간에 국내 종목만 움직인 경우(2026-09-21 실제 재현 — 491620이 실제로
+      // 움직였는데 미국 기준 종목만 보다가 놓침)를 못 잡았다. 그래서 보유 중인
+      // (현금 제외) 종목 전부를 보고, 그중 하나라도 시세가 직전과 다르면(국내장·
+      // 미국 정규장·프리·애프터 어디서든) 실제로 움직인 것으로 본다. quotes/fx는
+      // 그대로 갱신해서 신선도 표시는 최신을 유지한다.
+      const heldSymbolIds = new Set(portfolio.holdings.filter((h) => h.kind !== "cash").map((h) => h.symbolId));
       const previousQuoteById = new Map(raw.quotes.map((quote) => [quote.symbolId, quote]));
-      const referencePrev = previousQuoteById.get(REFERENCE_SYMBOL_ID);
-      const referenceNew = merged.get(REFERENCE_SYMBOL_ID);
-      const referenceUnchanged = referencePrev != null && referenceNew != null && referencePrev.price === referenceNew.price;
-      const unchanged = raw.snapshots.length > 0 && referenceUnchanged;
-      if (unchanged) logCronStage(`스냅샷 건너뜀 — 기준 종목(${REFERENCE_SYMBOL_ID}) 시세가 직전과 동일(휴장 추정)`);
+      const heldQuotesUnchanged =
+        heldSymbolIds.size > 0 &&
+        [...heldSymbolIds].every((id) => previousQuoteById.get(id)?.price === merged.get(id)?.price);
+      const unchanged = raw.snapshots.length > 0 && heldQuotesUnchanged;
+      if (unchanged) logCronStage("스냅샷 건너뜀 — 보유 종목 시세 전부 직전과 동일(휴장 추정)");
       const snapshots = unchanged ? raw.snapshots : [...raw.snapshots, point];
 
       const writes = [
