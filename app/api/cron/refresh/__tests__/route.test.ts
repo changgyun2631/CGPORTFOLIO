@@ -229,7 +229,7 @@ describe("GET /api/cron/refresh", () => {
       join(dataDir, "quotes.json"),
       JSON.stringify([
         { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-01T00:00:00Z" },
-        { symbolId: "491620", price: 10540, currency: "KRW", asOf: "2024-01-01T00:00:00Z" },
+        { symbolId: "491620", price: 10000, currency: "KRW", asOf: "2024-01-01T00:00:00Z" },
       ]),
     );
 
@@ -237,7 +237,7 @@ describe("GET /api/cron/refresh", () => {
       .mockResolvedValueOnce({
         quotes: [
           { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" },
-          { symbolId: "491620", price: 10540, currency: "KRW", asOf: "2024-01-02T00:00:00Z" },
+          { symbolId: "491620", price: 10000, currency: "KRW", asOf: "2024-01-02T00:00:00Z" },
         ],
         missing: [],
         errors: [],
@@ -246,7 +246,7 @@ describe("GET /api/cron/refresh", () => {
         // QLD(미국)는 그대로 — 미국장은 계속 휴장이라고 가정. 491620(국내)만 움직인다.
         quotes: [
           { symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T05:00:00Z" },
-          { symbolId: "491620", price: 10580, currency: "KRW", asOf: "2024-01-02T05:00:00Z" },
+          { symbolId: "491620", price: 10100, currency: "KRW", asOf: "2024-01-02T05:00:00Z" },
         ],
         missing: [],
         errors: [],
