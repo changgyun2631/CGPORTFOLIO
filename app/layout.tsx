@@ -36,10 +36,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body
         className="min-h-screen bg-bg text-text"
-        style={{
-          fontFamily:
-            '"Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif',
-        }}
       >
         <TopNav />
         {/* 폭 상한 없이 화면을 다 쓴다. 표·차트가 많아서 넓을수록 한눈에 들어온다 —

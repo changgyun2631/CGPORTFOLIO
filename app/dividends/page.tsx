@@ -67,7 +67,7 @@ export default async function DividendsPage({ searchParams }: { searchParams: Pr
                   key={y}
                   href={`/dividends?year=${y}`}
                   aria-current={y === year ? "page" : undefined}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                  className={`rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
                     y === year ? "bg-accent text-white" : "border border-line text-muted hover:border-line-strong hover:text-text"
                   }`}
                 >
@@ -81,7 +81,7 @@ export default async function DividendsPage({ searchParams }: { searchParams: Pr
         <Card>
           <MonthlyBars months={monthsOfYear(summary, year)} symbolOrder={symbolOrder} />
           {symbolOrder.length > 1 ? (
-            <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 border-t border-line pt-3 text-[11px]">
+            <ul className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-line pt-4 text-sm">
               {summary.bySymbol.map((line, index) => (
                 <li key={line.symbolId} className="flex items-center gap-1.5">
                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: colorFor(index) }} />
@@ -100,14 +100,14 @@ export default async function DividendsPage({ searchParams }: { searchParams: Pr
               const weight = summary.totalKrw > 0 ? (line.totalKrw / summary.totalKrw) * 100 : 0;
               return (
                 <li key={line.symbolId}>
-                  <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13px]">
-                    <Link href={`/symbols/${encodeURIComponent(line.symbolId)}`} className="flex min-w-0 items-baseline gap-2 hover:text-accent">
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-[15px]">
+                    <Link href={`/symbols/${encodeURIComponent(line.symbolId)}`} className="flex min-w-0 max-w-full items-baseline gap-2 hover:text-accent">
                       <span className="font-bold tracking-tight">{line.symbolId}</span>
-                      <span className="truncate text-[11px] text-faint">{line.name}</span>
+                      <span className="truncate text-xs text-faint">{line.name}</span>
                     </Link>
                     <span className="tnum shrink-0 font-semibold">
                       {money(line.totalKrw)}
-                      <span className="ml-2 text-[11px] font-normal text-muted">
+                      <span className="ml-2 text-xs font-normal text-muted">
                         {line.count}회 · {percent(weight, 1)}
                       </span>
                     </span>

@@ -35,8 +35,8 @@ export function Section({
     <section className={`space-y-3 ${className}`}>
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
-          {description ? <p className="mt-0.5 text-xs leading-5 text-muted">{description}</p> : null}
+          <h2 className="text-lg font-bold tracking-tight">{title}</h2>
+          {description ? <p className="mt-1 text-sm leading-6 text-muted">{description}</p> : null}
         </div>
         {action}
       </header>
@@ -67,10 +67,10 @@ export function PageTitle({
     <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
       <div>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h1>
-          {aside ? <span className="text-sm text-muted">{aside}</span> : null}
+          <h1 className="text-[28px] font-bold tracking-tight sm:text-[32px]">{title}</h1>
+          {aside ? <span className="text-[15px] text-muted">{aside}</span> : null}
         </div>
-        {description ? <p className="mt-1.5 text-sm text-muted">{description}</p> : null}
+        {description ? <p className="mt-2 text-[15px] leading-7 text-muted">{description}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
@@ -124,21 +124,21 @@ export function Stat({
   const valueTone = tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-text";
   const body = (
     <>
-      <p className="text-[11px] font-medium tracking-wide text-muted">{label}</p>
-      <p className={`tnum mt-1.5 text-[19px] font-bold leading-tight tracking-tight sm:text-[21px] ${valueTone}`}>{value}</p>
-      {delta ? <p className="mt-1 text-xs font-medium">{delta}</p> : null}
-      {sub ? <p className="mt-1 text-[11px] leading-4 text-faint">{sub}</p> : null}
+      <p className="text-sm font-semibold text-muted">{label}</p>
+      <p className={`tnum mt-2 text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] ${valueTone}`}>{value}</p>
+      {delta ? <p className="mt-2 text-sm font-medium">{delta}</p> : null}
+      {sub ? <p className="mt-2 text-xs leading-5 text-faint">{sub}</p> : null}
     </>
   );
 
   if (href) {
     return (
-      <a href={href} className="block rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-line-strong hover:bg-surface-hover">
+      <a href={href} className="block rounded-2xl border border-line-strong bg-surface p-5 transition-colors hover:border-accent hover:bg-surface-hover">
         {body}
       </a>
     );
   }
-  return <div className="rounded-2xl border border-line bg-surface p-4">{body}</div>;
+  return <div className="rounded-2xl border border-line-strong bg-surface p-5">{body}</div>;
 }
 
 /** 종목 코드 배지. */

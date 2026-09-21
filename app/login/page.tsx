@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import { Card } from "@/components/ui/primitives";
+import { BrandLockup } from "@/components/shell/brand";
 import { safeReturnPath } from "@/lib/auth/redirect";
-import { site } from "@/lib/config";
 
 export const metadata: Metadata = { title: "로그인", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
@@ -26,10 +26,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     <div className="mx-auto flex min-h-[65vh] max-w-md items-center">
       <Card className="w-full p-6 sm:p-8">
         <div className="mb-6">
-          <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-accent text-sm font-black text-white">
-            {site.shortName.slice(0, 2)}
+          <div className="mb-7">
+            <BrandLockup />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">{site.name} 로그인</h1>
+          <h1 className="text-2xl font-bold tracking-tight">로그인</h1>
           <p className="mt-2 text-sm leading-6 text-muted">개인 포트폴리오 화면입니다. 로그인 상태는 이 브라우저에서 7일간 유지됩니다.</p>
         </div>
 

@@ -4,7 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-import { nav, site } from "@/lib/config";
+import { nav } from "@/lib/config";
+import { BrandLockup } from "./brand";
 
 function isActive(pathname: string, href: string) {
   if (href === "/") return pathname === "/";
@@ -15,7 +16,7 @@ export function TopNav() {
   const pathname = usePathname();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg-elevated/85 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-line-strong bg-bg-elevated">
       {/*
         key에 경로를 물려두면 이동할 때 MobileMenu가 새로 마운트되면서 열림 상태가
         초기화된다. effect 안에서 setState를 부르지 않고 같은 결과를 얻는다.
@@ -31,16 +32,13 @@ function MobileMenu({ pathname }: { pathname: string }) {
 
   return (
     <>
-      <div className="flex h-14 w-full items-center gap-2 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="mr-2 flex shrink-0 items-center gap-2 text-[15px] font-bold tracking-tight">
-          <span className="grid h-7 w-7 place-items-center rounded-lg bg-accent text-[11px] font-black text-white">
-            {site.shortName.slice(0, 2)}
-          </span>
-          <span className="hidden sm:inline">{site.name}</span>
+      <div className="flex min-h-[76px] w-full items-center gap-2 px-3 sm:gap-4 sm:px-6 lg:px-8">
+        <Link href="/" aria-label="CGPORTFOLIO 홈" className="shrink-0 rounded-lg xl:mr-3">
+          <BrandLockup />
         </Link>
 
         {!loginPage ? (
-          <nav aria-label="주요 메뉴" className="hidden flex-1 items-center gap-1 md:flex">
+          <nav aria-label="주요 메뉴" className="hidden min-w-0 flex-1 items-center gap-0.5 xl:flex">
             {nav.map((item) => {
               const active = isActive(pathname, item.href);
               return (
@@ -48,7 +46,7 @@ function MobileMenu({ pathname }: { pathname: string }) {
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors ${
+                  className={`whitespace-nowrap rounded-lg px-2 py-2.5 text-sm font-semibold transition-colors 2xl:px-3 ${
                     active ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-hover hover:text-text"
                   }`}
                 >
@@ -63,10 +61,10 @@ function MobileMenu({ pathname }: { pathname: string }) {
           <ThemeToggle />
           {!loginPage ? (
             <>
-              <form action="/api/auth/logout" method="post" className="hidden md:block">
+              <form action="/api/auth/logout" method="post" className="hidden xl:block">
                 <button
                   type="submit"
-                  className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
+                  className="whitespace-nowrap rounded-lg border border-line-strong px-3 py-2 text-xs font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-text"
                 >
                   로그아웃
                 </button>
@@ -75,8 +73,9 @@ function MobileMenu({ pathname }: { pathname: string }) {
                 type="button"
                 onClick={() => setOpen((v) => !v)}
                 aria-expanded={open}
-                aria-label="메뉴 열기"
-                className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted md:hidden"
+                aria-controls="mobile-navigation"
+                aria-label={open ? "메뉴 닫기" : "메뉴 열기"}
+                className="whitespace-nowrap rounded-lg border border-line-strong px-2.5 py-2 text-xs font-semibold text-muted xl:hidden"
               >
                 메뉴
               </button>
@@ -86,13 +85,14 @@ function MobileMenu({ pathname }: { pathname: string }) {
       </div>
 
       {open && !loginPage ? (
-        <nav aria-label="모바일 메뉴" className="grid grid-cols-2 gap-1 border-t border-line px-4 py-3 md:hidden">
+        <nav id="mobile-navigation" aria-label="모바일 메뉴" className="grid grid-cols-2 gap-1 border-t border-line px-4 py-3 xl:hidden">
           {nav.map((item) => {
             const active = isActive(pathname, item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={`rounded-lg px-3 py-2 text-sm font-medium ${
                   active ? "bg-accent-soft text-accent" : "text-muted hover:bg-surface-hover"
                 }`}
@@ -139,7 +139,7 @@ function ThemeToggle() {
       type="button"
       onClick={toggle}
       aria-label="테마 전환"
-      className="rounded-lg border border-line px-2.5 py-1.5 text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
+      className="whitespace-nowrap rounded-lg border border-line-strong px-2.5 py-2 text-xs font-semibold text-muted transition-colors hover:bg-surface-hover hover:text-text"
     >
       <span className="only-dark">라이트</span>
       <span className="only-light">다크</span>

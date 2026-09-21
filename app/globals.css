@@ -13,9 +13,10 @@
   --border: #1e2633;
   --border-strong: #2b3648;
 
-  --text: #e8edf5;
-  --text-muted: #8b97ab;
-  --text-faint: #5d6878;
+  --text: #f3f6fc;
+  --text-muted: #bdc8da;
+  --text-faint: #a2b0c5;
+  --brand-gold: #d8bc82;
 
   --accent: #4f8cff;
   --accent-soft: #1b2a45;
@@ -48,8 +49,9 @@
   --border-strong: #cbd5e1;
 
   --text: #0f172a;
-  --text-muted: #5b6678;
-  --text-faint: #8a94a6;
+  --text-muted: #46556b;
+  --text-faint: #59697d;
+  --brand-gold: #806027;
 
   --accent: #2563eb;
   --accent-soft: #e4edff;
@@ -92,6 +94,11 @@
   --font-sans: var(--font-sans-stack);
 }
 
+@theme {
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.5;
+}
+
 html {
   color-scheme: dark;
 }
@@ -102,7 +109,62 @@ html[data-theme="light"] {
 body {
   background: var(--bg);
   color: var(--text);
-  -webkit-font-smoothing: antialiased;
+  /* 작은 한글 획을 강제로 가늘게 만들지 않고 운영체제의 기본 렌더링을 쓴다. */
+  font-family: Arial, "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  line-height: 1.6;
+}
+
+.brand-lockup {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.brand-wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  font-family: Arial, sans-serif;
+  color: var(--text);
+  line-height: 1;
+}
+
+.brand-initials {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -1.2px;
+}
+
+.brand-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 1.1px;
+}
+
+.brand-caption {
+  display: block;
+  margin-top: 6px;
+  color: var(--brand-gold);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 2.4px;
+}
+
+/* 320px 화면에서도 로고와 테마·메뉴 버튼 사이 여백을 유지한다. */
+@media (max-width: 359px) {
+  .brand-lockup { gap: 8px; }
+  .brand-lockup svg { width: 32px; height: 32px; }
+  .brand-initials { font-size: 22px; }
+  .brand-name { font-size: 13px; letter-spacing: 0.8px; }
+  .brand-caption { font-size: 8px; letter-spacing: 1.8px; }
+}
+
+:where(a, button, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
 }
 
 /*

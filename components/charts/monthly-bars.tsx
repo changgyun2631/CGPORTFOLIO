@@ -33,7 +33,7 @@ export function MonthlyBars({
         return (
           <div key={m.month} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5">
             {filled ? (
-              <div className="pointer-events-none absolute -top-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded border border-line bg-bg-elevated px-1.5 py-1 text-[10px] font-medium opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              <div className="pointer-events-none absolute -top-1 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded border border-line bg-bg-elevated px-2 py-1.5 text-xs font-medium opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
                 {segments ? (
                   <ul className="space-y-0.5">
                     {segments.map((s) => (
@@ -76,7 +76,7 @@ export function MonthlyBars({
                 title={`${m.month} · ${money(m.totalKrw)}`}
               />
             )}
-            <span className="text-center text-[10px] text-faint">{Number(m.month.slice(5, 7))}</span>
+            <span className="text-center text-xs font-medium text-muted">{Number(m.month.slice(5, 7))}</span>
           </div>
         );
       })}
