@@ -180,6 +180,35 @@ export function ValueChart({
             {r.label}
           </button>
         ))}
+        {/* 마우스로 짚은 점(안 짚었으면 마지막 점)의 값. 예전에는 차트 왼쪽 위에
+            겹쳐 띄웠는데 그만큼 그래프를 가렸다 — 머리말의 빈 자리로 옮기고 한 줄로
+            폈다. 세로로 쌓으면 이 줄 높이가 늘어 차트가 밀린다. */}
+        <div className="pointer-events-none ml-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
+          <span className="text-faint">{shortDateTime(active.snapshot.at)}</span>
+          <InlineStat label="총 평가금액" value={money(active.snapshot.totalKrw)} emphasis />
+          {showFx ? <InlineStat label="환율" value={active.snapshot.fxRate.toFixed(2)} /> : null}
+          {(() => {
+            const basis = active.snapshot.principalKrw ?? principalKrw;
+            if (!basis || basis <= 0) return null;
+            const gainKrw = active.snapshot.totalKrw - basis;
+            const gainPercent = (gainKrw / basis) * 100;
+            return (
+              <>
+                <InlineStat label="투입 원금" value={money(basis)} />
+                <InlineStat label="원금 대비" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
+                <InlineStat label="이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
+              </>
+            );
+          })()}
+          {activeTradeMarker ? (
+            <span className="border-l border-line pl-3 text-[11px]">
+              {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
+              {activeTradeMarker.sell > 0 ? <span className="font-semibold text-down">매도 {activeTradeMarker.sell}건 </span> : null}
+              <span className="text-muted">{activeTradeMarker.symbols.join(", ")}</span>
+            </span>
+          ) : null}
+        </div>
+
         <div className="ml-auto flex items-center gap-1.5">
           {trades.length > 0 ? (
             <button
@@ -368,34 +397,6 @@ export function ValueChart({
             })}
           </ul>
         ) : null}
-
-        <div className="pointer-events-none absolute left-0 top-0 w-max min-w-[180px] rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg">
-          <p className="text-faint">{shortDateTime(active.snapshot.at)}</p>
-          <dl className="mt-1 space-y-0.5">
-            <TooltipRow label="총 평가금액" value={money(active.snapshot.totalKrw)} emphasis />
-            {showFx ? <TooltipRow label="환율" value={active.snapshot.fxRate.toFixed(2)} /> : null}
-            {(() => {
-              const basis = active.snapshot.principalKrw ?? principalKrw;
-              if (!basis || basis <= 0) return null;
-              const gainKrw = active.snapshot.totalKrw - basis;
-              const gainPercent = (gainKrw / basis) * 100;
-              return (
-                <>
-                  <TooltipRow label="투입 원금" value={money(basis)} />
-                  <TooltipRow label="원금 대비 수익률" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
-                  <TooltipRow label="원금 대비 이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
-                </>
-              );
-            })()}
-          </dl>
-          {activeTradeMarker ? (
-            <p className="mt-1 border-t border-line pt-1 text-[11px] leading-4">
-              {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
-              {activeTradeMarker.sell > 0 ? <span className="font-semibold text-down">매도 {activeTradeMarker.sell}건 </span> : null}
-              <span className="text-muted">{activeTradeMarker.symbols.join(", ")}</span>
-            </p>
-          ) : null}
-        </div>
       </div>
 
       {/* 전부 지금 보고 있는 구간(stats)의 값이다 — 기간 탭을 바꾸면 같이 바뀐다. */}
@@ -487,7 +488,8 @@ function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; 
   );
 }
 
-function TooltipRow({
+/** 머리말 한 줄에 들어가는 이름-값 한 쌍. 숫자는 tnum으로 폭이 덜 흔들리게 한다. */
+function InlineStat({
   label,
   value,
   emphasis = false,
@@ -500,10 +502,10 @@ function TooltipRow({
 }) {
   const color = tone === "up" ? "text-up" : tone === "down" ? "text-down" : undefined;
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-faint">{label}</dt>
-      <dd className={`tnum ${emphasis ? "text-sm font-bold" : "font-semibold"} ${color ?? ""}`}>{value}</dd>
-    </div>
+    <span className="flex items-baseline gap-1">
+      <span className="text-faint">{label}</span>
+      <span className={`tnum ${emphasis ? "font-bold" : "font-semibold"} ${color ?? ""}`}>{value}</span>
+    </span>
   );
 }
 
