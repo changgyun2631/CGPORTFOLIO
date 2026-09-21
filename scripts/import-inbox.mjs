@@ -36,7 +36,7 @@ const logPath = join(homedir(), "cgportfolio-logs", "inbox-import.log");
 const MAX_LOG_LINES = 500;
 
 /**
- * 보유종목(잔고) CSV가 어느 계좌 것인지는 **파일이 놓인 하위 폴더 이름**으로 정한다.
+ * 보유종목(잔고)·거래내역 CSV가 어느 계좌 것인지는 **파일이 놓인 하위 폴더 이름**으로 정한다.
  * `~/cgportfolio-inbox/<계좌ID 또는 계좌이름>/잔고.csv` 처럼 넣으면 된다.
  *
  * 예전에는 계좌가 하나뿐이라 계좌를 코드에 고정해 뒀는데, 계좌가 늘어난 뒤로는
@@ -137,14 +137,20 @@ function isSettled(filePath) {
   }
 }
 
+const IMPORTER_SCRIPT = {
+  "account-history": "import-account-history-csv.mjs",
+  "position-basis": "import-position-basis-csv.mjs",
+  transactions: "import-transactions-csv.mjs",
+};
+
+/** 잔고와 거래내역은 한 계좌 것이라 대상 계좌를 알아야 한다. */
+const NEEDS_ACCOUNT = new Set(["position-basis", "transactions"]);
+
 function runImporter(kind, filePath, accountId) {
-  const script =
-    kind === "account-history"
-      ? join(repoRoot, "scripts", "import-account-history-csv.mjs")
-      : join(repoRoot, "scripts", "import-position-basis-csv.mjs");
+  const script = join(repoRoot, "scripts", IMPORTER_SCRIPT[kind]);
 
   const args = [script, filePath, "--replace"];
-  if (kind === "position-basis") args.push(`--account-id=${accountId}`);
+  if (NEEDS_ACCOUNT.has(kind)) args.push(`--account-id=${accountId}`);
 
   const result = spawnSync(process.execPath, args, { cwd: repoRoot, encoding: "utf8", timeout: 5 * 60 * 1000 });
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim().split("\n").pop() ?? "";
@@ -216,15 +222,15 @@ function main() {
       continue;
     }
 
-    // 잔고는 대상 계좌를 통째로 교체하므로, 어느 계좌인지 확실할 때만 반영한다.
+    // 잔고·거래내역은 대상 계좌의 기존 줄을 갈아끼우므로, 어느 계좌인지 확실할 때만 반영한다.
     let accountId = null;
-    if (kind === "position-basis") {
+    if (NEEDS_ACCOUNT.has(kind)) {
       accountId = resolveAccountId(folder, accounts);
       if (!accountId) {
         const reason = folder
           ? `"${folder}"에 해당하는 계좌가 없음`
           : "계좌를 알 수 없음(계좌 폴더에 넣어야 합니다)";
-        log(`  ${name}: 보유종목(잔고) ${reason} — 반영하지 않고 실패 폴더로 옮김`);
+        log(`  ${name}: ${INBOX_KIND_LABEL[kind]} ${reason} — 반영하지 않고 실패 폴더로 옮김`);
         moveAsideSafely(filePath, failedDir, basename(name));
         continue;
       }

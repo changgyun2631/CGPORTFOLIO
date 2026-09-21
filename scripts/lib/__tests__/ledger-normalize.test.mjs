@@ -79,4 +79,36 @@ describe("normalizeLedger", () => {
     expect(correction?.type).toBe("deposit");
     expect(correction?.amount).toBe(1000);
   });
+
+  it("가져오기가 정해 준 action을 적요명으로 다시 추측해 뒤집지 않는다", () => {
+    // 증권사 표현은 계좌마다 다르다(대체입고/이체입고). 적요명만 보고 다시
+    // 판단하면 이체가 매매로 뒤집혀 실현손익과 예수금이 한꺼번에 틀어진다.
+    const { transactions } = normalizeLedger({
+      transactions: [
+        { id: "tx-1", at: "2026-01-01T00:00:00Z", accountId: "acc-1", symbolId: "QLD", side: "buy", action: "transfer", shares: 1, price: 100, fee: 0, note: "대체입고" },
+      ],
+      cashflows: [],
+      symbols,
+    });
+    expect(transactions[0].action).toBe("transfer");
+  });
+
+  it("이미 한 줄로 합쳐진 분할은 다시 짝지으려 하지 않는다", () => {
+    const split = { id: "split-1", at: "2026-01-01T00:00:00Z", accountId: "acc-1", symbolId: "QLD", side: "buy", action: "split", shares: 20, price: 0, fee: 0, splitRatio: 2, note: "액면분할·병합 — 수량 2배" };
+    const { transactions } = normalizeLedger({ transactions: [split], cashflows: [], symbols });
+    expect(transactions).toEqual([split]);
+  });
+
+  it("이미 action이 붙은 이체는 보정 항목을 건드리지 않는다", () => {
+    // 화면 계산이 이미 이체를 현금에서 빼고 있으므로 되돌릴 것이 없다.
+    // 옛 원장(action 없음)만 보정 대상이다.
+    const { cashflows } = normalizeLedger({
+      transactions: [
+        { id: "tx-1", at: "2026-01-01T00:00:00Z", accountId: "acc-1", symbolId: "QLD", side: "sell", action: "transfer", shares: 10, price: 100, fee: 0, note: "대체출고" },
+      ],
+      cashflows: [{ id: "cf-1", at: "2026-01-01T00:00:00Z", accountId: "acc-1", type: "deposit", amount: 0, currency: "USD", note: "원장 재구성 보정" }],
+      symbols,
+    });
+    expect(cashflows.find((c) => c.kind === "adjustment")?.amount).toBe(0);
+  });
 });

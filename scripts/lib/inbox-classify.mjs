@@ -9,11 +9,12 @@
  * 같이 바꿀 것:
  *   - 계좌수익률: scripts/lib/import-account-history.mjs
  *   - 보유종목:   scripts/lib/import-position-basis.mjs
+ *   - 거래내역:   scripts/lib/import-transactions.mjs
  */
 
 import { parseCsvRows } from "./csv.mjs";
 
-/** @typedef {"account-history" | "position-basis" | "unknown"} InboxKind */
+/** @typedef {"account-history" | "position-basis" | "transactions" | "unknown"} InboxKind */
 
 /**
  * @param {string} decodedText 디코딩이 끝난 CSV 전체 텍스트
@@ -26,6 +27,13 @@ export function classifyInboxCsv(decodedText) {
   // 나눴는데, 헤더 이름에 줄바꿈이 든 CSV(키움 2167)는 한 행이 두 줄로 쪼개져
   // 조건을 못 맞추고 "판별 못 함"으로 빠졌다(2026-09-21).
   const rows = parseCsvRows(decodedText).slice(0, 80);
+
+  // 거래내역(2110)을 먼저 본다. 이 파일에도 "종목명" 열이 있어서 보유종목 조건과
+  // 헷갈릴 수 있는데, 보유종목에만 있는 "평가손익"이 없다는 점으로 갈린다.
+  const isTransactions = rows.some(
+    (row) => row.includes("거래일자") && row.includes("거래종류") && row.includes("거래수량"),
+  );
+  if (isTransactions) return "transactions";
 
   const isAccountHistory = rows.some(
     (row) => row.includes("일자") && row.includes("예탁자산") && row.includes("입금") && row.includes("출금"),
@@ -42,5 +50,6 @@ export function classifyInboxCsv(decodedText) {
 export const INBOX_KIND_LABEL = {
   "account-history": "계좌수익률",
   "position-basis": "보유종목(잔고)",
+  transactions: "거래내역",
   unknown: "알 수 없음",
 };

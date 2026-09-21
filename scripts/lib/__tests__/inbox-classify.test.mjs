@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { classifyInboxCsv } from "../inbox-classify.mjs";
+import { classifyInboxCsv, INBOX_KIND_LABEL } from "../inbox-classify.mjs";
 
 /** 실제 증권사 내보내기처럼 Version 줄과 2단 헤더가 붙은 모양. */
 function accountHistoryCsv() {
@@ -61,5 +61,27 @@ describe("헤더 이름에 줄바꿈이 든 CSV", () => {
     ].join("\n");
 
     expect(classifyInboxCsv(csv)).toBe("account-history");
+  });
+});
+
+describe("거래내역(2110) CSV", () => {
+  // 한 거래가 세 줄이고 헤더도 세 줄이다. 둘째 줄에 "종목명"이 있어 보유종목과
+  // 헷갈리기 쉬운데, 보유종목에만 있는 "평가손익"이 없다는 점으로 갈린다.
+  const csv = [
+    "Version=1.0,,,,,,,,,,",
+    "거래일자,거래종류,통화,거래수량,거래금액,정산금액,세금합,인지세,미수(원/주),변제합,매체구분",
+    "종목코드,적요명,거래단가/환율,,예수금잔고,외화예수금잔고,,유가금잔,,연체합,처리시간",
+    "거래소,종목명,,,거래금액(외),정산금액(외),수수료(외),미수(외),,변제합(외),외국납부세액",
+    "2026-09-15,매매,USD,1,0,0,0,0,0,0,영웅문S",
+    "QLD,매수,100,,0,0,,0,,0,9:30:00",
+    "미국,QQQ2배,,,100,100.1,0.1,0,,0,0",
+  ].join("\n");
+
+  it("거래내역으로 알아본다", () => {
+    expect(classifyInboxCsv(csv)).toBe("transactions");
+  });
+
+  it("사람이 읽을 이름이 있다", () => {
+    expect(INBOX_KIND_LABEL.transactions).toBe("거래내역");
   });
 });

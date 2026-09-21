@@ -1,3 +1,5 @@
+import { classifyCashFlowKind } from "./cashflow-kind.mjs";
+
 /**
  * 거래원장의 주식 이체·액면분할과 현금흐름 성격을 명시한다. 순수 함수라
  * `normalize-ledger.mjs`(파일 IO)와 웹 가져오기 화면이 같이 쓴다.
@@ -10,9 +12,13 @@ export function normalizeLedger({ transactions, cashflows, symbols }) {
   const nonTradeCashImpact = new Map();
   const addImpact = (currency, amount) => nonTradeCashImpact.set(currency, (nonTradeCashImpact.get(currency) ?? 0) + amount);
   for (const tx of transactions) {
-    if (!/액면분할|이체입고|이체출고/.test(tx.note ?? "")) continue;
+    // `action`이 이미 붙어 있는 줄은 화면 계산이 이체·분할로 보고 현금에서 빼므로
+    // 보정할 것이 없다. 이 보정은 action 없이 저장된 옛 원장을 위한 것이다
+    // (거래내역 가져오기가 생기기 전에는 이체도 매매로 저장됐다).
+    if (tx.action) continue;
+    if (!/액면분할|이체입고|이체출고|대체입고|대체출고/.test(tx.note ?? "")) continue;
     // 리워드 이체입고는 아래의 상쇄용 현금흐름도 함께 제거하므로 이미 순효과가 0이다.
-    if (/이체입고/.test(tx.note ?? "")) continue;
+    if (/이체입고|대체입고/.test(tx.note ?? "")) continue;
     const symbol = symbolById.get(tx.symbolId);
     if (!symbol) continue;
     const gross = tx.shares * tx.price;
@@ -24,6 +30,12 @@ export function normalizeLedger({ transactions, cashflows, symbols }) {
   const normalizedTransactions = [];
   for (const tx of transactions) {
     const note = tx.note ?? "";
+    // 가져오기가 이미 한 줄로 합쳐 놓은 분할은 다시 짝지으려 하면 안 된다
+    // ("전후 거래가 완전하지 않습니다"로 터진다). 그대로 통과시킨다.
+    if (tx.action === "split") {
+      normalizedTransactions.push(tx);
+      continue;
+    }
     if (/액면분할/.test(note)) {
       const key = `${tx.accountId}::${tx.symbolId}::${tx.at.slice(0, 10)}`;
       const group = splitGroups.get(key) ?? [];
@@ -32,7 +44,9 @@ export function normalizeLedger({ transactions, cashflows, symbols }) {
     } else {
       normalizedTransactions.push({
         ...tx,
-        action: /이체입고|이체출고/.test(note) ? "transfer" : "trade",
+        // 가져오기가 정한 성격이 있으면 그것을 믿는다. 적요명으로 다시 추측하면
+        // 증권사 표현이 조금만 달라도(대체입고/이체입고) 이체가 매매로 뒤집힌다.
+        action: tx.action ?? (/이체입고|이체출고|대체입고|대체출고/.test(note) ? "transfer" : "trade"),
       });
     }
   }
@@ -57,17 +71,9 @@ export function normalizeLedger({ transactions, cashflows, symbols }) {
   }
   normalizedTransactions.sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 
-  const normalizedCashflows = cashflows.filter((cashflow) => !/이체입고 상쇄/.test(cashflow.note ?? "")).map((cashflow) => {
-    const note = cashflow.note ?? "";
-    const kind = /원장 재구성 보정/.test(note)
-      ? "adjustment"
-      : /환전/.test(note)
-        ? "exchange"
-        : /쿠폰|배당|세액/.test(note)
-          ? "income"
-          : "external";
-    return { ...cashflow, kind };
-  });
+  const normalizedCashflows = cashflows
+    .filter((cashflow) => !/이체입고 상쇄/.test(cashflow.note ?? ""))
+    .map((cashflow) => ({ ...cashflow, kind: classifyCashFlowKind(cashflow.note) }));
 
   // 기존 화면에서 맞춘 예수금은 유지하면서, 주식 이체·분할의 잘못된 현금 효과만 보정 항목으로 옮긴다.
   for (const [currency, impact] of nonTradeCashImpact) {
