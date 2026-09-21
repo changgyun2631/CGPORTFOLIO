@@ -18,8 +18,12 @@ export function parsePositionBasisCsv(decodedText, { accountId, at }) {
     .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? ""])))
     .filter((row) => row["코드"]);
 
-  const basis = [];
-  const crossCheckInput = [];
+  // 같은 종목이 여러 줄로 나뉘어 오는 경우가 있다 — 키움은 소수점 보유를 "온주"와
+  // "소수점" 두 행으로 내보낸다(`소수점구분` 열). 그대로 두면 계좌×종목이 중복돼
+  // 검증에서 막히므로, 수량·매입금액·수수료를 더해 한 줄로 합친다. 평단은 합친
+  // 매입금액을 합친 수량으로 나눠 다시 구한다 — 행마다 평단이 다르기 때문에
+  // 어느 한쪽 값을 그대로 쓰면 틀린다.
+  const merged = new Map();
   for (const row of parsedRows) {
     const value = parseNumber(row["평가금액"]);
     const fee = parseNumber(row["수수료"]);
@@ -27,16 +31,29 @@ export function parsePositionBasisCsv(decodedText, { accountId, at }) {
     const shares = parseNumber(row["보유량"]);
     if (!(shares > 0 && costBasis >= 0)) continue;
     const symbolId = String(row["코드"]).replace(/^'/, "");
+
+    const found = merged.get(symbolId) ?? { symbolId, shares: 0, costBasis: 0, value: 0, fee: 0, reportedGainLoss: 0 };
+    found.shares += shares;
+    found.costBasis += costBasis;
+    found.value += value;
+    found.fee += fee;
+    found.reportedGainLoss += parseNumber(row["평가손익"]);
+    merged.set(symbolId, found);
+  }
+
+  const basis = [];
+  const crossCheckInput = [];
+  for (const { symbolId, shares, costBasis, value, fee, reportedGainLoss } of merged.values()) {
     basis.push({
       at,
       accountId,
       symbolId,
       shares,
-      averagePrice: parseNumber(row["매입가"]),
+      averagePrice: costBasis / shares,
       costBasis,
       estimatedExitFeeRate: value > 0 ? fee / value : 0,
     });
-    crossCheckInput.push({ symbolId, value, costBasis, fee, reportedGainLoss: parseNumber(row["평가손익"]) });
+    crossCheckInput.push({ symbolId, value, costBasis, fee, reportedGainLoss });
   }
 
   if (basis.length === 0) throw new Error("가져올 보유종목이 없습니다.");

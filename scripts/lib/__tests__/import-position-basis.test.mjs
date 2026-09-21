@@ -49,3 +49,32 @@ describe("parsePositionBasisCsv", () => {
     );
   });
 });
+
+describe("소수점 보유가 별도 행으로 오는 경우", () => {
+  // 키움 잔고 CSV는 같은 종목이라도 온주와 소수점을 나눠 내보낸다(`소수점구분` 열).
+  // 합치지 않으면 계좌×종목이 중복돼 검증에서 막힌다(2026-09-21 실제로 겪음).
+  const csv = [
+    "Version=1.0",
+    "코드,종목명,평가손익,매입가,보유량,현재가,매입금액,평가금액,수수료,소수점구분",
+    "SOXL,디렉시온,1000,150,3,200,450,600,1,온주",
+    "SOXL,디렉시온,2000,125,7,200,875,1400,2,소수점",
+  ].join("\n");
+
+  it("한 줄로 합치고 평단을 다시 구한다", () => {
+    const { basis } = parsePositionBasisCsv(csv, { accountId: "acc", at: "2026-09-21T00:00:00Z" });
+
+    expect(basis).toHaveLength(1);
+    expect(basis[0].shares).toBe(10);
+    expect(basis[0].costBasis).toBe(1325);
+    expect(basis[0].averagePrice).toBe(132.5); // 어느 한쪽 평단(150·125)이 아니라 가중평균
+  });
+
+  it("교차검증 입력도 합산한 값으로 낸다", () => {
+    const { crossCheckInput } = parsePositionBasisCsv(csv, { accountId: "acc", at: "2026-09-21T00:00:00Z" });
+
+    expect(crossCheckInput).toHaveLength(1);
+    expect(crossCheckInput[0].value).toBe(2000);
+    expect(crossCheckInput[0].fee).toBe(3);
+    expect(crossCheckInput[0].reportedGainLoss).toBe(3000);
+  });
+});
