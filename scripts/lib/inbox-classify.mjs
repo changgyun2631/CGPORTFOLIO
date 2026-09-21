@@ -11,6 +11,8 @@
  *   - 보유종목:   scripts/lib/import-position-basis.mjs
  */
 
+import { parseCsvRows } from "./csv.mjs";
+
 /** @typedef {"account-history" | "position-basis" | "unknown"} InboxKind */
 
 /**
@@ -20,7 +22,10 @@
 export function classifyInboxCsv(decodedText) {
   if (typeof decodedText !== "string" || decodedText.trim() === "") return "unknown";
 
-  const rows = decodedText.split(/\r?\n/, 80).map((line) => line.split(","));
+  // 판별도 실제 importer와 같은 파서를 써야 한다. 예전엔 줄 단위로 잘라 쉼표로만
+  // 나눴는데, 헤더 이름에 줄바꿈이 든 CSV(키움 2167)는 한 행이 두 줄로 쪼개져
+  // 조건을 못 맞추고 "판별 못 함"으로 빠졌다(2026-09-21).
+  const rows = parseCsvRows(decodedText).slice(0, 80);
 
   const isAccountHistory = rows.some(
     (row) => row.includes("일자") && row.includes("예탁자산") && row.includes("입금") && row.includes("출금"),

@@ -37,3 +37,30 @@ describe("parseNumber", () => {
     expect(parseNumber(undefined)).toBe(0);
   });
 });
+
+describe("parseCsvRows — 따옴표 안의 줄바꿈", () => {
+  // 증권사 CSV는 헤더 이름에 줄바꿈을 넣어 내보내기도 한다(키움 2167 화면).
+  // 줄바꿈으로 먼저 자르면 한 행이 두 줄로 쪼개져 열을 못 찾는다(2026-09-21).
+  it("따옴표 안 줄바꿈은 값의 일부로 두고 한 행으로 읽는다", () => {
+    const csv = '일자,예탁자산,"유가증권\n 평가금",입금,출금';
+    expect(parseCsvRows(csv)).toEqual([["일자", "예탁자산", "유가증권\n 평가금", "입금", "출금"]]);
+  });
+
+  it("따옴표 밖 줄바꿈에서는 행을 끊는다", () => {
+    expect(parseCsvRows("a,b\nc,d")).toEqual([
+      ["a", "b"],
+      ["c", "d"],
+    ]);
+  });
+
+  it("CRLF와 빈 줄을 섞어도 행 수가 맞는다", () => {
+    expect(parseCsvRows('a,"x\r\ny"\r\n\r\nb,c')).toEqual([
+      ["a", "x\r\ny"],
+      ["b", "c"],
+    ]);
+  });
+
+  it("값 안의 이스케이프된 따옴표(\"\")를 유지한다", () => {
+    expect(parseCsvRows('a,"he said ""hi"""')).toEqual([["a", 'he said "hi"']]);
+  });
+});

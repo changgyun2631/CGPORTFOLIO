@@ -48,9 +48,48 @@ export function parseCsvLine(line) {
   return fields;
 }
 
-/** 디코딩된 CSV 전체 텍스트를 줄 단위 필드 배열로 쪼갠다. */
+/**
+ * 디코딩된 CSV 전체 텍스트를 줄 단위 필드 배열로 쪼갠다.
+ *
+ * 줄바꿈으로 먼저 자르면 안 된다 — 증권사 CSV는 헤더 이름에 줄바꿈을 넣어
+ * 내보내는 경우가 있다(키움 2167 화면: `일자,예탁자산,"유가증권\n 평가금",...`).
+ * 그렇게 자르면 한 행이 두 줄로 쪼개져 "입금·출금 열을 찾지 못했습니다"로
+ * 가져오기가 통째로 실패한다(2026-09-21 실제로 겪음). 따옴표 안의 줄바꿈은
+ * 값의 일부로 두고, 따옴표 밖의 줄바꿈에서만 행을 끊는다.
+ */
 export function parseCsvRows(decodedText) {
-  return decodedText.split(/\r?\n/).filter(Boolean).map(parseCsvLine);
+  const rows = [];
+  let line = "";
+  let quoted = false;
+
+  const flush = () => {
+    if (line !== "") rows.push(parseCsvLine(line));
+    line = "";
+  };
+
+  for (let i = 0; i < decodedText.length; i += 1) {
+    const char = decodedText[i];
+    if (char === '"') {
+      // 따옴표 두 개("")는 값 안의 따옴표다 — 상태를 뒤집지 않고 그대로 넘긴다.
+      if (quoted && decodedText[i + 1] === '"') {
+        line += '""';
+        i += 1;
+        continue;
+      }
+      quoted = !quoted;
+      line += char;
+      continue;
+    }
+    if (!quoted && (char === "\n" || char === "\r")) {
+      if (char === "\r" && decodedText[i + 1] === "\n") i += 1;
+      flush();
+      continue;
+    }
+    line += char;
+  }
+  flush();
+
+  return rows;
 }
 
 /** "1,234", "12%", " 500 " 같은 표기를 숫자로 만든다. 빈 값은 0. */

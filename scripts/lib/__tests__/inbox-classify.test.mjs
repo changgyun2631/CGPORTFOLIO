@@ -47,3 +47,19 @@ describe("classifyInboxCsv", () => {
     expect(classifyInboxCsv(csv)).toBe("account-history");
   });
 });
+
+describe("헤더 이름에 줄바꿈이 든 CSV", () => {
+  // 판별기가 줄 단위로만 보던 시절엔 이런 파일이 "판별 못 함"으로 빠졌다 —
+  // 일자·예탁자산과 입금·출금이 서로 다른 줄로 쪼개졌기 때문이다(2026-09-21).
+  it("계좌수익률로 알아본다", () => {
+    const csv = [
+      "Version=1.0,,,,,,,,,,,,,",
+      '일자,예탁자산,"유가증권',
+      ' 평가금",매수금,입금,출금,"수수료',
+      ' +세금",손익',
+      "2026-09-18,1000,900,0,0,0,0,0",
+    ].join("\n");
+
+    expect(classifyInboxCsv(csv)).toBe("account-history");
+  });
+});
