@@ -54,7 +54,13 @@ function positionBasisCsv(rows: string[]): File {
 }
 
 function writeFixtures(dir: string) {
-  writeFileSync(join(dir, "accounts.json"), JSON.stringify([{ id: "acc-1", name: "테스트", kind: "위탁", currency: "USD" }]));
+  writeFileSync(
+    join(dir, "accounts.json"),
+    JSON.stringify([
+      { id: "acc-1", name: "테스트", kind: "위탁", currency: "USD" },
+      { id: "acc-2", name: "테스트2", kind: "위탁", currency: "USD" },
+    ]),
+  );
   writeFileSync(
     join(dir, "symbols.json"),
     JSON.stringify([{ id: "QLD", name: "QLD", kind: "etf", currency: "USD", market: "US" }]),
@@ -94,6 +100,49 @@ describe("position-basis-actions", () => {
     // 적용 직전 자동 백업이 실제로 만들어졌는지.
     const backups = readdirSync(backupRoot);
     expect(backups.length).toBeGreaterThan(0);
+  });
+
+  it("다른 계좌의 기준값은 건드리지 않는다 — 올린 계좌 줄만 갈아끼운다", async () => {
+    // 한 계좌 CSV로 파일 전체를 덮어써서 다른 계좌 보유가 통째로 날아간 적이 있다(2026-09-21).
+    writeFileSync(
+      join(dataDir, "position-basis.json"),
+      JSON.stringify([
+        { at: "2026-01-01T00:00:00Z", accountId: "acc-2", symbolId: "QLD", shares: 5, averagePrice: 100, costBasis: 500 },
+      ]),
+    );
+
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    form.set("file", positionBasisCsv(["test,QLD,10,1000,10000,12000,1998,2"]));
+    const preview = await previewPositionBasis(form);
+    expect(await applyPositionBasis(preview.token)).toMatchObject({ ok: true });
+
+    const written = JSON.parse(readFileSync(join(dataDir, "position-basis.json"), "utf8"));
+    const byAccount = Object.fromEntries(
+      ["acc-1", "acc-2"].map((id) => [id, written.filter((row: { accountId: string }) => row.accountId === id)]),
+    );
+    expect(byAccount["acc-2"]).toHaveLength(1); // 남의 계좌는 그대로
+    expect(byAccount["acc-2"][0].shares).toBe(5);
+    expect(byAccount["acc-1"]).toHaveLength(1); // 올린 계좌만 새 값
+  });
+
+  it("같은 계좌를 다시 올리면 이전 값을 대체한다(중복으로 쌓이지 않는다)", async () => {
+    writeFileSync(
+      join(dataDir, "position-basis.json"),
+      JSON.stringify([
+        { at: "2026-01-01T00:00:00Z", accountId: "acc-1", symbolId: "QLD", shares: 999, averagePrice: 1, costBasis: 999 },
+      ]),
+    );
+
+    const form = new FormData();
+    form.set("accountId", "acc-1");
+    form.set("file", positionBasisCsv(["test,QLD,10,1000,10000,12000,1998,2"]));
+    const preview = await previewPositionBasis(form);
+    expect(await applyPositionBasis(preview.token)).toMatchObject({ ok: true });
+
+    const written = JSON.parse(readFileSync(join(dataDir, "position-basis.json"), "utf8"));
+    expect(written).toHaveLength(1);
+    expect(written[0].shares).toBe(10);
   });
 
   it("클라이언트가 검증 실패 상태로 apply를 직접 불러도(우회 시도) 서버가 막고 기존 데이터를 보존한다", async () => {

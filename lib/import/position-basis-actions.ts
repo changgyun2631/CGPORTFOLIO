@@ -126,9 +126,20 @@ export async function applyPositionBasis(token: string): Promise<ApplyResult> {
       if (validationErrors.length > 0) return { ok: false, errors: validationErrors };
 
       backupData(dataDir, backupRoot);
-      writeJsonAtomic(join(dataDir, "position-basis.json"), `${JSON.stringify(staged.basis, null, 2)}\n`);
+      // 올린 CSV는 **한 계좌의** 잔고다. 파일 전체를 이걸로 덮으면 다른 계좌의
+      // 기준값이 사라진다(2026-09-21에 CLI 쪽에서 실제로 그렇게 날아갔다).
+      // 이 계좌 줄만 갈아끼우고 나머지 계좌는 그대로 둔다.
+      // 아직 기준값 파일이 없는 첫 가져오기라면 이번 것이 전부다.
+      let existing: PositionBasis[] = [];
+      try {
+        existing = readJson<PositionBasis[]>("position-basis.json");
+      } catch {
+        existing = [];
+      }
+      const next = [...existing.filter((row) => row.accountId !== staged.accountId), ...staged.basis];
+      writeJsonAtomic(join(dataDir, "position-basis.json"), `${JSON.stringify(next, null, 2)}\n`);
 
-      return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다.` };
+      return { ok: true, message: `현재 잔고 기준 ${staged.basis.length}종목을 반영했습니다(계좌 ${staged.accountId}).` };
     });
   } catch (error) {
     // 잠금 획득·백업·쓰기 자체가 실패한 경우(위 return들과 달리 예기치 못한 예외) —

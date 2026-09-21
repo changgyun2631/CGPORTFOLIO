@@ -79,8 +79,29 @@ if (validationErrors.length > 0) {
 }
 
 const target = join(dataDir, flags.replace ? "position-basis.json" : "out-position-basis.json");
-const write = () => writeJsonAtomic(target, `${JSON.stringify(basis, null, 2)}\n`);
+
+/**
+ * 이 CSV는 **한 계좌의** 잔고다. 파일 전체를 이 계좌 값으로 덮어쓰면 다른 계좌의
+ * 기준값이 통째로 사라진다 — 계좌가 하나뿐일 땐 티가 안 났지만, 계좌를 늘린 뒤
+ * 바로 사고가 났다(2026-09-21: kiwoom-2 잔고를 넣었더니 메인 계좌 28종목이
+ * 날아가 백업에서 되살렸다). 대상 계좌의 줄만 갈아끼우고 나머지는 그대로 둔다.
+ */
+function mergeIntoExisting(incoming) {
+  let existing = [];
+  try {
+    existing = JSON.parse(readFileSync(target, "utf8"));
+  } catch {
+    return incoming; // 파일이 아직 없으면 이번 것이 전부다.
+  }
+  const kept = existing.filter((row) => row.accountId !== accountId);
+  return [...kept, ...incoming];
+}
+
+const write = () => {
+  const next = flags.replace ? mergeIntoExisting(basis) : basis;
+  writeJsonAtomic(target, `${JSON.stringify(next, null, 2)}\n`);
+};
 if (flags.replace) withDataLock(dataDir, write);
 else write();
-console.log(`현재 잔고 기준 ${basis.length}종목을 ${target}에 저장했습니다.`);
+console.log(`현재 잔고 기준 ${basis.length}종목을 ${target}에 저장했습니다(계좌 ${accountId}).`);
 if (!flags.replace) console.log("검토 후 --replace를 붙이면 실제 화면 기준값으로 반영됩니다.");
