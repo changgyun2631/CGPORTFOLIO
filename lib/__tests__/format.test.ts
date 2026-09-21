@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dateLabel, shortDateTime } from "../format";
+import { dateLabel, daysHeld, daysHeldLabel, shortDateTime } from "../format";
 
 describe("dateLabel", () => {
   it("날짜만 있는 문자열은 그대로 쓴다", () => {
@@ -13,5 +13,38 @@ describe("dateLabel", () => {
       const [month, day] = shortDateTime(iso).split(" ")[0].split("/");
       expect(dateLabel(iso).slice(5)).toBe(`${month}-${day}`);
     }
+  });
+});
+
+describe("daysHeld", () => {
+  const now = new Date("2026-09-21T10:00:00+09:00");
+
+  it("달력 날짜끼리 센다 — 어제 산 것은 시각과 무관하게 1일이다", () => {
+    expect(daysHeld("2026-09-20T23:50:00+09:00", now)).toBe(1);
+  });
+
+  it("같은 날이면 0일이다", () => {
+    expect(daysHeld("2026-09-21T01:00:00+09:00", now)).toBe(0);
+  });
+
+  it("1년 전이면 365일이다", () => {
+    expect(daysHeld("2025-09-21T09:30:00+09:00", now)).toBe(365);
+  });
+});
+
+describe("daysHeldLabel", () => {
+  const now = new Date("2026-09-21T10:00:00+09:00");
+
+  it("오늘 산 것은 0일 대신 '오늘'로 적는다", () => {
+    expect(daysHeldLabel("2026-09-21T09:30:00+09:00", now)).toBe("오늘");
+  });
+
+  it("긴 기간은 천 단위로 끊어 읽기 쉽게 한다", () => {
+    expect(daysHeldLabel("2022-09-21T09:30:00+09:00", now)).toBe("1,461일");
+  });
+
+  it("취득 기록이 없으면 줄표로 둔다 — 0일로 적으면 오늘 산 것처럼 보인다", () => {
+    expect(daysHeldLabel(null, now)).toBe("—");
+    expect(daysHeldLabel("날짜 아님", now)).toBe("—");
   });
 });

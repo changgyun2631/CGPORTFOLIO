@@ -52,6 +52,24 @@ export function shortDateTime(iso: string) {
  * 앞 10자만 자르면 `Z` 쪽이 하루 어긋났다 — 같은 시점을 `shortDateTime`은 09/17,
  * 이 함수는 09/16으로 표시하던 문제.
  */
+/**
+ * 그날부터 오늘까지 며칠인가. 달력 날짜끼리 세므로, 어제 산 것은 시:분과 무관하게
+ * 1일이다(시각까지 빼면 23시간 59분이 0일로 나온다).
+ */
+export function daysHeld(iso: string, now: Date = new Date()) {
+  const startOfDay = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.floor((startOfDay(now) - startOfDay(new Date(iso))) / 86_400_000);
+  return Number.isFinite(days) ? Math.max(days, 0) : null;
+}
+
+/** "412일" · 오늘 산 것은 "오늘". 앞의 숫자만 보고도 길이를 가늠하게 한다. */
+export function daysHeldLabel(iso: string | null | undefined, now: Date = new Date()) {
+  if (!iso || Number.isNaN(Date.parse(iso))) return "—";
+  const days = daysHeld(iso, now);
+  if (days === null) return "—";
+  return days === 0 ? "오늘" : `${days.toLocaleString("ko-KR")}일`;
+}
+
 export function dateLabel(iso: string) {
   if (!/\d{2}:\d{2}/.test(iso)) return iso.slice(0, 10);
   const d = new Date(iso);

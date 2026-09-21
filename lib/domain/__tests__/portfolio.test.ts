@@ -4,6 +4,7 @@ import {
   applyPositionBasis,
   buildCashBalances,
   buildCashFlowLedger,
+  buildHoldingStart,
   buildPortfolio,
   buildPositions,
 } from "../portfolio";
@@ -364,5 +365,78 @@ describe("annotateTradesWithRealized", () => {
     const annotated = annotateTradesWithRealized(transactions);
     expect(annotated.find((a) => a.id === "3")!.realized).toBeCloseTo(200);
     expect(annotated.find((a) => a.id === "4")!.realized).toBeCloseTo(-50);
+  });
+});
+
+describe("buildHoldingStart", () => {
+  const key = "acc1::QLD";
+
+  it("처음 산 날을 보유 시작일로 잡는다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2025-03-04T09:30:00+09:00", side: "buy", shares: 3, price: 10 }),
+      tx({ id: "b", at: "2025-06-01T09:30:00+09:00", side: "buy", shares: 2, price: 12 }),
+    ]);
+    expect(start.get(key)).toBe("2025-03-04T09:30:00+09:00");
+  });
+
+  it("일부만 팔면 기준일이 그대로다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2025-03-04T09:30:00+09:00", side: "buy", shares: 5, price: 10 }),
+      tx({ id: "b", at: "2025-06-01T09:30:00+09:00", side: "sell", shares: 2, price: 12 }),
+    ]);
+    expect(start.get(key)).toBe("2025-03-04T09:30:00+09:00");
+  });
+
+  it("전량 판 뒤 다시 사면 다시 산 날이 기준이다", () => {
+    // 몇 년 전에 한 번 샀다는 이유로 보유기간이 부풀면 안 된다.
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2023-01-02T09:30:00+09:00", side: "buy", shares: 5, price: 10 }),
+      tx({ id: "b", at: "2024-05-02T09:30:00+09:00", side: "sell", shares: 5, price: 12 }),
+      tx({ id: "c", at: "2026-02-10T09:30:00+09:00", side: "buy", shares: 1, price: 20 }),
+    ]);
+    expect(start.get(key)).toBe("2026-02-10T09:30:00+09:00");
+  });
+
+  it("전량 팔고 그대로면 기준일이 없다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2025-03-04T09:30:00+09:00", side: "buy", shares: 5, price: 10 }),
+      tx({ id: "b", at: "2025-06-01T09:30:00+09:00", side: "sell", shares: 5, price: 12 }),
+    ]);
+    expect(start.has(key)).toBe(false);
+  });
+
+  it("이체입고도 취득으로 본다 — 그날부터 들고 있는 것이다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2025-04-01T09:30:00+09:00", side: "buy", action: "transfer", shares: 4, price: 10 }),
+    ]);
+    expect(start.get(key)).toBe("2025-04-01T09:30:00+09:00");
+  });
+
+  it("전량 매도+재매수 두 줄로 저장된 액면분할도 기준일을 리셋하지 않는다", () => {
+    // 지금 저장된 원장이 이 모양이다 — action 없이 적요로만 분할임을 밝힌다.
+    // 그대로 접으면 수량이 한 번 0이 되어 분할한 날이 취득일이 돼 버린다.
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2023-05-02T09:30:00+09:00", side: "buy", shares: 5, price: 100 }),
+      tx({ id: "b", at: "2025-11-20T00:00:00+09:00", side: "sell", shares: 5, price: 143, note: "2:1 액면분할 - 공시된 분할 전 수량(실제 매도 아님)" }),
+      tx({ id: "c", at: "2025-11-20T00:00:01+09:00", side: "buy", shares: 10, price: 71, note: "2:1 액면분할 - 공시된 분할 후 수량(실제 매수 아님)" }),
+      tx({ id: "d", at: "2026-01-05T09:30:00+09:00", side: "sell", shares: 4, price: 80 }),
+    ]);
+    expect(start.get(key)).toBe("2023-05-02T09:30:00+09:00");
+  });
+
+  it("액면분할은 수량만 바꾸고 기준일은 건드리지 않는다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "a", at: "2025-03-04T09:30:00+09:00", side: "buy", shares: 5, price: 100 }),
+      tx({ id: "b", at: "2025-11-20T09:30:00+09:00", side: "buy", action: "split", shares: 10, price: 0, splitRatio: 2 }),
+    ]);
+    expect(start.get(key)).toBe("2025-03-04T09:30:00+09:00");
+  });
+
+  it("기록 순서가 뒤섞여 들어와도 시간순으로 본다", () => {
+    const start = buildHoldingStart([
+      tx({ id: "b", at: "2025-06-01T09:30:00+09:00", side: "buy", shares: 2, price: 12 }),
+      tx({ id: "a", at: "2025-03-04T09:30:00+09:00", side: "buy", shares: 3, price: 10 }),
+    ]);
+    expect(start.get(key)).toBe("2025-03-04T09:30:00+09:00");
   });
 });

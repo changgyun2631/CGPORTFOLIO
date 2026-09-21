@@ -5,7 +5,7 @@ import { colorFor } from "@/components/dashboard/palette";
 import { Card, PageTitle, Section, WeightBar } from "@/components/ui/primitives";
 import { loadAccountSummary, loadPortfolio } from "@/lib/data/views";
 import { buildCashFlowLedger } from "@/lib/domain/portfolio";
-import { money, percent, shares as fmtShares, shortDateTime } from "@/lib/format";
+import { dateLabel, daysHeldLabel, money, percent, shares as fmtShares, shortDateTime } from "@/lib/format";
 
 export const metadata: Metadata = { title: "계좌" };
 export const dynamic = "force-dynamic";
@@ -115,6 +115,14 @@ export default async function AccountsPage() {
                       <span className="min-w-0 flex-1 truncate text-faint">{holding.name}</span>
                       <span className="tnum shrink-0 text-muted">
                         {holding.kind === "cash" ? "—" : `${fmtShares(holding.shares)}주`}
+                      </span>
+                      {/* 지금 물량을 들고 있기 시작한 날로부터 며칠인지. 전량 판 뒤 다시
+                          샀으면 다시 산 날이 기준이다. 원장에 매수 기록이 없으면 "—". */}
+                      <span
+                        className="tnum w-[58px] shrink-0 text-right text-faint"
+                        title={holding.heldSince ? `${dateLabel(holding.heldSince)}부터 보유` : "원장에 취득 기록이 없습니다"}
+                      >
+                        {holding.kind === "cash" ? "—" : daysHeldLabel(holding.heldSince)}
                       </span>
                       <span className="tnum w-[110px] shrink-0 text-right font-semibold">{money(holding.valueKrw)}</span>
                     </li>

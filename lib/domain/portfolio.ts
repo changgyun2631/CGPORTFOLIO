@@ -471,7 +471,57 @@ export function buildPortfolio(input: BuildHoldingsInput): PortfolioView {
 }
 
 /** 계좌별 평가금액 집계. 계좌 화면과 대시보드 하단 막대에서 쓴다. */
-export function summarizeAccounts(accounts: Account[], holdings: Holding[]) {
+/**
+ * 계좌×종목별로 **지금 들고 있는 물량을 언제부터 들고 있었는지** 찾는다.
+ *
+ * 원장을 시간순으로 접으면서 보유수량이 0에서 플러스로 바뀐 순간을 기억하고,
+ * 다시 0이 되면 지운다. 그래서 전량 매도한 뒤 다시 산 종목은 **다시 산 날**이
+ * 기준이다 — 예전에 한 번 샀다는 이유로 보유기간이 몇 년으로 부풀지 않는다.
+ *
+ * 이체입고(`transfer`)도 취득으로 본다 — 실제로 그날부터 들고 있는 것이다.
+ *
+ * 액면분할은 수량만 바뀌므로 기준일을 건드리지 않는다. `action: "split"`뿐 아니라
+ * **적요가 액면분할인 매도·매수 한 쌍**도 같이 걸러야 한다 — 지금 저장된 원장은
+ * 분할을 "전량 매도 + 재매수" 두 줄로 담고 있어서(16-4절: `action`이 채워진 적이
+ * 없다), 그대로 접으면 보유수량이 한 번 0이 되어 **분할한 날이 취득일로 리셋된다**
+ * (실제로 QLD가 몇 년 보유인데 분할일 기준 305일로 나왔다).
+ *
+ * **원장이 계좌 개설 시점까지 닿지 않으면 실제보다 짧게 나온다** — 조회 기간
+ * 이전부터 들고 있던 물량은 원장에 매수 기록이 없다.
+ */
+export function buildHoldingStart(transactions: Transaction[]): Map<string, string> {
+  const ordered = [...transactions].sort((a, b) => a.at.localeCompare(b.at));
+  const shares = new Map<string, number>();
+  const since = new Map<string, string>();
+
+  for (const tx of ordered) {
+    const key = `${tx.accountId}::${tx.symbolId}`;
+    const before = shares.get(key) ?? 0;
+    const action = tx.action ?? "trade";
+
+    if (action === "split") {
+      shares.set(key, before * (tx.splitRatio ?? 1));
+      continue;
+    }
+
+    if (/액면분할/.test(tx.note ?? "")) {
+      // 분할 전 수량(매도 줄)은 그냥 넘기고, 분할 후 수량(매수 줄)으로 갈아끼운다.
+      // 둘 다 실제 매매가 아니므로 취득일은 손대지 않는다.
+      if (tx.side === "buy") shares.set(key, tx.shares);
+      continue;
+    }
+
+    const after = tx.side === "buy" ? before + tx.shares : Math.max(before - tx.shares, 0);
+    shares.set(key, after);
+
+    if (before <= EPSILON && after > EPSILON) since.set(key, tx.at);
+    else if (after <= EPSILON) since.delete(key);
+  }
+
+  return since;
+}
+
+export function summarizeAccounts(accounts: Account[], holdings: Holding[], heldSince?: Map<string, string>) {
   const totals = new Map<string, number>();
   for (const holding of holdings) {
     for (const line of holding.byAccount) {
@@ -491,7 +541,15 @@ export function summarizeAccounts(accounts: Account[], holdings: Holding[]) {
           .filter((h) => h.byAccount.some((line) => line.accountId === account.id))
           .map((h) => {
             const line = h.byAccount.find((l) => l.accountId === account.id)!;
-            return { symbolId: h.symbolId, name: h.name, shares: line.shares, valueKrw: line.valueKrw, kind: h.kind };
+            return {
+              symbolId: h.symbolId,
+              name: h.name,
+              shares: line.shares,
+              valueKrw: line.valueKrw,
+              kind: h.kind,
+              /** 지금 물량을 들고 있기 시작한 날. 원장에 매수 기록이 없으면 없다. */
+              heldSince: heldSince?.get(`${account.id}::${h.symbolId}`) ?? null,
+            };
           })
           .sort((a, b) => b.valueKrw - a.valueKrw),
       };

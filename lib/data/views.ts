@@ -8,7 +8,7 @@ import { summarizeDividends } from "@/lib/domain/dividends";
 import { positionValuesAsOf, qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
 import { analyzeSeries, cashflowAdjustedDrawdown, filterSnapshots } from "@/lib/domain/metrics";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
-import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
+import { annotateTradesWithRealized, buildHoldingStart, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
 import { summarizeRealizedByYear } from "@/lib/domain/realized-tax";
 import type { PointInTime } from "@/lib/domain/weekly-report";
 
@@ -123,8 +123,8 @@ export const loadPortfolio = cache(async () => {
 });
 
 export const loadAccountSummary = cache(async () => {
-  const { accounts, holdings } = await loadPortfolio();
-  return summarizeAccounts(accounts, holdings);
+  const { accounts, holdings, transactions } = await loadPortfolio();
+  return summarizeAccounts(accounts, holdings, buildHoldingStart(transactions));
 });
 
 export const loadAssetMap = cache(async () => {
