@@ -31,6 +31,12 @@
   --fx: #f0a04b;
 
   --grid: #1a2130;
+
+  /* UPDATE 표기 전용 형광 그라데이션. 다크에서 네온으로 보이게 채도를 높게 잡는다. */
+  --neon-from: #22d3ee;
+  --neon-via: #4f8cff;
+  --neon-to: #c084fc;
+  --neon-glow: rgba(79, 140, 255, 0.45);
 }
 
 :root[data-theme="light"] {
@@ -55,6 +61,12 @@
   --flat: #5b6678;
 
   --fx: #c2701b;
+
+  /* 흰 바탕에서는 같은 색이 너무 옅어 안 읽힌다 — 한 단계 어둡게 잡고 발광은 뺀다. */
+  --neon-from: #0891b2;
+  --neon-via: #2563eb;
+  --neon-to: #7c3aed;
+  --neon-glow: transparent;
 
   --grid: #e8edf4;
 }
@@ -103,6 +115,18 @@ body {
 }
 
 /* 숫자는 항상 같은 폭으로 흐르게 해서 표가 흔들리지 않도록 한다. */
+/**
+ * 그라데이션을 글자 모양에 입히고 은은한 발광을 얹는다. 배경을 글자로 잘라내는
+ * 방식이라 `color`는 투명이어야 한다 — 그래서 글자색을 따로 주면 안 보인다.
+ */
+.neon-text {
+  background-image: linear-gradient(90deg, var(--neon-from), var(--neon-via), var(--neon-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 6px var(--neon-glow));
+}
+
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum";

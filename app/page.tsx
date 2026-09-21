@@ -59,22 +59,24 @@ export default async function DashboardPage() {
     <div className="space-y-10">
       <PageTitle
         title="대시보드"
-        description={`보유 자산 ${totals.symbolCount}개 · ${totals.accountCount}개 계좌`}
+        aside={`보유 자산 ${totals.symbolCount}개 · ${totals.accountCount}개 계좌`}
+        action={
+          <div className="flex flex-col items-end gap-1.5">
+            {/* 갱신 시각은 여기 한 곳에만 적는다. 제목 줄과 배지에도 같은 시각이 또
+                나와서 셋이 몇 분씩 어긋난 채 나란히 보였다(2026-09-21 사용자 지적).
+                항목별 기준 시각은 마우스를 올리면 나오고, 늦어진 항목만 아래 배지가 따로 알린다. */}
+            <p
+              className="tnum neon-text text-xs font-bold tracking-wide"
+              title={freshness
+                .map((check) => `${check.label} 기준 ${check.asOf ? shortDateTime(check.asOf) : "없음"}`)
+                .join(" · ")}
+            >
+              UPDATE : {dateTimeLabel(fx.asOf)}
+            </p>
+            <FreshnessBadges checks={freshness} />
+          </div>
+        }
       />
-      <div className="-mt-4 mb-6 flex flex-wrap items-center gap-x-3 gap-y-2">
-        {/* 갱신 시각은 여기 한 곳에만 적는다. 제목 줄과 배지에도 같은 시각이 또
-            나와서 셋이 몇 분씩 어긋난 채 나란히 보였다(2026-09-21 사용자 지적).
-            항목별 기준 시각은 마우스를 올리면 나오고, 늦어진 항목은 아래 배지가 따로 알린다. */}
-        <p
-          className="tnum text-xs font-semibold tracking-wide text-muted"
-          title={freshness
-            .map((check) => `${check.label} 기준 ${check.asOf ? shortDateTime(check.asOf) : "없음"}`)
-            .join(" · ")}
-        >
-          UPDATE : <span className="text-text">{dateTimeLabel(fx.asOf)}</span>
-        </p>
-        <FreshnessBadges checks={freshness} />
-      </div>
 
       <TickerStrip holdings={holdings} />
 

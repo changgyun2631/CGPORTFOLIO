@@ -45,11 +45,34 @@ export function Section({
   );
 }
 
-export function PageTitle({ title, description }: { title: string; description?: string }) {
+/**
+ * 페이지 제목.
+ *
+ * - `aside`: 제목 바로 옆에 붙는 한 줄(보유 개수처럼 제목을 꾸미는 값).
+ * - `description`: 제목 아래 설명문.
+ * - `action`: 오른쪽 위로 밀어내는 것(갱신 시각처럼 페이지 전체에 걸리는 표시).
+ */
+export function PageTitle({
+  title,
+  description,
+  aside,
+  action,
+}: {
+  title: string;
+  description?: string;
+  aside?: ReactNode;
+  action?: ReactNode;
+}) {
   return (
-    <div className="mb-6">
-      <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h1>
-      {description ? <p className="mt-1.5 text-sm text-muted">{description}</p> : null}
+    <div className="mb-6 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+      <div>
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{title}</h1>
+          {aside ? <span className="text-sm text-muted">{aside}</span> : null}
+        </div>
+        {description ? <p className="mt-1.5 text-sm text-muted">{description}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
