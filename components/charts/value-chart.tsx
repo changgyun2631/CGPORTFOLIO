@@ -16,6 +16,8 @@ import { dateLabel, money, moneySigned, percent, percentSigned, shortDateTime } 
 
 const WIDTH = 1000;
 const HEIGHT = 300;
+/** 그리는 점의 상한. 5년 × 365일보다 넉넉히 잡아 하루 한 점을 솎지 않게 한다. */
+const MAX_POINTS = 2000;
 const PAD = { top: 16, right: 44, bottom: 26, left: 44 };
 
 export type { ChartTrade };
@@ -51,8 +53,11 @@ export function ValueChart({
     useMemo(() => {
     const { snapshots: filtered, usedFallback, shortOfRange } = filterSnapshots(snapshots, range);
     const stats = analyzeSeries(filtered);
-    // 점이 많으면 솎아내되 최고점과 최저점은 반드시 남긴다.
-    const series = downsample(filtered, 260, (s) => s.at === stats.peak?.at || s.at === stats.trough?.at);
+    // 긴 구간은 filterSnapshots가 이미 하루 한 점으로 접어 오므로 날짜를 더 솎지
+    // 않는다 — 연중·1년에서도 하루가 한 점이어야 자세히 볼 수 있다. 상한은 5년치
+    // 하루 한 점을 넘는 비정상적인 경우만 막는 안전장치이고, 그때도 최고점과
+    // 최저점은 반드시 남긴다.
+    const series = downsample(filtered, MAX_POINTS, (s) => s.at === stats.peak?.at || s.at === stats.trough?.at);
 
     const values = series.map((s) => s.totalKrw);
     // 원금(순입금 누적)도 같은 축에 선으로 그리므로, 원금이 평가금액 범위를 벗어나면
@@ -211,9 +216,9 @@ export function ValueChart({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         <p className="text-xs text-faint">
           {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
-          {/* 그린 점(series)이 아니라 구간에 있는 스냅샷 수다 — 점이 많으면 솎아서
-              그리므로 둘이 다르고, 아래 지표는 솎기 전 전체로 계산한다. 긴 구간은
-              하루 한 점으로 접은 뒤라(metrics의 collapseDaily) 사실상 날짜 수다. */}
+          {/* 구간에 있는 스냅샷 수다. 긴 구간은 하루 한 점으로 접은 뒤라(metrics의
+              collapseDaily) 사실상 날짜 수이고, 상한(MAX_POINTS)을 넘지 않는 한 그린
+              점 수와도 같다. */}
           {stats.count}개 스냅샷
           {usedFallback ? (
             <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
