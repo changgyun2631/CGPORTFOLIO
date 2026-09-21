@@ -28,6 +28,7 @@ import { spawnSync } from "node:child_process";
 
 import { trimLogFile } from "./lib/log-rotate.mjs";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
+import { refreshCalendar } from "./lib/calendar-refresh.mjs";
 import { REFRESH_EXIT, classifyFetchError, classifyJobOutcome, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
 
 loadLocalEnv();
@@ -164,6 +165,13 @@ function dataFilesTouchedSince(startedAtMs) {
 }
 
 async function main() {
+  // 기존 6시간 예약 작업에 무료 캘린더도 연결한다. 실패해도 시세 갱신은 계속한다.
+  try {
+    const calendar = await refreshCalendar();
+    log(`캘린더: 확인 ${calendar.updated}건, 실패 ${calendar.errors}건`);
+  } catch (error) {
+    log(`캘린더 수집 실패(시세 갱신 계속): ${error.message}`);
+  }
   const headers = {};
   if (secret) headers.authorization = `Bearer ${secret}`;
 

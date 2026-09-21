@@ -153,4 +153,6 @@ export type CalendarEvent = {
   kind: "earnings" | "dividend" | "macro" | "personal";
   symbolId?: string;
   note?: string;
+  /** 발표일과 관측 대상 기간은 다르다. period는 YYYY-MM(실적은 분기 종료 월). */
+  resultSource?: import("./calendar-results").CalendarResultSource;
 };

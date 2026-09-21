@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "calendar:refresh": "node scripts/refresh-calendar.mjs",
     "auth:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/setup-auth.ps1",
     "backup": "node scripts/backup-data.mjs",
     "backup:verify": "node scripts/verify-backup.mjs"

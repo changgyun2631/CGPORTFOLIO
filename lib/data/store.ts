@@ -21,6 +21,7 @@ import type {
   Transaction,
 } from "@/lib/domain/types";
 import type { GeneratedReport } from "@/lib/domain/weekly-report";
+import type { CalendarResults } from "@/lib/domain/calendar-results";
 
 /**
  * 읽기 전용 저장소.
@@ -127,11 +128,17 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
   }
 }
 
-/**
- * 예약 실행이 만든 리포트. 손으로 쓴 `reports.json`/`reports/*.md`는 저장소에
- * 커밋되지만 이쪽은 실제 평가금액·비중이 들어가므로 `.gitignore`로 막혀 있다.
- * 그래서 파일이 아직 없는 게 정상이고, 없으면 빈 목록으로 본다.
- */
+/** 공식 원천 수집 결과. 페이지에서는 외부 API를 호출하지 않는다. */
+export async function getCalendarResults(): Promise<CalendarResults | null> {
+  try {
+    const data = await readJson<CalendarResults>("calendar-results.json");
+    return data.version === 1 && data.results && typeof data.results === "object" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 예약 실행이 만든 리포트는 실제 비중·평가금액을 포함하므로 gitignore 대상이다. */
 export const getGeneratedReports = () =>
   readJson<GeneratedReport[]>("weekly-reports.json").catch(() => [] as GeneratedReport[]);
 
