@@ -42,10 +42,14 @@ const dividends = readJson("dividends.json");
 const lastAt = [...snapshots].sort((a, b) => a.at.localeCompare(b.at)).at(-1)?.at;
 if (!lastAt) throw new Error("기준이 될 스냅샷이 하나도 없습니다.");
 
-const changedSince = [...transactions, ...cashflows, ...dividends].filter((row) => Date.parse(row.at) > Date.parse(lastAt));
+// 비교는 **시각이 아니라 날짜**로 한다. 채우는 날은 마지막 스냅샷 **다음 날부터**라,
+// 같은 날 늦게 찍힌 기록(예: 15:30 스냅샷 뒤 16:32 환전정산입금)은 이미 그 다음 날
+// 수량에 반영돼 있어 문제가 없다. 시각으로 비교하면 이런 줄에 걸려 매번 거부된다.
+const lastDate = lastAt.slice(0, 10);
+const changedSince = [...transactions, ...cashflows, ...dividends].filter((row) => row.at.slice(0, 10) > lastDate);
 if (changedSince.length > 0) {
   console.error(
-    `마지막 스냅샷(${lastAt.slice(0, 10)}) 이후 장부 기록이 ${changedSince.length}건 있습니다 — ` +
+    `마지막 스냅샷(${lastDate}) 다음 날부터 장부 기록이 ${changedSince.length}건 있습니다 — ` +
       "그 사이 보유수량이 달라졌을 수 있어 과거 날짜를 채우지 않습니다.",
   );
   process.exit(1);
