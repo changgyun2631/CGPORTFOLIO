@@ -1,4 +1,4 @@
-import type { Symbol } from "./types";
+import type { Account, Symbol } from "./types";
 
 /**
  * 연도별 실현손익과 해외주식 양도소득세 추정.
@@ -30,6 +30,7 @@ function taxYearOf(iso: string): string {
 
 export type RealizedTrade = {
   at: string;
+  accountId: string;
   symbolId: string;
   /** 종목 통화 기준 실현손익(수수료 반영) */
   realized: number;
@@ -37,21 +38,31 @@ export type RealizedTrade = {
   fee?: number;
 };
 
+/**
+ * 실현손익을 과세 성격으로 가른다.
+ *  - `overseas`: 위탁 계좌의 해외주식 → 양도소득세 대상
+ *  - `domestic`: 위탁 계좌의 국내상장 → 대주주가 아니면 비과세
+ *  - `pension`: 연금저축·퇴직연금 등 세제혜택 계좌 → 매매차익에는 양도세가
+ *    안 붙는다(나중에 연금으로 받을 때 연금소득세로 과세된다)
+ */
+export type RealizedBucket = "overseas" | "domestic" | "pension";
+
 export type RealizedSymbolLine = {
   symbolId: string;
   name: string;
-  /** 해외주식이라 양도세 대상인지 */
-  overseas: boolean;
+  bucket: RealizedBucket;
   realizedKrw: number;
   tradeCount: number;
 };
 
 export type RealizedYear = {
   year: string;
-  /** 해외주식(양도세 대상) 실현손익 합계 */
+  /** 위탁 계좌의 해외주식(양도세 대상) 실현손익 합계 */
   overseasRealizedKrw: number;
-  /** 국내상장(대주주가 아니면 비과세) 실현손익 합계 */
+  /** 위탁 계좌의 국내상장(대주주가 아니면 비과세) 실현손익 합계 */
   domesticRealizedKrw: number;
+  /** 연금저축·퇴직연금 등 세제혜택 계좌의 실현손익 합계 — 양도세 계산에서 뺀다 */
+  pensionRealizedKrw: number;
   totalRealizedKrw: number;
   /**
    * 그 해 매도에서 차감한 수수료 합계(원). 증권사 실현손익 화면은 수수료를
@@ -76,10 +87,12 @@ export type RealizedYear = {
 export function summarizeRealizedByYear(input: {
   trades: RealizedTrade[];
   symbols: Symbol[];
+  accounts: Account[];
   fxRateAt: (date: string) => number;
 }): RealizedYear[] {
-  const { trades, symbols, fxRateAt } = input;
+  const { trades, symbols, accounts, fxRateAt } = input;
   const symbolById = new Map(symbols.map((symbol) => [symbol.id, symbol]));
+  const accountById = new Map(accounts.map((account) => [account.id, account]));
 
   const byYear = new Map<string, Map<string, RealizedSymbolLine>>();
   const sellCountByYear = new Map<string, number>();
@@ -96,33 +109,46 @@ export function summarizeRealizedByYear(input: {
     const realizedKrw = trade.realized * rate;
     sellFeeKrwByYear.set(year, (sellFeeKrwByYear.get(year) ?? 0) + (trade.fee ?? 0) * rate);
 
+    const bucket: RealizedBucket = accountById.get(trade.accountId)?.taxDeferred
+      ? "pension"
+      : symbol.market === "US"
+        ? "overseas"
+        : "domestic";
+
+    // 같은 종목이라도 과세 계좌와 연금 계좌에 나눠 담을 수 있어, 성격까지 키에 넣는다.
     const lines = byYear.get(year) ?? new Map<string, RealizedSymbolLine>();
-    const line = lines.get(trade.symbolId) ?? {
+    const key = `${trade.symbolId}::${bucket}`;
+    const line = lines.get(key) ?? {
       symbolId: trade.symbolId,
       name: symbol.name,
-      overseas: symbol.market === "US",
+      bucket,
       realizedKrw: 0,
       tradeCount: 0,
     };
     line.realizedKrw += realizedKrw;
     line.tradeCount += 1;
-    lines.set(trade.symbolId, line);
+    lines.set(key, line);
     byYear.set(year, lines);
     sellCountByYear.set(year, (sellCountByYear.get(year) ?? 0) + 1);
   }
 
+  const sumOf = (lines: RealizedSymbolLine[], bucket: RealizedBucket) =>
+    lines.filter((line) => line.bucket === bucket).reduce((sum, line) => sum + line.realizedKrw, 0);
+
   return [...byYear.entries()]
     .map(([year, lines]) => {
       const all = [...lines.values()].sort((a, b) => b.realizedKrw - a.realizedKrw);
-      const overseasRealizedKrw = all.filter((l) => l.overseas).reduce((sum, l) => sum + l.realizedKrw, 0);
-      const domesticRealizedKrw = all.filter((l) => !l.overseas).reduce((sum, l) => sum + l.realizedKrw, 0);
+      const overseasRealizedKrw = sumOf(all, "overseas");
+      const domesticRealizedKrw = sumOf(all, "domestic");
+      const pensionRealizedKrw = sumOf(all, "pension");
       const taxableKrw = Math.max(overseasRealizedKrw - OVERSEAS_ANNUAL_DEDUCTION_KRW, 0);
 
       return {
         year,
         overseasRealizedKrw,
         domesticRealizedKrw,
-        totalRealizedKrw: overseasRealizedKrw + domesticRealizedKrw,
+        pensionRealizedKrw,
+        totalRealizedKrw: overseasRealizedKrw + domesticRealizedKrw + pensionRealizedKrw,
         sellFeeKrw: sellFeeKrwByYear.get(year) ?? 0,
         sellCount: sellCountByYear.get(year) ?? 0,
         taxableKrw,

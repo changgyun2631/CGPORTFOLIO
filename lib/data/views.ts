@@ -177,14 +177,14 @@ export const loadChartTrades = cache(async () => {
 
 /** 연도별 실현손익과 해외주식 양도소득세 추정. */
 export const loadRealizedByYear = cache(async () => {
-  const { transactions, symbols, fxRateAt } = await loadPortfolio();
+  const { transactions, symbols, accounts, fxRateAt } = await loadPortfolio();
   // 이체·분할까지 포함한 전체 원장을 넣어야 평단이 정확하다(loadChartTrades와 같은 이유).
   const feeById = new Map(transactions.map((tx) => [tx.id, tx.fee ?? 0]));
   const trades = annotateTradesWithRealized(transactions).map((trade) => ({
     ...trade,
     fee: feeById.get(trade.id) ?? 0,
   }));
-  return summarizeRealizedByYear({ trades, symbols, fxRateAt });
+  return summarizeRealizedByYear({ trades, symbols, accounts, fxRateAt });
 });
 
 /** 최근 입출금 내역. */

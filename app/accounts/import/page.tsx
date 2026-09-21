@@ -4,6 +4,7 @@ import { AccountHistoryImportSection } from "@/components/import/account-history
 import { NormalizeLedgerImportSection } from "@/components/import/normalize-ledger-import";
 import { PositionBasisImportSection } from "@/components/import/position-basis-import";
 import { PageTitle } from "@/components/ui/primitives";
+import { getAccounts } from "@/lib/data/store";
 
 export const metadata: Metadata = { title: "CSV 가져오기" };
 
@@ -11,7 +12,9 @@ export const metadata: Metadata = { title: "CSV 가져오기" };
 // 렌더링이어야 한다(원칙은 다른 실데이터 페이지와 같다 — WORK_ORDER B 참고).
 export const dynamic = "force-dynamic";
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  const accounts = await getAccounts();
+
   return (
     <div className="space-y-8">
       <PageTitle
@@ -25,7 +28,7 @@ export default function ImportPage() {
         일도 일어나지 않습니다.
       </p>
 
-      <PositionBasisImportSection />
+      <PositionBasisImportSection accounts={accounts.map(({ id, name, broker }) => ({ id, name, broker }))} />
       <AccountHistoryImportSection />
       <NormalizeLedgerImportSection />
     </div>

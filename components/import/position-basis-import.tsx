@@ -14,7 +14,12 @@ import { ValidationList } from "./validation-list";
  * 교차검증) → 확인 → 적용(자동 백업 후 반영) 순서다. 적용 전에는 아무 파일도
  * 바뀌지 않는다.
  */
-export function PositionBasisImportSection() {
+export function PositionBasisImportSection({
+  accounts,
+}: {
+  /** 등록된 계좌 목록. 계좌 ID를 손으로 적으면 오타 하나로 엉뚱한 계좌에 들어간다. */
+  accounts: { id: string; name: string; broker?: string }[];
+}) {
   const [preview, setPreview] = useState<PositionBasisPreview | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,15 +74,25 @@ export function PositionBasisImportSection() {
         <form action={handlePreview} className="mt-4 space-y-3">
           <div>
             <label className="block text-xs font-medium text-muted" htmlFor="position-basis-account-id">
-              계좌 ID
+              계좌
             </label>
-            <input
+            <select
               id="position-basis-account-id"
               name="accountId"
               required
-              placeholder="예: brokerage-us"
+              defaultValue=""
               className="mt-1 w-full rounded-lg border border-line bg-bg px-3 py-1.5 text-sm text-text outline-none focus:border-accent"
-            />
+            >
+              <option value="" disabled>
+                계좌를 고르세요
+              </option>
+              {accounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.broker ? `${account.broker} · ` : ""}
+                  {account.name}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-muted" htmlFor="position-basis-file">

@@ -77,10 +77,20 @@ export default async function RealizedPage({ searchParams }: { searchParams: Pro
             sub={selected.taxableKrw > 0 ? `과세표준 ${money(selected.taxableKrw)} × ${percent(OVERSEAS_TAX_RATE * 100)}` : "공제 범위 안"}
           />
           <Stat
-            label="국내주식 실현손익"
-            value={moneySigned(selected.domesticRealizedKrw)}
-            tone={selected.domesticRealizedKrw >= 0 ? "up" : "down"}
-            sub="대주주가 아니면 비과세"
+            label={selected.pensionRealizedKrw !== 0 ? "연금계좌 실현손익" : "국내주식 실현손익"}
+            value={moneySigned(
+              selected.pensionRealizedKrw !== 0 ? selected.pensionRealizedKrw : selected.domesticRealizedKrw,
+            )}
+            tone={
+              (selected.pensionRealizedKrw !== 0 ? selected.pensionRealizedKrw : selected.domesticRealizedKrw) >= 0
+                ? "up"
+                : "down"
+            }
+            sub={
+              selected.pensionRealizedKrw !== 0
+                ? `양도세 비대상 · 국내주식 ${moneySigned(selected.domesticRealizedKrw)}`
+                : "대주주가 아니면 비과세"
+            }
           />
         </div>
 
@@ -123,7 +133,7 @@ export default async function RealizedPage({ searchParams }: { searchParams: Pro
                 </Link>
                 <span className="min-w-0 flex-1 truncate text-faint">{line.name}</span>
                 <span className="shrink-0 rounded border border-line px-1.5 py-0.5 text-[10px] text-faint">
-                  {line.overseas ? "해외" : "국내"}
+                  {line.bucket === "overseas" ? "해외" : line.bucket === "domestic" ? "국내" : "연금"}
                 </span>
                 <span className="tnum shrink-0 text-muted">{line.tradeCount}건</span>
                 <span className={`tnum w-[120px] shrink-0 text-right font-semibold ${line.realizedKrw >= 0 ? "text-up" : "text-down"}`}>

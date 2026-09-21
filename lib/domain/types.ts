@@ -8,6 +8,12 @@ export type Account = {
   kind: string;
   currency: Currency;
   broker?: string;
+  /**
+   * 연금저축·퇴직연금·ISA처럼 매매차익에 양도소득세가 안 붙는 계좌.
+   * `kind`가 자유 문자열이라 문자열을 보고 추측하면 오타 하나에 세금 계산이
+   * 틀어지므로, 과세 여부는 이 플래그로만 판단한다(없으면 과세 계좌로 본다).
+   */
+  taxDeferred?: boolean;
 };
 
 export type SymbolKind = "etf" | "stock" | "cash";
