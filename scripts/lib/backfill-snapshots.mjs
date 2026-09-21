@@ -12,12 +12,43 @@
  *   둘 중 하나라도 없는 날은 **건너뛴다**(지어내지 않는다).
  * - 원금은 마지막 스냅샷의 값을 그대로 이어 쓴다. 외부 입출금이 없었다는 전제다.
  *
- * **금액은 절대값으로 계산하지 않고, 마지막 스냅샷에 등락률을 곱해 만든다.**
- * 기존 스냅샷은 증권사가 적어 준 예탁자산이고 우리 계산은 종가×수량인데, 실제로
- * 대보니 둘이 늘 2%쯤 어긋났다(환율 출처·평가 시점 차이로 보인다). 절대값을 그대로
- * 이어 붙이면 이어지는 자리에 그만큼 **가짜 단차**가 생긴다. 비율로 이으면 그
- * 차이가 상쇄돼 마지막 점에서 매끄럽게 이어진다.
+ * **금액은 화면의 "총 평가금액"과 같은 방식으로 계산한다** — 종가 × 보유수량 +
+ * 예수금. 기존 스냅샷 중 계좌수익률 CSV에서 온 것은 증권사가 적어 준 예탁자산이라
+ * 우리 계산과 2%쯤 차이가 나는데, 그쪽에 맞추려고 등락률만 이어 붙여 봤더니
+ * **차트 끝점이 옆에 있는 총 평가금액과 2% 어긋나 보였다**(2026-09-21 사용자 지적).
+ * cron이 앞으로 찍을 점도 전부 우리 계산이므로, 기준을 그쪽에 맞추는 게 맞다.
+ * 그 결과 CSV 구간과 만나는 자리에 한 번 단차가 생기지만, 그건 **자료 출처가
+ * 바뀌는 지점**이라 감추지 않는 편이 낫다.
+ *
+ * 시각은 **그날 미국장 종가가 찍힌 순간**(현지 16:00)을 쓴다. 계좌수익률 CSV가
+ * 쓰는 15:30(+09:00)은 증권사가 원화 기준으로 하루를 닫는 시각이라, 미국 종목만
+ * 담긴 이 계좌에는 맞지 않는다 — 그 시각엔 미국장이 열리지도 않았다.
  */
+
+/** 그 시각의 뉴욕 시간대 오프셋(분). 서머타임은 직접 계산하지 않고 시간대 자료에 맡긴다. */
+function newYorkOffsetMinutes(instant) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+      .formatToParts(instant)
+      .map((part) => [part.type, part.value]),
+  );
+  const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute);
+  return (asUtc - instant.getTime()) / 60000;
+}
+
+/** 그날 미국장 마감(현지 16:00)을 UTC ISO로. cron이 찍는 점과 같은 표기다. */
+export function usMarketCloseIso(date) {
+  const offset = newYorkOffsetMinutes(new Date(`${date}T12:00:00Z`));
+  return new Date(Date.parse(`${date}T16:00:00Z`) - offset * 60000).toISOString();
+}
 
 /** 그날 값이 없으면 그 이전 가장 가까운 값을 쓴다(휴장일 대비). */
 function valueAt(series, date, maxLookbackDays = 7) {
@@ -73,11 +104,6 @@ export function backfillSnapshots({ snapshots, holdings, cash, prices, fxHistory
     return { value, rate: fx.rate };
   };
 
-  // 기준점: 마지막 스냅샷 날짜를 같은 방식으로 평가한 값. 이 값과의 비율만 쓴다.
-  const base = valuate(lastDate);
-  if (base.error) return { added: [], skipped: [{ date: lastDate, reason: `기준일 평가 불가 — ${base.error}` }] };
-  if (!(base.value > 0)) return { added: [], skipped: [{ date: lastDate, reason: "기준일 평가금액이 0 이하" }] };
-
   const added = [];
   const skipped = [];
   for (const date of [...candidates].sort()) {
@@ -90,9 +116,8 @@ export function backfillSnapshots({ snapshots, holdings, cash, prices, fxHistory
     }
 
     added.push({
-      // 계좌수익률 CSV가 만드는 일별 스냅샷과 같은 시각 표기를 쓴다.
-      at: `${date}T15:30:00+09:00`,
-      totalKrw: last.totalKrw * (point.value / base.value),
+      at: usMarketCloseIso(date),
+      totalKrw: point.value,
       principalKrw: last.principalKrw,
       fxRate: point.rate,
     });
