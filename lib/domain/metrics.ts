@@ -71,8 +71,43 @@ export type FilteredSnapshots = {
 /** 요청한 구간 대비 실제로 덮은 기간이 이 비율보다 짧으면 구간을 못 채운 걸로 본다. */
 const RANGE_COVERAGE_MIN = 0.7;
 
-export function filterSnapshots(snapshots: Snapshot[], range: RangeKey): FilteredSnapshots {
-  if (snapshots.length === 0) return { snapshots: [], usedFallback: false, shortOfRange: false };
+/**
+ * 장중 움직임을 그대로 보여줄 구간. 이보다 긴 구간은 하루 한 점으로 접는다.
+ * 하루 안의 여러 점이 궁금한 건 짧은 구간을 볼 때뿐이다.
+ */
+const INTRADAY_RANGES = new Set<RangeKey>(["1d", "7d"]);
+
+/** KST 달력 날짜. 스냅샷의 `at`은 `+09:00`과 `Z`가 섞여 있어 앞 10자를 자르면 하루 어긋난다. */
+function kstDate(iso: string) {
+  return new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+}
+
+/**
+ * 같은 날짜의 점을 **그날 마지막 값** 하나로 접는다.
+ *
+ * x축이 날짜가 아니라 점 순서라, 하루에 찍히는 점 수가 구간마다 다르면 그만큼
+ * 가로로 늘어난다. 지난 기록은 증권사 CSV에서 와서 하루 1개인데 예약 갱신은
+ * 거래일마다 서너 개를 찍으므로, 그대로 두면 **최근 며칠만 서너 배로 벌어진다**.
+ * 접어 두면 어느 구간이든 하루가 한 칸이다.
+ *
+ * 저장된 자료는 건드리지 않는다 — 보기만 고르는 것이라 짧은 구간에서는 장중
+ * 움직임을 그대로 볼 수 있고, 나중에 다른 방식이 필요해도 되돌릴 수 있다.
+ */
+export function collapseDaily(snapshots: Snapshot[]): Snapshot[] {
+  const byDate = new Map<string, Snapshot>();
+  for (const snapshot of snapshots) {
+    const key = kstDate(snapshot.at);
+    const kept = byDate.get(key);
+    if (!kept || Date.parse(kept.at) <= Date.parse(snapshot.at)) byDate.set(key, snapshot);
+  }
+  return [...byDate.values()].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+}
+
+export function filterSnapshots(input: Snapshot[], range: RangeKey): FilteredSnapshots {
+  if (input.length === 0) return { snapshots: [], usedFallback: false, shortOfRange: false };
+  // 접는 것은 자르기 전에 한다 — 뒤의 "마지막 N개" 대체값도 하루 단위로 세야
+  // 버튼 이름("30개 스냅샷")과 실제로 그린 점이 어긋나지 않는다.
+  const snapshots = INTRADAY_RANGES.has(range) ? input : collapseDaily(input);
   const latest = new Date(snapshots[snapshots.length - 1].at);
   const start = rangeStart(range, latest);
   if (!start) return { snapshots, usedFallback: false, shortOfRange: false };

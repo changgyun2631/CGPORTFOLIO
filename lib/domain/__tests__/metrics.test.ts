@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analyzeSeries, cashflowAdjustedDrawdown, downsample, filterSnapshots, rangeStart, ranges } from "../metrics";
+import { analyzeSeries, cashflowAdjustedDrawdown, collapseDaily, downsample, filterSnapshots, rangeStart, ranges } from "../metrics";
 import type { Snapshot } from "../types";
 
 function snap(at: string, totalKrw: number): Snapshot {
@@ -83,15 +83,16 @@ describe("filterSnapshots", () => {
     ];
 
     // "1개월"은 점이 여러 개라 fallback은 아니지만, 실제로는 이틀치만 덮는다.
+    // 뒤쪽 세 점은 한국 날짜로 09-16·09-16·09-17이라 접으면 두 점이 된다.
     const month = filterSnapshots(gapped, "1m");
     expect(month.usedFallback).toBe(false);
     expect(month.shortOfRange).toBe(true);
-    expect(month.snapshots).toHaveLength(3);
+    expect(month.snapshots).toHaveLength(2);
 
     // "3개월"은 2026-06-20까지 닿으므로 구간을 충분히 덮는다.
     const quarter = filterSnapshots(gapped, "3m");
     expect(quarter.shortOfRange).toBe(false);
-    expect(quarter.snapshots).toHaveLength(5);
+    expect(quarter.snapshots).toHaveLength(4);
   });
 
   it("1일 범위에 실제 점이 부족하면 마지막 두 관측값을 fallback으로 반환한다", () => {
@@ -364,5 +365,61 @@ describe("cashflowAdjustedDrawdown", () => {
       ]);
       expect(result.maxDrawdown).toBeCloseTo(-20, 9);
     });
+  });
+});
+
+describe("collapseDaily", () => {
+  it("같은 날짜는 그날 마지막 값만 남긴다", () => {
+    const collapsed = collapseDaily([
+      snap("2026-09-21T02:00:00+09:00", 100),
+      snap("2026-09-21T08:00:00+09:00", 110),
+      snap("2026-09-21T20:00:00+09:00", 120),
+      snap("2026-09-22T02:00:00+09:00", 130),
+    ]);
+    expect(collapsed.map((s) => s.totalKrw)).toEqual([120, 130]);
+  });
+
+  it("표기가 Z든 +09:00이든 한국 날짜로 묶는다", () => {
+    // 같은 순간을 다르게 적은 두 점이 이틀로 갈라지면 안 된다.
+    const collapsed = collapseDaily([
+      snap("2026-09-20T15:30:00+09:00", 100),
+      snap("2026-09-20T20:00:00Z", 200), // = 09-21 05:00 KST
+    ]);
+    expect(collapsed).toHaveLength(2);
+    expect(collapsed.map((s) => s.totalKrw)).toEqual([100, 200]);
+  });
+
+  it("순서가 뒤섞여 들어와도 날짜순으로 돌려준다", () => {
+    const collapsed = collapseDaily([
+      snap("2026-09-22T02:00:00+09:00", 130),
+      snap("2026-09-21T08:00:00+09:00", 110),
+    ]);
+    expect(collapsed.map((s) => s.totalKrw)).toEqual([110, 130]);
+  });
+
+  it("하루 한 점씩이면 아무것도 바뀌지 않는다", () => {
+    const daily = [snap("2026-09-19T15:30:00+09:00", 100), snap("2026-09-20T15:30:00+09:00", 105)];
+    expect(collapseDaily(daily)).toEqual(daily);
+  });
+});
+
+describe("filterSnapshots — 하루 한 점으로 접기", () => {
+  // 지난 기록은 하루 1개(증권사 CSV), 최근은 거래일마다 서너 개(예약 갱신)라
+  // 그대로 그리면 최근 며칠만 가로로 서너 배 벌어진다.
+  const mixed = [
+    snap("2026-09-17T15:30:00+09:00", 100),
+    snap("2026-09-18T15:30:00+09:00", 101),
+    snap("2026-09-19T02:00:00+09:00", 102),
+    snap("2026-09-19T08:00:00+09:00", 103),
+    snap("2026-09-19T20:00:00+09:00", 104),
+  ];
+
+  it("긴 구간은 하루 한 점으로 접는다", () => {
+    const { snapshots } = filterSnapshots(mixed, "1y");
+    expect(snapshots.map((s) => s.totalKrw)).toEqual([100, 101, 104]);
+  });
+
+  it("1일·7일은 접지 않아 장중 움직임이 그대로 보인다", () => {
+    expect(filterSnapshots(mixed, "7d").snapshots).toHaveLength(5);
   });
 });

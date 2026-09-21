@@ -211,8 +211,9 @@ export function ValueChart({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
         <p className="text-xs text-faint">
           {series.length > 0 ? `${dateLabel(series[0].at)} ~ ${dateLabel(series[series.length - 1].at)} · ` : ""}
-          {/* 그린 점(series)이 아니라 구간에 실제로 있는 스냅샷 수다 — 점이 많으면
-              솎아서 그리므로 둘이 다르고, 아래 지표는 솎기 전 전체로 계산한다. */}
+          {/* 그린 점(series)이 아니라 구간에 있는 스냅샷 수다 — 점이 많으면 솎아서
+              그리므로 둘이 다르고, 아래 지표는 솎기 전 전체로 계산한다. 긴 구간은
+              하루 한 점으로 접은 뒤라(metrics의 collapseDaily) 사실상 날짜 수다. */}
           {stats.count}개 스냅샷
           {usedFallback ? (
             <span className="ml-1.5 rounded border border-line-strong bg-bg-elevated px-1.5 py-0.5 font-medium text-muted">
