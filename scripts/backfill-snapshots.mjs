@@ -55,6 +55,21 @@ if (changedSince.length > 0) {
   process.exit(1);
 }
 
+// 장부가 채우려는 날짜보다 먼저 끝나 있으면, 그 사이 매매가 있었는지 **알 수 없다**.
+// 없다고 단정하지 않는다 — 조회 기간이 거기까지였을 뿐일 수 있다(거래내역 CSV는
+// 내려받은 날까지만 담긴다). 보유수량은 증권사 현재 잔고를 쓰므로, 그 사이 산 만큼
+// 과거 날짜가 부풀려진다. 막지는 않되 반드시 알린다.
+const lastLedgerAt = [...transactions, ...cashflows, ...dividends]
+  .map((row) => row.at)
+  .sort()
+  .at(-1);
+if (lastLedgerAt && lastLedgerAt.slice(0, 10) <= lastDate) {
+  console.warn(
+    `경고: 원장이 ${lastLedgerAt.slice(0, 10)}에서 끝납니다 — 그 뒤 매매가 있었다면 ` +
+      "채운 날짜의 보유수량이 실제보다 많습니다. 거래내역 CSV를 최신으로 다시 받으면 정확해집니다.",
+  );
+}
+
 const currencyById = new Map(symbols.map((symbol) => [symbol.id, symbol.currency]));
 const holdings = positionBasis.map((line) => ({
   symbolId: line.symbolId,
