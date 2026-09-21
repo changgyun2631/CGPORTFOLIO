@@ -126,6 +126,31 @@ describe("summarizeRealizedByYear", () => {
     expect(result).toEqual([]);
   });
 
+  it("매도 수수료를 연도별로 따로 합산한다 — 증권사 화면 대조용", () => {
+    const [year] = summarizeRealizedByYear({
+      symbols,
+      fxRateAt: () => 1300,
+      trades: [
+        { at: "2026-02-02T10:00:00+09:00", symbolId: "QLD", realized: 1000, fee: 10 },
+        { at: "2026-03-02T10:00:00+09:00", symbolId: "QLD", realized: 500, fee: 5 },
+        // 국내 종목은 환산 없이 그대로 더한다.
+        { at: "2026-04-02T10:00:00+09:00", symbolId: "491620", realized: 10_000, fee: 1_000 },
+      ],
+    });
+
+    expect(year.sellFeeKrw).toBe(10 * 1300 + 5 * 1300 + 1_000);
+  });
+
+  it("수수료 정보가 없으면 0으로 둔다", () => {
+    const [year] = summarizeRealizedByYear({
+      symbols,
+      fxRateAt: flatFx,
+      trades: [{ at: "2026-02-02T10:00:00+09:00", symbolId: "QLD", realized: 1000 }],
+    });
+
+    expect(year.sellFeeKrw).toBe(0);
+  });
+
   it("KST 기준으로 연도를 끊는다 — UTC로 끊으면 연말 거래가 전년으로 밀린다", () => {
     const [year] = summarizeRealizedByYear({
       symbols,

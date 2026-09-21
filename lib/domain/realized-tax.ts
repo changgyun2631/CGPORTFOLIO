@@ -33,6 +33,8 @@ export type RealizedTrade = {
   symbolId: string;
   /** 종목 통화 기준 실현손익(수수료 반영) */
   realized: number;
+  /** 그 매도에서 뺀 수수료(종목 통화 기준). 증권사 화면과 대조할 때 쓴다. */
+  fee?: number;
 };
 
 export type RealizedSymbolLine = {
@@ -51,6 +53,12 @@ export type RealizedYear = {
   /** 국내상장(대주주가 아니면 비과세) 실현손익 합계 */
   domesticRealizedKrw: number;
   totalRealizedKrw: number;
+  /**
+   * 그 해 매도에서 차감한 수수료 합계(원). 증권사 실현손익 화면은 수수료를
+   * 덜 빼고 보여주는 경우가 있어, 대조하려면 이 값을 도로 더해봐야 한다
+   * (매수 수수료는 취득원가에 녹아 있어 연도별로 못 가른다 — 매도분만이다).
+   */
+  sellFeeKrw: number;
   sellCount: number;
   /** 기본공제를 뺀 과세표준. 손실이면 0이다. */
   taxableKrw: number;
@@ -75,6 +83,7 @@ export function summarizeRealizedByYear(input: {
 
   const byYear = new Map<string, Map<string, RealizedSymbolLine>>();
   const sellCountByYear = new Map<string, number>();
+  const sellFeeKrwByYear = new Map<string, number>();
 
   for (const trade of trades) {
     // 매수 거래는 실현손익이 0으로 들어온다 — 집계에서 빼야 "매도 몇 건"이 맞는다.
@@ -83,8 +92,9 @@ export function summarizeRealizedByYear(input: {
     if (!symbol) continue;
 
     const year = taxYearOf(trade.at);
-    const realizedKrw =
-      symbol.currency === "USD" ? trade.realized * fxRateAt(trade.at.slice(0, 10)) : trade.realized;
+    const rate = symbol.currency === "USD" ? fxRateAt(trade.at.slice(0, 10)) : 1;
+    const realizedKrw = trade.realized * rate;
+    sellFeeKrwByYear.set(year, (sellFeeKrwByYear.get(year) ?? 0) + (trade.fee ?? 0) * rate);
 
     const lines = byYear.get(year) ?? new Map<string, RealizedSymbolLine>();
     const line = lines.get(trade.symbolId) ?? {
@@ -113,6 +123,7 @@ export function summarizeRealizedByYear(input: {
         overseasRealizedKrw,
         domesticRealizedKrw,
         totalRealizedKrw: overseasRealizedKrw + domesticRealizedKrw,
+        sellFeeKrw: sellFeeKrwByYear.get(year) ?? 0,
         sellCount: sellCountByYear.get(year) ?? 0,
         taxableKrw,
         estimatedTaxKrw: taxableKrw * OVERSEAS_TAX_RATE,

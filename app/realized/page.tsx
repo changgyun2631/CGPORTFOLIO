@@ -83,6 +83,34 @@ export default async function RealizedPage({ searchParams }: { searchParams: Pro
             sub="대주주가 아니면 비과세"
           />
         </div>
+
+        {selected.sellFeeKrw > 0 ? (
+          <Card className="mt-3">
+            <h3 className="text-[13px] font-semibold">증권사 화면과 대조하기</h3>
+            <p className="mt-1.5 text-[12px] leading-5 text-muted">
+              위 금액은 <b>매수·매도 수수료를 모두 뺀</b> 실제 손익입니다. 증권사 실현손익 화면은 수수료를 덜 빼고 보여주는
+              경우가 있어, 숫자가 안 맞으면 아래처럼 맞춰 보세요.
+            </p>
+            <dl className="tnum mt-2.5 space-y-1 border-t border-line pt-2.5 text-[12px]">
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-faint">실현손익 합계</dt>
+                <dd className="font-semibold">{moneySigned(selected.totalRealizedKrw)}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3">
+                <dt className="text-faint">＋ 차감한 매도 수수료</dt>
+                <dd className="font-semibold">{money(selected.sellFeeKrw)}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-3 border-t border-line pt-1">
+                <dt className="text-faint">＝ 매도 수수료 차감 전</dt>
+                <dd className="text-sm font-bold">{moneySigned(selected.totalRealizedKrw + selected.sellFeeKrw)}</dd>
+              </div>
+            </dl>
+            <p className="mt-2 text-[11px] leading-4 text-faint">
+              그래도 1% 안팎이 남으면 환율 출처 차이입니다 — 이 화면은 일별 종가 환율을, 증권사는 결제일 매매기준율을 씁니다.
+              매수 수수료는 취득원가에 녹아 있어 연도별로 따로 가를 수 없습니다.
+            </p>
+          </Card>
+        ) : null}
       </Section>
 
       <Section title="종목별" description={`${selected.lines.length}종목`}>
