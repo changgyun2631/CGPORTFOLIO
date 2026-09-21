@@ -90,6 +90,22 @@ function log(line) {
   }
 }
 
+/**
+ * 파일 옮기기가 실패해도 이번 주기 전체를 멈추지 않는다. 엑셀로 열어 둔 파일은
+ * 잠겨 있어 `rename`이 EBUSY로 터지는데, 예전에는 그 예외가 그대로 위로 올라가
+ * **뒤에 있던 멀쩡한 파일들까지 처리되지 않았다**(2026-09-21 실제로 잔고 CSV가
+ * 이것 때문에 통째로 밀렸다). 못 옮긴 파일은 다음 주기에 다시 만나게 된다.
+ */
+function moveAsideSafely(filePath, targetDir, name) {
+  try {
+    moveAside(filePath, targetDir, name);
+    return true;
+  } catch (error) {
+    log(`  ${name}: 옮기지 못함(${error.code ?? error.message}) — 파일을 닫으면 다음 주기에 다시 시도합니다`);
+    return false;
+  }
+}
+
 /** 같은 이름이 이미 있으면 뒤에 번호를 붙여 덮어쓰지 않는다. */
 function moveAside(filePath, targetDir, name) {
   mkdirSync(targetDir, { recursive: true });
@@ -181,7 +197,7 @@ function main() {
     // 엑셀 파일은 파서가 CSV만 다룬다. 조용히 실패시키지 않고 이유를 알려준다.
     if (extname(name).toLowerCase() !== ".csv") {
       log(`  ${name}: CSV가 아니라 처리 불가 — 증권사에서 CSV로 내보내 주세요`);
-      moveAside(filePath, failedDir, basename(name));
+      moveAsideSafely(filePath, failedDir, basename(name));
       continue;
     }
 
@@ -190,13 +206,13 @@ function main() {
       kind = classifyInboxCsv(decodeBrokerCsv(readFileSync(filePath)));
     } catch (error) {
       log(`  ${name}: 읽기 실패 — ${error.message}`);
-      moveAside(filePath, failedDir, basename(name));
+      moveAsideSafely(filePath, failedDir, basename(name));
       continue;
     }
 
     if (kind === "unknown") {
       log(`  ${name}: 어떤 가져오기인지 판별 못 함 — 건드리지 않고 실패 폴더로 옮김`);
-      moveAside(filePath, failedDir, basename(name));
+      moveAsideSafely(filePath, failedDir, basename(name));
       continue;
     }
 
@@ -209,7 +225,7 @@ function main() {
           ? `"${folder}"에 해당하는 계좌가 없음`
           : "계좌를 알 수 없음(계좌 폴더에 넣어야 합니다)";
         log(`  ${name}: 보유종목(잔고) ${reason} — 반영하지 않고 실패 폴더로 옮김`);
-        moveAside(filePath, failedDir, basename(name));
+        moveAsideSafely(filePath, failedDir, basename(name));
         continue;
       }
     }
@@ -231,10 +247,10 @@ function main() {
     const { ok, detail } = runImporter(kind, filePath, accountId);
     if (ok) {
       applied += 1;
-      moveAside(filePath, doneDir, basename(name));
+      moveAsideSafely(filePath, doneDir, basename(name));
       log(`  ${name}: ${INBOX_KIND_LABEL[kind]} 반영 완료 — ${detail}`);
     } else {
-      moveAside(filePath, failedDir, basename(name));
+      moveAsideSafely(filePath, failedDir, basename(name));
       log(`  ${name}: ${INBOX_KIND_LABEL[kind]} 반영 실패 — ${detail}`);
     }
   }
