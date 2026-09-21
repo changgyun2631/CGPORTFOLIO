@@ -18,5 +18,6 @@ export const nav = [
   { href: "/accounts", label: "계좌" },
   { href: "/symbols", label: "종목" },
   { href: "/dividends", label: "배당" },
+  { href: "/realized", label: "실현손익" },
   { href: "/reports", label: "리포트" },
 ] as const;

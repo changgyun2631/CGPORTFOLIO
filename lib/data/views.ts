@@ -9,6 +9,7 @@ import { positionValuesAsOf, qqqExposureAt, summarizeQqqExposure } from "@/lib/d
 import { analyzeSeries, cashflowAdjustedDrawdown, filterSnapshots } from "@/lib/domain/metrics";
 import { expandHoldings, groupBySector } from "@/lib/domain/lookthrough";
 import { annotateTradesWithRealized, buildPortfolio, summarizeAccounts } from "@/lib/domain/portfolio";
+import { summarizeRealizedByYear } from "@/lib/domain/realized-tax";
 import type { PointInTime } from "@/lib/domain/weekly-report";
 
 import {
@@ -172,6 +173,14 @@ export const loadChartTrades = cache(async () => {
       const realizedKrw = currency === "USD" ? realized * fxRateAt(at) : realized;
       return { at, side, symbolId, shares, price, realizedKrw };
     });
+});
+
+/** 연도별 실현손익과 해외주식 양도소득세 추정. */
+export const loadRealizedByYear = cache(async () => {
+  const { transactions, symbols, fxRateAt } = await loadPortfolio();
+  // 이체·분할까지 포함한 전체 원장을 넣어야 평단이 정확하다(loadChartTrades와 같은 이유).
+  const trades = annotateTradesWithRealized(transactions);
+  return summarizeRealizedByYear({ trades, symbols, fxRateAt });
 });
 
 /** 최근 입출금 내역. */
