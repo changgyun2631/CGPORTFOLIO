@@ -172,8 +172,21 @@ async function runRefresh(jobId: string): Promise<void> {
       const heldQuotesUnchanged =
         heldSymbolIds.size > 0 &&
         [...heldSymbolIds].every((id) => previousQuoteById.get(id)?.price === merged.get(id)?.price);
-      const unchanged = raw.snapshots.length > 0 && heldQuotesUnchanged;
+
+      // 시세가 그대로여도 장부가 바뀌었으면(매매·입출금·배당) 평가금액과 원금은
+      // 실제로 달라진다. 거래내역·입출금을 반영하는 가져오기 화면들은
+      // snapshots.json을 직접 건드리지 않고 이 cron이 찍어주기만 기다리므로,
+      // 여기서 시세만 보고 건너뛰면 그 변동이 기록에서 빠진다 — 마지막 스냅샷
+      // 이후 날짜의 장부 기록이 하나라도 있으면 시세와 무관하게 점을 찍는다.
+      const lastSnapshotAt = raw.snapshots.at(-1)?.at;
+      const lastSnapshotMs = lastSnapshotAt ? Date.parse(lastSnapshotAt) : null;
+      const ledgerChanged =
+        lastSnapshotMs != null &&
+        [...raw.transactions, ...raw.cashflows, ...raw.dividends].some((entry) => Date.parse(entry.at) > lastSnapshotMs);
+
+      const unchanged = raw.snapshots.length > 0 && heldQuotesUnchanged && !ledgerChanged;
       if (unchanged) logCronStage("스냅샷 건너뜀 — 보유 종목 시세 전부 직전과 동일(휴장 추정)");
+      else if (heldQuotesUnchanged) logCronStage("스냅샷 기록 — 시세는 그대로지만 마지막 스냅샷 이후 장부(매매·입출금·배당)가 바뀜");
       const snapshots = unchanged ? raw.snapshots : [...raw.snapshots, point];
 
       const writes = [

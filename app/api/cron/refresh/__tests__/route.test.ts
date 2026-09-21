@@ -267,6 +267,48 @@ describe("GET /api/cron/refresh", () => {
     expect(afterSecond).toHaveLength(2); // 국내 종목이 움직였으니 새 점을 찍는다
   });
 
+  it("시세는 그대로여도 마지막 스냅샷 이후 매매·입출금이 있으면 새 점을 찍는다", async () => {
+    // 거래내역·입출금을 반영하는 가져오기 화면들은 snapshots.json을 직접 건드리지
+    // 않는다 — 시세만 보고 건너뛰면 그 변동이 기록에서 통째로 빠진다.
+    const { dataDir } = writeFixtures();
+    // 예수금이 평가금액에 잡히려면 CASH.KRW 심볼이 있어야 한다(lib/domain/portfolio.ts).
+    writeFileSync(
+      join(dataDir, "symbols.json"),
+      JSON.stringify([
+        { id: "QLD", name: "QLD", kind: "etf", currency: "USD", market: "US" },
+        { id: "CASH.KRW", name: "원화 예수금", kind: "cash", currency: "KRW", market: "CASH" },
+      ]),
+    );
+    fetchAllQuotes.mockResolvedValue({
+      quotes: [{ symbolId: "QLD", price: 110, currency: "USD", asOf: "2024-01-02T00:00:00Z" }],
+      missing: [],
+      errors: [],
+    });
+
+    const { GET } = await import("../route");
+    const { readJob } = await import("@/lib/data/refresh-job");
+
+    const first = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, first.jobId);
+    const afterFirst = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+    expect(afterFirst).toHaveLength(1);
+
+    // 첫 스냅샷 이후 시각으로 입금 기록을 추가한다 — 시세는 그대로다.
+    writeFileSync(
+      join(dataDir, "cashflows.json"),
+      JSON.stringify([
+        { id: "cf-1", at: new Date(Date.now() + 1000).toISOString(), accountId: "acc1", type: "deposit", amount: 1_000_000, currency: "KRW" },
+      ]),
+    );
+
+    const second = await (await GET(new Request("http://localhost/api/cron/refresh"))).json();
+    await waitForJob(readJob, second.jobId);
+    const afterSecond = JSON.parse(readFileSync(join(root, "data", "snapshots.json"), "utf8"));
+
+    expect(afterSecond).toHaveLength(2); // 시세가 같아도 장부가 바뀌었으니 기록한다
+    expect(afterSecond[1].totalKrw).toBeGreaterThan(afterSecond[0].totalKrw); // 입금만큼 늘어난다
+  });
+
   it("보유 종목 시세는 그대로인데 환율만 바뀌어도(주말 FX 변동) 새 점을 찍지 않는다", async () => {
     writeFixtures();
     fetchAllQuotes.mockResolvedValue({
