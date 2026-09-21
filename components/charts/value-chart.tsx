@@ -35,6 +35,9 @@ export function ValueChart({
   const [range, setRange] = useState<RangeKey>("1y");
   const [showTrades, setShowTrades] = useState(true);
   const [hover, setHover] = useState<number | null>(null);
+  /** 짚은 점 위에 상자를 띄우려면 SVG가 화면에서 실제로 몇 px인지 알아야 한다.
+      viewBox 좌표(1000×300)를 그 비율로 곱해 화면 좌표로 바꾼다. */
+  const [svgBox, setSvgBox] = useState<{ width: number; height: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [fullscreen, setFullscreen] = useState(false);
 
@@ -180,35 +183,6 @@ export function ValueChart({
             {r.label}
           </button>
         ))}
-        {/* 마우스로 짚은 점(안 짚었으면 마지막 점)의 값. 예전에는 차트 왼쪽 위에
-            겹쳐 띄웠는데 그만큼 그래프를 가렸다 — 머리말의 빈 자리로 옮기고 한 줄로
-            폈다. 세로로 쌓으면 이 줄 높이가 늘어 차트가 밀린다. */}
-        <div className="pointer-events-none ml-3 flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs">
-          <span className="text-faint">{shortDateTime(active.snapshot.at)}</span>
-          <InlineStat label="총 평가금액" value={money(active.snapshot.totalKrw)} emphasis />
-          {showFx ? <InlineStat label="환율" value={active.snapshot.fxRate.toFixed(2)} /> : null}
-          {(() => {
-            const basis = active.snapshot.principalKrw ?? principalKrw;
-            if (!basis || basis <= 0) return null;
-            const gainKrw = active.snapshot.totalKrw - basis;
-            const gainPercent = (gainKrw / basis) * 100;
-            return (
-              <>
-                <InlineStat label="투입 원금" value={money(basis)} />
-                <InlineStat label="원금 대비" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
-                <InlineStat label="이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
-              </>
-            );
-          })()}
-          {activeTradeMarker ? (
-            <span className="border-l border-line pl-3 text-[11px]">
-              {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
-              {activeTradeMarker.sell > 0 ? <span className="font-semibold text-down">매도 {activeTradeMarker.sell}건 </span> : null}
-              <span className="text-muted">{activeTradeMarker.symbols.join(", ")}</span>
-            </span>
-          ) : null}
-        </div>
-
         <div className="ml-auto flex items-center gap-1.5">
           {trades.length > 0 ? (
             <button
@@ -279,6 +253,7 @@ export function ValueChart({
             // 맞아떨어진다) -> 데이터 인덱스. 그냥 (clientX-rect.left)/rect.width를
             // 바로 인덱스 비율로 썼더니, 차트 좌우 여백(PAD)만큼 실제 마우스 위치와
             // 크로스헤어가 어긋났었다 — xAt()의 역함수를 그대로 써야 정확하다.
+            setSvgBox({ width: rect.width, height: rect.height });
             const svgX = ((event.clientX - rect.left) / rect.width) * WIDTH;
             const innerW = WIDTH - PAD.left - PAD.right;
             const ratio = (svgX - PAD.left) / innerW;
@@ -378,6 +353,54 @@ export function ValueChart({
             ));
           })()}
         </svg>
+
+        {/* 짚은 점의 살짝 왼쪽 위에 띄운다. 예전에는 차트 왼쪽 위 구석에 고정이라
+            어느 점을 말하는지 눈으로 이어붙여야 했다. 점이 왼쪽 끝이나 위쪽 끝에
+            있으면 상자가 차트 밖으로 나가므로 반대쪽으로 뒤집는다. */}
+        {hover !== null && svgBox
+          ? (() => {
+              const left = (active.x / WIDTH) * svgBox.width;
+              const top = (active.y / HEIGHT) * svgBox.height;
+              const toRight = left < svgBox.width * 0.3;
+              const below = top < svgBox.height * 0.4;
+              return (
+                <div
+                  className="pointer-events-none absolute z-10 w-max min-w-[180px] rounded-xl border border-line bg-bg-elevated/95 px-3 py-2 text-xs shadow-lg"
+                  style={{
+                    left,
+                    top,
+                    transform: `translate(${toRight ? "12px" : "calc(-100% - 12px)"}, ${below ? "12px" : "calc(-100% - 12px)"})`,
+                  }}
+                >
+                  <p className="text-faint">{shortDateTime(active.snapshot.at)}</p>
+                  <dl className="mt-1 space-y-0.5">
+                    <TooltipRow label="총 평가금액" value={money(active.snapshot.totalKrw)} emphasis />
+                    {showFx ? <TooltipRow label="환율" value={active.snapshot.fxRate.toFixed(2)} /> : null}
+                    {(() => {
+                      const basis = active.snapshot.principalKrw ?? principalKrw;
+                      if (!basis || basis <= 0) return null;
+                      const gainKrw = active.snapshot.totalKrw - basis;
+                      const gainPercent = (gainKrw / basis) * 100;
+                      return (
+                        <>
+                          <TooltipRow label="투입 원금" value={money(basis)} />
+                          <TooltipRow label="원금 대비 수익률" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
+                          <TooltipRow label="원금 대비 이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
+                        </>
+                      );
+                    })()}
+                  </dl>
+                  {activeTradeMarker ? (
+                    <p className="mt-1 border-t border-line pt-1 text-[11px] leading-4">
+                      {activeTradeMarker.buy > 0 ? <span className="font-semibold text-up">매수 {activeTradeMarker.buy}건 </span> : null}
+                      {activeTradeMarker.sell > 0 ? <span className="font-semibold text-down">매도 {activeTradeMarker.sell}건 </span> : null}
+                      <span className="text-muted">{activeTradeMarker.symbols.join(", ")}</span>
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })()
+          : null}
 
         {tradeMarkers.length > 0 ? (
           <ul className="sr-only">
@@ -488,8 +511,8 @@ function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; 
   );
 }
 
-/** 머리말 한 줄에 들어가는 이름-값 한 쌍. 숫자는 tnum으로 폭이 덜 흔들리게 한다. */
-function InlineStat({
+/** 상자 안의 이름-값 한 줄. 숫자는 tnum으로 폭이 덜 흔들리게 한다. */
+function TooltipRow({
   label,
   value,
   emphasis = false,
@@ -502,10 +525,10 @@ function InlineStat({
 }) {
   const color = tone === "up" ? "text-up" : tone === "down" ? "text-down" : undefined;
   return (
-    <span className="flex items-baseline gap-1">
-      <span className="text-faint">{label}</span>
-      <span className={`tnum ${emphasis ? "font-bold" : "font-semibold"} ${color ?? ""}`}>{value}</span>
-    </span>
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-faint">{label}</dt>
+      <dd className={`tnum ${emphasis ? "text-sm font-bold" : "font-semibold"} ${color ?? ""}`}>{value}</dd>
+    </div>
   );
 }
 
