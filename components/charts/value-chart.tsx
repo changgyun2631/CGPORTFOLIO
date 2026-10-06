@@ -160,6 +160,39 @@ export function ValueChart({
   // 알 수 없다는 피드백을 반영했다.
   const activeTradeMarker = tradeMarkers.find((marker) => marker.point.snapshot.at === active.snapshot.at) ?? null;
 
+  // 원금 대비 이익(평가금액 − 원금). 입출금은 평가금액과 원금에 똑같이 들어가 상쇄되므로
+  // 이 값의 변화가 입출금을 뺀 순수 손익이다.
+  const gainOf = (s: Snapshot) => {
+    const basis = s.principalKrw ?? principalKrw;
+    return basis && basis > 0 ? s.totalKrw - basis : null;
+  };
+  // 전일 대비 이익: 짚은 날짜 바로 앞 날짜의 마지막 점과 비교한다. 구간 첫날은 비교할 전일이 없다.
+  const activeIndex = points.indexOf(active);
+  const activeDay = dateLabel(active.snapshot.at);
+  let prevSnapshot: Snapshot | null = null;
+  for (let i = activeIndex - 1; i >= 0; i--) {
+    if (dateLabel(points[i].snapshot.at) !== activeDay) {
+      prevSnapshot = points[i].snapshot;
+      break;
+    }
+  }
+  const activeGain = gainOf(active.snapshot);
+  const prevGain = prevSnapshot ? gainOf(prevSnapshot) : null;
+  const dayGain = activeGain !== null && prevGain !== null ? activeGain - prevGain : null;
+
+  // 기간 수익률: 구간 첫 점 → 끝 점의 이익 증가분을 (시작 평가금액 + 구간 중 순입금)으로 나눈다.
+  // 평가금액 증감률(stats.changePercent)은 입금만 해도 오르므로 입출금을 걷어낸 값이다.
+  const first = series[0];
+  const last = series[series.length - 1];
+  const firstGain = gainOf(first);
+  const lastGain = gainOf(last);
+  const periodGain = firstGain !== null && lastGain !== null ? lastGain - firstGain : null;
+  const periodBase =
+    periodGain !== null
+      ? first.totalKrw + ((last.principalKrw ?? principalKrw ?? 0) - (first.principalKrw ?? principalKrw ?? 0))
+      : 0;
+  const periodPercent = periodGain !== null && periodBase > 0 ? (periodGain / periodBase) * 100 : null;
+
   const toggleFullscreen = () => {
     if (!containerRef.current) return;
     if (document.fullscreenElement) document.exitFullscreen();
@@ -392,6 +425,9 @@ export function ValueChart({
                           <TooltipRow label="투입 원금" value={money(basis)} />
                           <TooltipRow label="원금 대비 수익률" value={percentSigned(gainPercent)} tone={gainPercent >= 0 ? "up" : "down"} />
                           <TooltipRow label="원금 대비 이익" value={moneySigned(gainKrw)} tone={gainKrw >= 0 ? "up" : "down"} />
+                          {dayGain !== null ? (
+                            <TooltipRow label="전일 대비 이익" value={moneySigned(dayGain)} tone={dayGain >= 0 ? "up" : "down"} />
+                          ) : null}
                         </>
                       );
                     })()}
@@ -429,7 +465,13 @@ export function ValueChart({
       </div>
 
       {/* 전부 지금 보고 있는 구간(stats)의 값이다 — 기간 탭을 바꾸면 같이 바뀐다. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <MiniStat
+          label={`${ranges.find((r) => r.key === range)?.label} 수익률`}
+          value={periodPercent === null ? "—" : percentSigned(periodPercent)}
+          sub={periodGain === null ? undefined : `기간 이익 ${moneySigned(periodGain)}`}
+          tone={periodPercent === null ? "default" : periodPercent >= 0 ? "up" : "down"}
+        />
         <MiniStat
           label="최고점"
           value={money(stats.peak?.totalKrw)}
