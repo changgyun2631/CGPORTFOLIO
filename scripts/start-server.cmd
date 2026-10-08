@@ -9,6 +9,8 @@ cd /d "%~dp0.."
 if not exist "%USERPROFILE%\cgportfolio-logs" mkdir "%USERPROFILE%\cgportfolio-logs"
 
 :loop
+netstat -ano | findstr /R /C:":3000 .*LISTENING" >nul
+if not errorlevel 1 goto busy
 echo %date% %time% server starting >> "%USERPROFILE%\cgportfolio-logs\server.log"
 call npm start
 echo %date% %time% server exited, restarting in 10s >> "%USERPROFILE%\cgportfolio-logs\server.log"
@@ -16,5 +18,10 @@ rem Use ping instead of timeout to wait. timeout needs a real console and fails 
 rem "Input redirection is not supported" when the task runs at boot without a logged
 rem on user. That failure returns instantly, which would turn this into a busy restart
 rem loop. ping always waits, console or not.
+ping -n 11 127.0.0.1 >nul
+goto loop
+:busy
+rem Port 3000 is already served (for example by a server left over from an earlier run).
+rem Wait quietly instead of crash-looping on EADDRINUSE, and take over once the port is free.
 ping -n 11 127.0.0.1 >nul
 goto loop
