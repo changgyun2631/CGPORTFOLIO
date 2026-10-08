@@ -16,7 +16,7 @@
   --text: #f3f6fc;
   --text-muted: #bdc8da;
   --text-faint: #a2b0c5;
-  --brand-gold: #d8bc82;
+  --brand-logo: #3fb0d4;
 
   --accent: #4f8cff;
   --accent-soft: #1b2a45;
@@ -51,7 +51,7 @@
   --text: #0f172a;
   --text-muted: #46556b;
   --text-faint: #59697d;
-  --brand-gold: #806027;
+  --brand-logo: #0c7096;
 
   --accent: #2563eb;
   --accent-soft: #e4edff;
@@ -118,48 +118,21 @@ body {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 10px;
-  white-space: nowrap;
 }
 
-.brand-wordmark {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  font-family: Arial, sans-serif;
-  color: var(--text);
-  line-height: 1;
-}
-
-.brand-initials {
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -1.2px;
-}
-
-.brand-name {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 1.1px;
-}
-
-.brand-caption {
+.brand-lockup svg {
   display: block;
-  margin-top: 6px;
-  color: var(--brand-gold);
-  font-size: 9px;
-  font-weight: 700;
-  line-height: 1;
-  letter-spacing: 2.4px;
+  height: 40px;
+  width: auto;
+}
+
+@media (min-width: 640px) {
+  .brand-lockup svg { height: 44px; }
 }
 
 /* 320px 화면에서도 로고와 테마·메뉴 버튼 사이 여백을 유지한다. */
 @media (max-width: 359px) {
-  .brand-lockup { gap: 8px; }
-  .brand-lockup svg { width: 32px; height: 32px; }
-  .brand-initials { font-size: 22px; }
-  .brand-name { font-size: 13px; letter-spacing: 0.8px; }
-  .brand-caption { font-size: 8px; letter-spacing: 1.8px; }
+  .brand-lockup svg { height: 34px; }
 }
 
 :where(a, button, input, select, textarea):focus-visible {
