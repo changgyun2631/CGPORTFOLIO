@@ -42,8 +42,11 @@ export default async function DashboardPage() {
   const fxChange = fx.rate - fx.prevRate;
   const fxChangePercent = fx.prevRate > 0 ? (fxChange / fx.prevRate) * 100 : 0;
 
+  // 지금 보유하지 않는 종목의 옛 시세(갱신 대상에서 빠진 뒤에도 quotes.json에 남는다)가
+  // "시세 기준"을 끌어내리지 않도록 보유 종목만 본다.
+  const heldIds = new Set(holdings.map((h) => h.symbolId));
   const freshness = assessFreshness({
-    quoteAsOf: earliestAsOf(quotes.map((q) => q.asOf)),
+    quoteAsOf: earliestAsOf(quotes.filter((q) => heldIds.has(q.symbolId)).map((q) => q.asOf)),
     basisAsOf: earliestAsOf(positionBasis.map((p) => p.at)),
     principalAsOf: snapshots.at(-1)?.at ?? null,
   });
