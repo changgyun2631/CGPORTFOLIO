@@ -177,7 +177,7 @@ body {
 }
 
 .ticker-marquee-track {
-  animation: ticker-marquee 100s linear infinite;
+  animation: ticker-marquee 70s linear infinite;
   will-change: transform;
 }
 
