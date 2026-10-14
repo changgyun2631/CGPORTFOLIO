@@ -79,10 +79,18 @@ export function summarizeQqqExposure(
 /** 날짜 오름차순 시계열에서 그 날짜 이하의 마지막 값. 없으면 null. */
 export function valueOnOrBefore<T extends { d: string }>(series: T[] | undefined, date: string): T | null {
   if (!series || series.length === 0) return null;
+  // 이진 탐색 — 일별 손익이 날짜×종목마다 부르므로 5천 행짜리 시계열을 매번 훑으면 느리다.
+  let lo = 0;
+  let hi = series.length - 1;
   let found: T | null = null;
-  for (const point of series) {
-    if (point.d > date) break;
-    found = point;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (series[mid].d <= date) {
+      found = series[mid];
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
   }
   return found;
 }

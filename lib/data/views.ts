@@ -4,6 +4,7 @@ import { cache } from "react";
 
 import { runBacktest } from "@/lib/domain/backtest";
 import { summarizeComposition, unexplainedPercent } from "@/lib/domain/composition";
+import { buildDailyGains } from "@/lib/domain/daily-gains";
 import { summarizeDividends } from "@/lib/domain/dividends";
 import { positionValuesAsOf, qqqExposureAt, summarizeQqqExposure } from "@/lib/domain/exposure";
 import { analyzeSeries, cashflowAdjustedDrawdown, filterSnapshots } from "@/lib/domain/metrics";
@@ -188,6 +189,23 @@ export const loadRealizedByYear = cache(async () => {
 });
 
 /** 최근 입출금 내역. */
+/** 일별 평가손익과 종목별 기여. 최근 날짜가 먼저 오게 뒤집어 돌려준다. */
+export const loadDailyGains = cache(async () => {
+  const [{ snapshots, totals, transactions, symbols, fxHistory }, priceHistory] = await Promise.all([
+    loadPortfolio(),
+    getPriceHistory(),
+  ]);
+  const currencyById = new Map(symbols.map((symbol) => [symbol.id, symbol.currency]));
+  return buildDailyGains({
+    snapshots,
+    principalKrw: totals.principalKrw,
+    transactions,
+    priceHistory,
+    fxHistory,
+    currencyOf: (symbolId) => currencyById.get(symbolId) ?? "USD",
+  }).reverse();
+});
+
 export const loadRecentCashFlows = cache(async (limit = 5) => {
   const { cashflows, accounts } = await loadPortfolio();
   const accountById = new Map(accounts.map((a) => [a.id, a]));
