@@ -47,7 +47,7 @@ export function DailyCalendar({ rows }: { rows: DailyGainRow[] }) {
   const days = useMemo(() => rows.filter((row): row is Day => row.dayGainKrw !== null), [rows]);
   const byDate = useMemo(() => new Map(days.map((day) => [day.date, day])), [days]);
   const months = useMemo(() => [...new Set(days.map((day) => day.date.slice(0, 7)))].sort(), [days]);
-  const latest = days.find((day) => !isWeekend(day.date)) ?? days[0];
+  const latest = days[0];
 
   const [month, setMonth] = useState(latest.date.slice(0, 7));
   const [selected, setSelected] = useState(latest.date);
@@ -57,11 +57,10 @@ export function DailyCalendar({ rows }: { rows: DailyGainRow[] }) {
 
   const [year, mon] = month.split("-").map(Number);
   const inMonth = days.filter((day) => day.date.startsWith(month));
-  const trading = inMonth.filter((day) => !isWeekend(day.date));
-  // 주말 값(기록 출처 차이)도 합계에는 넣는다 — 그래야 한 달 동안 실제로 변한 이익과 맞는다.
+  // 주말 변동은 계산 단계에서 다음 거래일에 합쳐져 오므로 이 합이 그달 실제로 변한 이익이다.
   const monthSum = inMonth.reduce((sum, day) => sum + day.dayGainKrw, 0);
-  const best = trading.reduce<Day | null>((a, day) => (!a || day.dayGainKrw > a.dayGainKrw ? day : a), null);
-  const worst = trading.reduce<Day | null>((a, day) => (!a || day.dayGainKrw < a.dayGainKrw ? day : a), null);
+  const best = inMonth.reduce<Day | null>((a, day) => (!a || day.dayGainKrw > a.dayGainKrw ? day : a), null);
+  const worst = inMonth.reduce<Day | null>((a, day) => (!a || day.dayGainKrw < a.dayGainKrw ? day : a), null);
   const monthIndex = months.indexOf(month);
   const goTo = (m: string) => months.includes(m) && setMonth(m);
 
@@ -137,8 +136,8 @@ export function DailyCalendar({ rows }: { rows: DailyGainRow[] }) {
           </span>
         </p>
         <p className="mt-0.5 text-sm text-muted">
-          거래일 {trading.length}일 중 {trading.filter((d) => d.dayGainKrw > 0).length}일 늘고{" "}
-          {trading.filter((d) => d.dayGainKrw < 0).length}일 줄었습니다.
+          거래일 {inMonth.length}일 중 {inMonth.filter((d) => d.dayGainKrw > 0).length}일 늘고{" "}
+          {inMonth.filter((d) => d.dayGainKrw < 0).length}일 줄었습니다.
         </p>
       </div>
 
@@ -160,7 +159,7 @@ export function DailyCalendar({ rows }: { rows: DailyGainRow[] }) {
               const d = i + 1;
               const date = `${month}-${String(d).padStart(2, "0")}`;
               const day = byDate.get(date);
-              if (isWeekend(date)) return <WeekendCell key={date} d={d} day={day} />;
+              if (isWeekend(date)) return <WeekendCell key={date} d={d} />;
               if (!day) return <EmptyCell key={date} d={d} future={date > newest} />;
               return (
                 <DayCell
@@ -232,15 +231,11 @@ function DayCell({ d, day, mark, selected, onSelect }: { d: number; day: Day; ma
   );
 }
 
-function WeekendCell({ d, day }: { d: number; day: Day | undefined }) {
-  const noise = day && Math.abs(day.dayGainKrw) >= 5_000;
+/** 주말 변동은 다음 거래일 칸에 합쳐져 있어서 날짜만 적는다. */
+function WeekendCell({ d }: { d: number }) {
   return (
-    <div
-      className={`${CELL} justify-start gap-1 text-faint`}
-      title={noise ? "장이 쉬는 날입니다. 기록 출처가 바뀌며 생긴 차이로, 월 합계에는 들어갑니다." : undefined}
-    >
+    <div className={`${CELL} justify-start text-faint`} title="장이 쉬는 날입니다. 이날 변동은 다음 거래일에 합쳐집니다.">
       <span className="text-[11px] leading-4 sm:text-xs">{d}</span>
-      {noise ? <span className="tnum hidden text-[10px] leading-4 sm:block">{manwon(day.dayGainKrw)}만</span> : null}
     </div>
   );
 }

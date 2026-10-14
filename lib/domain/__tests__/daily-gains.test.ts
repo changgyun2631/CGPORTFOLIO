@@ -67,6 +67,19 @@ describe("buildDailyGains", () => {
     expect(rows[2].contributions).toEqual([{ symbolId: "AAA", krw: 10_000 }]);
   });
 
+  it("주말 점은 행을 만들지 않고 다음 거래일에 합친다(그 사이 매매도 이어진다)", () => {
+    // 01-09 금, 01-10 토, 01-12 월. 토요일 점 직전에 10주를 더 샀다.
+    const rows = buildDailyGains({
+      ...base,
+      snapshots: [snap("2026-01-09T07:00:00Z", 205_000, 205_000), snap("2026-01-10T07:00:00Z", 230_000, 205_000), snap("2026-01-12T07:00:00Z", 220_000, 205_000)],
+      transactions: [buy("2026-01-02T00:00:00Z", 10, 10), buy("2026-01-09T12:00:00Z", 10, 10.5)],
+      priceHistory: { AAA: [{ d: "2026-01-08", c: 10 }, { d: "2026-01-09", c: 11 }] },
+    });
+    expect(rows.map((r) => r.date)).toEqual(["2026-01-09", "2026-01-12"]);
+    // 평가액 220,000 − 금요일 100,000 − 매수 105,000 = 15,000
+    expect(rows[1]).toMatchObject({ dayGainKrw: 15_000, contributions: [{ symbolId: "AAA", krw: 15_000 }], otherKrw: 0 });
+  });
+
   it("CSV 점(15:30 KST)은 시각이 아니라 일자 라벨의 종가로 평가한다", () => {
     const rows = buildDailyGains({
       ...base,

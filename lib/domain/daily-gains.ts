@@ -29,7 +29,7 @@ export type DailyGainRow = {
   totalKrw: number;
   /** 원금 대비 누적 이익(평가금액 − 원금). 원금을 모르면 null */
   gainKrw: number | null;
-  /** 전일 대비 이익 증감. 첫날이나 원금을 모르는 날은 null */
+  /** 직전 거래일 대비 이익 증감(그 사이 주말 변동 포함). 첫날이나 원금을 모르는 날은 null */
   dayGainKrw: number | null;
   /** 전일 평가금액 대비 % */
   dayPercent: number | null;
@@ -40,6 +40,7 @@ export type DailyGainRow = {
 };
 
 const kstDate = (iso: string) => new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+const isWeekend = (date: string) => [0, 6].includes(new Date(`${date}T12:00:00Z`).getUTCDay());
 
 const newYork = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/New_York",
@@ -132,6 +133,9 @@ export function buildDailyGains({
 
   for (const snap of collapseDaily(snapshots)) {
     const shares = advance(Date.parse(snap.at), snap.fxRate);
+    // 주말은 장이 쉬어 그날 값은 기록 출처 차이뿐이다 — 행을 따로 두지 않고 다음 거래일에
+    // 합친다. prev와 쌓인 매매 흐름을 그대로 두면 다음 행이 금요일과 바로 비교된다.
+    if (isWeekend(kstDate(snap.at))) continue;
     const tradeFlow = flow;
     flow = new Map();
 
