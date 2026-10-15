@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import type { Holding } from "@/lib/domain/portfolio";
-import { percent } from "@/lib/format";
+import { moneyBare, percent } from "@/lib/format";
 
 import { colorFor } from "./palette";
 
@@ -54,19 +54,24 @@ export function AllocationBar({ holdings, paginate = false }: { holdings: Holdin
 
       <ul className="space-y-2">
         {listed.map((holding) => {
-          const colorIndex = sorted.indexOf(holding);
+          const color = colorFor(sorted.indexOf(holding));
           return (
             <li key={holding.symbolId}>
               <Link
                 href={`/symbols/${encodeURIComponent(holding.symbolId)}`}
                 className="flex items-center gap-3 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-surface-hover"
               >
-                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: colorFor(colorIndex) }} />
-                <span className="w-[58px] shrink-0 text-[12px] font-bold tracking-tight">{holding.symbolId}</span>
-                {/* 종목명이 이 줄의 우선순위다 — 나머지 칸은 고정 폭이라, 남는 폭을
-                    전부 이름에 준다. 평가금액은 아래 종목 랭킹 표에 그대로 있다. */}
-                <span className="min-w-0 flex-1 truncate text-[11px] text-muted">{holding.name}</span>
-                <span className="tnum w-[48px] shrink-0 text-right text-[12px] font-semibold">{percent(holding.weight, 1)}</span>
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: color }} />
+                <span className="w-[70px] shrink-0 truncate text-[13px] font-bold tracking-tight">{holding.symbolId}</span>
+                {/* 남는 폭은 전부 종목명에 준다 — 비중 배지와 금액은 고정 폭이다. */}
+                <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{holding.name}</span>
+                <span
+                  className="tnum w-[52px] shrink-0 rounded-md py-0.5 text-center text-[11px] font-bold"
+                  style={{ color, background: `color-mix(in srgb, ${color} 16%, transparent)` }}
+                >
+                  {percent(holding.weight, 1)}
+                </span>
+                <span className="tnum w-[92px] shrink-0 text-right text-[13px] font-bold">{moneyBare(holding.valueKrw)}</span>
               </Link>
             </li>
           );
@@ -78,8 +83,8 @@ export function AllocationBar({ holdings, paginate = false }: { holdings: Holdin
         {Array.from({ length: paginate ? PAGE_SIZE - listed.length : 0 }, (_, index) => (
           <li key={`filler-${index}`} aria-hidden="true" className="invisible">
             <span className="flex items-center gap-3 px-1.5 py-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-sm" />
-              <span className="text-[12px] font-bold tracking-tight">—</span>
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" />
+              <span className="py-0.5 text-[13px] font-bold tracking-tight">—</span>
             </span>
           </li>
         ))}

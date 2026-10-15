@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { MonthlyBars } from "@/components/charts/monthly-bars";
-import { Sparkline } from "@/components/charts/sparkline";
+import { SparkBars, Sparkline } from "@/components/charts/sparkline";
 import { Treemap, TreemapLegend } from "@/components/charts/treemap";
 import { ValueChart } from "@/components/charts/value-chart";
 import { AllocationBar } from "@/components/dashboard/allocation";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
 import { assessFreshness, earliestAsOf } from "@/lib/domain/freshness";
+import { getPriceHistory } from "@/lib/data/store";
+import { holdingTrends } from "@/lib/domain/stat-trends";
 import type { Snapshot } from "@/lib/domain/types";
 import { dateLabel, dateTimeLabel, money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 
@@ -30,7 +32,7 @@ import { dateLabel, dateTimeLabel, money, moneyBare, percent, price, shortDateTi
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades, exposure, sparklines] = await Promise.all([
+  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades, exposure, sparklines, priceHistory] = await Promise.all([
     loadPortfolio(),
     loadAccountSummary(),
     loadAssetMap(),
@@ -39,7 +41,8 @@ export default async function DashboardPage() {
     loadRecentCashFlows(3),
     loadChartTrades(),
     loadQqqExposure(),
-    loadSparklines(),
+    loadSparklines(SPARK_DAYS),
+    getPriceHistory(),
   ]);
 
   const { holdings, totals, fx, snapshots, quotes, positionBasis } = portfolio;
@@ -62,11 +65,15 @@ export default async function DashboardPage() {
   const currentYear = String(new Date().getFullYear());
   const dividendMonths = monthsOfYear(dividends, currentYear);
 
-  // 핵심 지표 카드의 추세선 — 과거 기록이 있는 지표만 그린다(수익 종목 비율·현재
-  // 평가손익은 날짜별 원가 기록이 없어 그릴 수 없다).
-  const recentDays = lastPerDay(snapshots).slice(-SPARK_DAYS);
-  const gainSpark = recentDays.map((s) => s.totalKrw - (s.principalKrw ?? totals.principalKrw));
-  const fxSpark = recentDays.map((s) => s.fxRate);
+  // 핵심 지표 카드의 추세선. 평가손익·수익 종목 수는 날짜별 원가 기록이 없어
+  // 지금 보유분을 과거 종가에 대어 본 추정치다(`holdingTrends`).
+  const recentDays = lastPerDay(snapshots).slice(-(SPARK_DAYS + 1));
+  const principalGains = recentDays.map((s) => s.totalKrw - (s.principalKrw ?? totals.principalKrw));
+  const gainSpark = principalGains.slice(1);
+  // 원금 대비 이익의 날짜별 차이 = 입출금을 뺀 그날 손익.
+  const dayGainBars = principalGains.slice(1).map((g, i) => g - principalGains[i]);
+  const fxSpark = recentDays.slice(1).map((s) => s.fxRate);
+  const trends = holdingTrends(invested, priceHistory, fx.rate, SPARK_DAYS);
   const thisMonth = new Date().getMonth() + 1;
   const dividendSpark = dividendMonths
     .slice(0, thisMonth)
@@ -167,6 +174,7 @@ export default async function DashboardPage() {
             tone={totals.gainKrw >= 0 ? "up" : "down"}
             delta={<Delta percent={totals.gainPercent} showAmount={false} />}
             sub={`매입금 ${money(totals.costKrw)} · 예상 수수료 ${money(totals.estimatedExitFeeKrw)}`}
+            chart={<StatSpark values={trends.gain} title={`최근 ${SPARK_DAYS}거래일 평가손익 (지금 보유분 기준 추정)`} />}
           />
           <Stat
             label="전일 평가손익"
@@ -174,6 +182,13 @@ export default async function DashboardPage() {
             tone={totals.dayChangeKrw >= 0 ? "up" : "down"}
             delta={<Delta percent={totals.dayChangePercent} showAmount={false} />}
             sub={`총 평가 ${money(totals.totalKrw)}`}
+            chart={
+              dayGainBars.length > 1 ? (
+                <div title={`최근 ${SPARK_DAYS}일 날짜별 손익 (입출금 제외)`}>
+                  <SparkBars values={dayGainBars} height={SPARK_HEIGHT} />
+                </div>
+              ) : undefined
+            }
           />
           <Stat
             label="환율"
@@ -196,6 +211,7 @@ export default async function DashboardPage() {
               <span className="text-muted">{percent(invested.length > 0 ? (winners.length / invested.length) * 100 : 0, 1)}</span>
             }
             sub={`손실 ${invested.length - winners.length}개 종목`}
+            chart={<StatSpark values={trends.winners} title={`최근 ${SPARK_DAYS}거래일 수익 종목 수 (지금 보유분 기준 추정)`} />}
           />
           <Stat
             label="최고 수익률"
@@ -378,6 +394,7 @@ export default async function DashboardPage() {
 }
 
 const SPARK_DAYS = 30;
+const SPARK_HEIGHT = 48;
 
 /** 스냅샷은 하루에도 여러 개라, 날짜마다 마지막 점만 남긴다. */
 function lastPerDay(snapshots: Snapshot[]) {
@@ -390,7 +407,7 @@ function StatSpark({ values, tone, title }: { values: number[]; tone?: "up" | "d
   if (values.length < 2) return null;
   return (
     <div title={title}>
-      <Sparkline values={values} width={88} height={32} tone={tone} />
+      <Sparkline values={values} width={200} height={SPARK_HEIGHT} tone={tone} fluid />
     </div>
   );
 }

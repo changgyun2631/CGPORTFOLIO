@@ -130,8 +130,8 @@ export function Stat({
       <p className="text-sm font-semibold text-muted">{label}</p>
       {/* 추세선은 카드가 넓을 때만 — 좁으면 큰 숫자와 맞붙어서 숫자가 먼저다. */}
       <div className="@container mt-2 flex items-end justify-between gap-3">
-        <p className={`tnum min-w-0 text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] ${valueTone}`}>{value}</p>
-        {chart ? <div className="hidden shrink-0 pb-1 @[17rem]:block">{chart}</div> : null}
+        <p className={`tnum shrink-0 text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] ${valueTone}`}>{value}</p>
+        {chart ? <div className="ml-auto hidden min-w-0 max-w-[280px] flex-1 pb-1 @[17rem]:block">{chart}</div> : null}
       </div>
       {delta ? <p className="mt-2 text-sm font-medium">{delta}</p> : null}
       {sub ? <p className="mt-2 text-xs leading-5 text-faint">{sub}</p> : null}

@@ -9,6 +9,7 @@ export function Sparkline({
   tone = "auto",
   strokeWidth = 1.5,
   fill = true,
+  fluid = false,
 }: {
   values: number[];
   width?: number;
@@ -17,6 +18,8 @@ export function Sparkline({
   tone?: "auto" | "up" | "down" | "flat";
   strokeWidth?: number;
   fill?: boolean;
+  /** 부모 폭을 꽉 채운다(가로로 늘림). width는 비율 계산용이 된다. */
+  fluid?: boolean;
 }) {
   if (values.length < 2) {
     return <svg width={width} height={height} aria-hidden="true" />;
@@ -43,7 +46,14 @@ export function Sparkline({
   const gradientId = `spark-${direction}-${values.length}-${Math.round(min)}`;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden="true" className="overflow-visible">
+    <svg
+      width={fluid ? "100%" : width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio={fluid ? "none" : undefined}
+      aria-hidden="true"
+      className="overflow-visible"
+    >
       {fill ? (
         <>
           <defs>
@@ -55,7 +65,34 @@ export function Sparkline({
           <polygon points={area} fill={`url(#${gradientId})`} />
         </>
       ) : null}
-      <polyline points={line} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" />
+      <polyline points={line} fill="none" stroke={stroke} strokeWidth={strokeWidth} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+}
+
+/** 0을 기준으로 위(이익)·아래(손실)로 뻗는 작은 막대. 날짜별 손익처럼 부호가 뜻인 값에 쓴다. */
+export function SparkBars({ values, height = 28 }: { values: number[]; height?: number }) {
+  if (values.length === 0) return null;
+  const maxAbs = Math.max(...values.map(Math.abs)) || 1;
+  const width = values.length * 10;
+  const mid = height / 2;
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+      <line x1="0" y1={mid} x2={width} y2={mid} stroke="var(--grid)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+      {values.map((value, i) => {
+        const h = (Math.abs(value) / maxAbs) * (mid - 1);
+        return (
+          <rect
+            key={i}
+            x={i * 10 + 2}
+            y={value >= 0 ? mid - h : mid}
+            width="6"
+            height={Math.max(h, 0.5)}
+            fill={value >= 0 ? "var(--up)" : "var(--down)"}
+            opacity="0.85"
+          />
+        );
+      })}
     </svg>
   );
 }
