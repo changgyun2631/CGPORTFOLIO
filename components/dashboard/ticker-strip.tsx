@@ -19,9 +19,9 @@ export function TickerStrip({ holdings }: { holdings: Holding[] }) {
         key={`${duplicate ? "duplicate" : "primary"}-${holding.symbolId}`}
         href={`/symbols/${encodeURIComponent(holding.symbolId)}`}
         tabIndex={duplicate ? -1 : undefined}
-        className="flex w-[200px] shrink-0 flex-col gap-1 rounded-2xl border border-line bg-surface px-3.5 py-3 transition-colors hover:border-line-strong hover:bg-surface-hover"
+        className="flex w-[220px] shrink-0 flex-col gap-1 rounded-2xl border border-line bg-surface px-3.5 py-3 transition-colors hover:border-line-strong hover:bg-surface-hover"
       >
-        <p className="truncate text-[12px] leading-4">
+        <p className="truncate text-[13px] leading-5">
           <span className="font-bold tracking-tight">{holding.symbolId}</span>
           <span className="ml-1.5 text-faint">{holding.name}</span>
         </p>
@@ -29,7 +29,7 @@ export function TickerStrip({ holdings }: { holdings: Holding[] }) {
           <span className="tnum text-[15px] font-bold leading-tight">
             {holding.kind === "cash" ? price(holding.shares, holding.currency) : price(holding.price, holding.currency)}
           </span>
-          <span className={`tnum text-[11px] font-medium ${tone}`}>
+          <span className={`tnum text-[14px] font-bold ${tone}`}>
             {holding.kind === "cash" ? moneySigned(holding.dayChangeKrw) : percentSigned(holding.dayChangePercent)}
           </span>
         </div>
