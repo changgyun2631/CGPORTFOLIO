@@ -113,6 +113,7 @@ export function Stat({
   delta,
   tone = "default",
   href,
+  chart,
 }: {
   label: string;
   value: ReactNode;
@@ -120,12 +121,18 @@ export function Stat({
   delta?: ReactNode;
   tone?: "default" | "up" | "down";
   href?: string;
+  /** 값 오른쪽에 붙는 작은 추세선. */
+  chart?: ReactNode;
 }) {
   const valueTone = tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-text";
   const body = (
     <>
       <p className="text-sm font-semibold text-muted">{label}</p>
-      <p className={`tnum mt-2 text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] ${valueTone}`}>{value}</p>
+      {/* 추세선은 카드가 넓을 때만 — 좁으면 큰 숫자와 맞붙어서 숫자가 먼저다. */}
+      <div className="@container mt-2 flex items-end justify-between gap-3">
+        <p className={`tnum min-w-0 text-[24px] font-bold leading-tight tracking-tight sm:text-[28px] ${valueTone}`}>{value}</p>
+        {chart ? <div className="hidden shrink-0 pb-1 @[17rem]:block">{chart}</div> : null}
+      </div>
       {delta ? <p className="mt-2 text-sm font-medium">{delta}</p> : null}
       {sub ? <p className="mt-2 text-xs leading-5 text-faint">{sub}</p> : null}
     </>

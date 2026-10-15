@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { MonthlyBars } from "@/components/charts/monthly-bars";
+import { Sparkline } from "@/components/charts/sparkline";
 import { Treemap, TreemapLegend } from "@/components/charts/treemap";
 import { ValueChart } from "@/components/charts/value-chart";
 import { AllocationBar } from "@/components/dashboard/allocation";
@@ -18,16 +19,18 @@ import {
   loadQqqExposure,
   loadRecentCashFlows,
   loadRecentTrades,
+  loadSparklines,
 } from "@/lib/data/views";
 import { monthsOfYear } from "@/lib/domain/dividends";
 import { assessFreshness, earliestAsOf } from "@/lib/domain/freshness";
-import { dateTimeLabel, money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
+import type { Snapshot } from "@/lib/domain/types";
+import { dateLabel, dateTimeLabel, money, moneyBare, percent, price, shortDateTime } from "@/lib/format";
 
 // cron이 갱신한 시세·스냅샷을 재빌드 없이 매 요청에 반영한다.
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades, exposure] = await Promise.all([
+  const [portfolio, accounts, assetMap, dividends, trades, cashflows, chartTrades, exposure, sparklines] = await Promise.all([
     loadPortfolio(),
     loadAccountSummary(),
     loadAssetMap(),
@@ -36,6 +39,7 @@ export default async function DashboardPage() {
     loadRecentCashFlows(3),
     loadChartTrades(),
     loadQqqExposure(),
+    loadSparklines(),
   ]);
 
   const { holdings, totals, fx, snapshots, quotes, positionBasis } = portfolio;
@@ -57,6 +61,17 @@ export default async function DashboardPage() {
 
   const currentYear = String(new Date().getFullYear());
   const dividendMonths = monthsOfYear(dividends, currentYear);
+
+  // 핵심 지표 카드의 추세선 — 과거 기록이 있는 지표만 그린다(수익 종목 비율·현재
+  // 평가손익은 날짜별 원가 기록이 없어 그릴 수 없다).
+  const recentDays = lastPerDay(snapshots).slice(-SPARK_DAYS);
+  const gainSpark = recentDays.map((s) => s.totalKrw - (s.principalKrw ?? totals.principalKrw));
+  const fxSpark = recentDays.map((s) => s.fxRate);
+  const thisMonth = new Date().getMonth() + 1;
+  const dividendSpark = dividendMonths
+    .slice(0, thisMonth)
+    .reduce<number[]>((acc, m) => [...acc, (acc.at(-1) ?? 0) + m.totalKrw], []);
+  const bestSpark = best ? sparklines[best.symbolId] : undefined;
 
   return (
     <div className="space-y-10">
@@ -144,6 +159,7 @@ export default async function DashboardPage() {
             tone={totals.principalGainKrw >= 0 ? "up" : "down"}
             delta={<Delta percent={totals.principalGainPercent} showAmount={false} />}
             sub={`원금 ${money(totals.principalKrw)}`}
+            chart={<StatSpark values={gainSpark} title={`최근 ${SPARK_DAYS}일 원금 대비 수익`} />}
           />
           <Stat
             label="현재 평가손익"
@@ -164,12 +180,14 @@ export default async function DashboardPage() {
             value={fx.rate.toFixed(2)}
             delta={<Delta percent={fxChangePercent} showAmount={false} />}
             sub={`달러/원 · ${fxChange >= 0 ? "+" : ""}${fxChange.toFixed(2)}`}
+            chart={<StatSpark values={fxSpark} tone="flat" title={`최근 ${SPARK_DAYS}일 환율`} />}
           />
           <Stat
             label="연간 예상 배당"
             value={moneyBare(dividends.forecastKrw)}
             sub={`올해 수령 ${money(dividends.thisYearKrw)}${dividends.forecastIsEstimated ? " · 일부 추정치" : ""}`}
             href="/dividends"
+            chart={<StatSpark values={dividendSpark} tone="up" title={`${currentYear}년 누적 배당`} />}
           />
           <Stat
             label="수익 종목 비율"
@@ -186,6 +204,7 @@ export default async function DashboardPage() {
             delta={best ? <Delta amount={best.totalGainKrw} percent={best.totalGainPercent} /> : undefined}
             sub={best ? best.name : undefined}
             href={best ? `/symbols/${encodeURIComponent(best.symbolId)}` : undefined}
+            chart={bestSpark ? <StatSpark values={bestSpark} title={`${best?.symbolId} 최근 종가`} /> : undefined}
           />
           <Stat label="계좌 / 종목" value={`${totals.accountCount} / ${totals.symbolCount}`} sub="계좌별 구성은 계좌 화면에서" href="/accounts" />
         </div>
@@ -354,6 +373,24 @@ export default async function DashboardPage() {
           <QqqExposure current={exposure.current} past={exposure.past} />
         </Card>
       </Section>
+    </div>
+  );
+}
+
+const SPARK_DAYS = 30;
+
+/** 스냅샷은 하루에도 여러 개라, 날짜마다 마지막 점만 남긴다. */
+function lastPerDay(snapshots: Snapshot[]) {
+  const byDay = new Map<string, Snapshot>();
+  for (const s of snapshots) byDay.set(dateLabel(s.at), s);
+  return [...byDay.values()];
+}
+
+function StatSpark({ values, tone, title }: { values: number[]; tone?: "up" | "down" | "flat"; title: string }) {
+  if (values.length < 2) return null;
+  return (
+    <div title={title}>
+      <Sparkline values={values} width={88} height={32} tone={tone} />
     </div>
   );
 }
