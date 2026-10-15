@@ -1,91 +1,63 @@
 import type { Metadata } from "next";
 
-import { MonthCalendar } from "@/components/calendar/month-calendar";
-import { Card, PageTitle } from "@/components/ui/primitives";
-import { getCalendarEvents, getCalendarResults, getGoals } from "@/lib/data/store";
-import { loadDailyGains, loadPortfolio } from "@/lib/data/views";
+import { GoalCard } from "@/components/calendar/goal-card";
+import { EventRow, MonthCalendar } from "@/components/calendar/month-calendar";
+import { Card, PageTitle, Section } from "@/components/ui/primitives";
+import { getCalendarEvents, getCalendarResults, getGoal } from "@/lib/data/store";
+import { loadPortfolio } from "@/lib/data/views";
 import { seoulDate } from "@/lib/domain/calendar-results";
-import { goalCurve, targetOn } from "@/lib/domain/goals";
-import { dateLabel, eok } from "@/lib/format";
 
 export const metadata: Metadata = { title: "캘린더" };
 // 예약 스크립트가 바꾼 결과 파일과 새로 저장한 목표를 새 요청에서 즉시 읽는다.
 export const dynamic = "force-dynamic";
 
+/** 아래 "발표 결과"에 지난 며칠치 일정을 모을지 */
+const RESULT_DAYS = 45;
+
 export default async function CalendarPage() {
-  const [events, data, goals, { totals, snapshots }, dailyRows] = await Promise.all([
-    getCalendarEvents(),
-    getCalendarResults(),
-    getGoals(),
-    loadPortfolio(),
-    loadDailyGains(),
-  ]);
+  const [events, data, goal, { totals }] = await Promise.all([getCalendarEvents(), getCalendarResults(), getGoal(), loadPortfolio()]);
   const now = new Date();
   const today = seoulDate(now);
+  const results = data?.results ?? {};
 
-  // 목표 곡선의 출발점은 기록 첫날의 평가금액이다.
-  const first = snapshots[0];
-  const curve = goalCurve(first ? { date: dateLabel(first.at), amountKrw: first.totalKrw } : null, goals);
-  const todayTarget = targetOn(curve, today);
-  const gap = todayTarget === null ? null : totals.totalKrw - todayTarget;
-  const nextGoal = goals.filter((g) => g.date >= today).sort((a, b) => a.date.localeCompare(b.date))[0];
-
-  const days = dailyRows
-    .filter((row) => row.dayGainKrw !== null)
-    .map((row) => ({ date: row.date, dayGainKrw: row.dayGainKrw as number, dayPercent: row.dayPercent }));
+  // 결과를 받을 수 있는 일정 중 발표일이 지난 것 — 최근 것이 위.
+  const since = seoulDate(new Date(now.getTime() - RESULT_DAYS * 86_400_000));
+  const released = events
+    .filter((event) => event.resultSource && event.date <= today && event.date >= since)
+    .sort((a, b) => b.date.localeCompare(a.date));
 
   return (
     <div className="space-y-8">
-      <PageTitle title="캘린더" description="일정·발표 결과, 날짜별 손익, 총 평가금액 목표를 한 달 단위로 봅니다." />
+      <PageTitle title="캘린더" description="보유 종목 실적 발표·경제지표 일정과 발표 결과, 총 평가금액 목표를 봅니다." />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <SummaryCard label="현재 총 평가금액" value={eok(totals.totalKrw)} />
-        <SummaryCard
-          label="오늘 기준 목표"
-          value={todayTarget === null ? "—" : eok(todayTarget)}
-          sub={
-            nextGoal
-              ? `다음 목표 ${nextGoal.date} · ${eok(nextGoal.amountKrw)}`
-              : goals.length === 0
-                ? "아래 달력에서 날짜를 누르고 목표금액을 저장하세요"
-                : "마지막 목표일이 지났습니다"
-          }
-        />
-        <SummaryCard
-          label={gap === null ? "목표 대비" : gap >= 0 ? "초과" : "부족"}
-          value={gap === null ? "—" : `${gap >= 0 ? "+" : ""}${eok(gap)}`}
-          tone={gap === null ? undefined : gap >= 0 ? "up" : "down"}
-          sub={gap !== null && todayTarget ? `${gap >= 0 ? "+" : ""}${((gap / todayTarget) * 100).toFixed(2)}%` : undefined}
-        />
-      </div>
+      <GoalCard currentKrw={totals.totalKrw} goal={goal} />
 
-      <MonthCalendar
-        events={events}
-        results={data?.results ?? {}}
-        days={days}
-        goals={goals}
-        curve={curve}
-        today={today}
-        nowMs={now.getTime()}
-      />
+      <MonthCalendar events={events} results={results} today={today} nowMs={now.getTime()} />
+
+      <Section title="발표 결과" description={`최근 ${RESULT_DAYS}일 동안 발표된 실적·지표입니다. 공시가 올라오는 대로 6시간마다 채워집니다.`}>
+        <Card>
+          {released.length === 0 ? (
+            <p className="text-sm text-faint">최근 발표된 일정이 없습니다.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {released.map((event) => (
+                <EventRow key={event.id} event={event} result={results[event.id]} nowMs={now.getTime()} showDate />
+              ))}
+            </ul>
+          )}
+        </Card>
+      </Section>
 
       <Card>
-        <p className="text-sm font-semibold">무료 공식 데이터 · 기존 예약 작업에서 6시간마다 수집</p>
-        <p className="mt-2 text-sm leading-6 text-muted">고용보고서는 BLS, 기업 실적은 SEC 공시를 확인합니다. 시장 예상치·조정 EPS는 제공하지 않습니다. 발표·공시 시점과 수집 시점은 다를 수 있으며, 화면을 새로고침하면 저장된 최신 결과가 표시됩니다.</p>
-        <p className="mt-1 text-xs leading-6 text-faint">일정 날짜는 등록된 일정 기준이며 자동 검증하지 않습니다. 지원되지 않는 기업·지표는 결과가 표시되지 않을 수 있습니다. 칸의 손익은 일별손익 화면과 같은 값(만 원 단위, 입출금 제외)입니다.</p>
+        <p className="text-sm font-semibold">일정과 결과는 무료 공개 자료로 채웁니다</p>
+        <p className="mt-2 text-sm leading-6 text-muted">
+          보유 종목의 실적 발표일은 하루 한 번 나스닥 실적 캘린더에서 앞으로 90일치를 확인해 자동으로 넣습니다. 결과는 발표 뒤 SEC에 올라오는 분기
+          공시(매출·희석 EPS)와 BLS 고용보고서를 6시간마다 확인합니다. 시장 예상치 대비 서프라이즈나 조정 EPS는 제공하지 않습니다.
+        </p>
+        <p className="mt-1 text-xs leading-6 text-faint">
+          발표일은 미국 날짜 기준이고, 장 마감 후 발표는 한국 시간으로 다음 날 아침입니다. 해외 기업(ADR)은 SEC 분기 공시가 없어 결과가 비어 있을 수 있습니다.
+        </p>
       </Card>
-    </div>
-  );
-}
-
-function SummaryCard({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
-  return (
-    <div className="rounded-2xl border border-line-strong bg-surface p-5">
-      <p className="text-sm font-semibold text-muted">{label}</p>
-      <p className={`tnum mt-2 text-[24px] font-bold leading-tight tracking-tight ${tone === "up" ? "text-up" : tone === "down" ? "text-down" : "text-text"}`}>
-        {value}
-      </p>
-      {sub ? <p className="mt-1.5 text-xs text-faint">{sub}</p> : null}
     </div>
   );
 }

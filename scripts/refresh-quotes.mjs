@@ -29,6 +29,7 @@ import { spawnSync } from "node:child_process";
 import { trimLogFile } from "./lib/log-rotate.mjs";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { refreshCalendar } from "./lib/calendar-refresh.mjs";
+import { syncEarningsDaily } from "./lib/earnings-sync.mjs";
 import { REFRESH_EXIT, classifyFetchError, classifyJobOutcome, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
 
 loadLocalEnv();
@@ -166,6 +167,13 @@ function dataFilesTouchedSince(startedAtMs) {
 
 async function main() {
   // 기존 6시간 예약 작업에 무료 캘린더도 연결한다. 실패해도 시세 갱신은 계속한다.
+  // 보유 종목 실적 발표일은 하루 한 번 먼저 채워 두고, 이어서 결과를 수집한다.
+  try {
+    const earnings = await syncEarningsDaily();
+    if (earnings) log(`실적 발표일: 보유 종목 일정 ${earnings.found}건, 새로 추가 ${earnings.added}건`);
+  } catch (error) {
+    log(`실적 발표일 확인 실패(계속): ${error.message}`);
+  }
   try {
     const calendar = await refreshCalendar();
     log(`캘린더: 확인 ${calendar.updated}건, 실패 ${calendar.errors}건`);
