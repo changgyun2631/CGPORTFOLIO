@@ -50,6 +50,7 @@ yarn-error.log*
 /data/position-basis.json
 /data/calendar.json
 /data/calendar-results.json
+/data/goals.json
 /data/.calendar-refresh.lock
 # cron 이 적재하는 시세·스냅샷. 여기에도 내 평가금액이 그대로 담긴다.
 /data/snapshots.json

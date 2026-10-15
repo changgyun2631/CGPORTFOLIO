@@ -88,3 +88,15 @@ export function trendOf(value: number | null | undefined): "up" | "down" | "flat
   if (value === null || value === undefined || !Number.isFinite(value) || value === 0) return "flat";
   return value > 0 ? "up" : "down";
 }
+
+const manFormat = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 0 });
+
+/** 11억 4,305만 — 목표처럼 큰 금액을 읽기 쉽게. */
+export function eok(value: number) {
+  const sign = value < 0 ? "-" : "";
+  const abs = Math.round(Math.abs(value) / 10_000);
+  const hundredMillion = Math.floor(abs / 10_000);
+  const rest = abs % 10_000;
+  if (hundredMillion === 0) return `${sign}${manFormat.format(rest)}만`;
+  return `${sign}${hundredMillion}억${rest ? ` ${manFormat.format(rest)}만` : ""}`;
+}

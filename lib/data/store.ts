@@ -22,6 +22,7 @@ import type {
 } from "@/lib/domain/types";
 import type { GeneratedReport } from "@/lib/domain/weekly-report";
 import type { CalendarResults } from "@/lib/domain/calendar-results";
+import type { AssetGoal } from "@/lib/domain/goals";
 
 /**
  * 읽기 전용 저장소.
@@ -127,6 +128,9 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
     return [];
   }
 }
+
+/** 캘린더에서 저장한 총 평가금액 목표. 아직 하나도 없으면 파일이 없다. */
+export const getGoals = () => readJson<AssetGoal[]>("goals.json").catch(() => [] as AssetGoal[]);
 
 /** 공식 원천 수집 결과. 페이지에서는 외부 API를 호출하지 않는다. */
 export async function getCalendarResults(): Promise<CalendarResults | null> {
