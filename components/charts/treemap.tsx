@@ -15,12 +15,15 @@ export type TreemapDatum = {
 };
 
 /**
- * 등락률을 색 농도로 바꾼다. ±3%에서 가장 진해진다.
+ * 등락률을 색 농도로 바꾼다. ±TONE_RANGE%에서 가장 진해진다 — ±3%로는 하락장에
+ * −3%와 −11%가 같은 색이라 큰 낙폭이 묻혔다.
  * 상승 초록·하락 빨강(핀비즈 등 미국식). 화면의 나머지 등락 표시(`--up`/`--down`)와도
  * 같은 방향이라, 여기만 반대였던 걸 맞췄다.
  */
+const TONE_RANGE = 6;
+
 function toneFor(changePercent: number) {
-  const clamped = Math.max(Math.min(changePercent / 3, 1), -1);
+  const clamped = Math.max(Math.min(changePercent / TONE_RANGE, 1), -1);
   const intensity = Math.abs(clamped);
   if (Math.abs(changePercent) < 0.03) {
     return { background: "var(--surface)", border: "var(--border)", text: "var(--text-muted)" };
@@ -69,11 +72,12 @@ export function Treemap({
         const tone = toneFor(datum.changePercent);
 
         const area = tile.width * tile.height;
-        const showLabel = tile.width > 34 && tile.height > 20;
-        const showChange = tile.width > 52 && tile.height > 36;
-        const showValue = tile.width > 96 && tile.height > 62;
         // 큰 칸일수록 글자를 키우되 상한을 둔다.
         const labelSize = Math.max(9, Math.min(Math.sqrt(area) / 6.5, 20));
+        // 칸 폭만 보면 CASH.USD처럼 긴 이름이 칸 밖으로 삐져나와서, 글자 폭(어림)도 같이 본다.
+        const showLabel = tile.width > Math.max(34, datum.label.length * labelSize * 0.62 + 6) && tile.height > 20;
+        const showChange = showLabel && tile.width > 52 && tile.height > 36;
+        const showValue = tile.width > 96 && tile.height > 62;
 
         const cx = tile.x + tile.width / 2;
         const cy = tile.y + tile.height / 2;
@@ -142,17 +146,17 @@ export function Treemap({
 
 /** 자산맵 색 범례. */
 export function TreemapLegend() {
-  const steps = [-3, -1.5, 0, 1.5, 3];
+  const steps = [-1, -0.5, 0, 0.5, 1].map((t) => t * TONE_RANGE);
   return (
     <div className="flex items-center gap-2 text-[11px] text-faint">
-      <span>-3%</span>
+      <span>-{TONE_RANGE}%</span>
       <div className="flex h-2.5 overflow-hidden rounded-full">
         {steps.map((step, index) => {
           const from = toneFor(step);
           return <div key={index} className="h-full w-8" style={{ background: from.background }} />;
         })}
       </div>
-      <span>+3%</span>
+      <span>+{TONE_RANGE}%</span>
     </div>
   );
 }

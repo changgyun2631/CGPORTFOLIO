@@ -202,7 +202,7 @@ export function ValueChart({
   return (
     <div
       ref={containerRef}
-      className={`flex flex-col gap-4 ${fullscreen ? "h-screen justify-center bg-bg p-6" : "h-full"}`}
+      className={`@container flex flex-col gap-4 ${fullscreen ? "h-screen justify-center bg-bg p-6" : "h-full"}`}
     >
       <div className="flex flex-wrap items-center gap-1.5">
         {ranges.map((r) => (
@@ -279,10 +279,13 @@ export function ValueChart({
       {/* 카드가 옆 칸 높이에 맞춰 늘어나면 차트도 같이 커진다. 높이가 정해지지
           않은 곳(백테스트 상세)에서는 min-h가 예전 고정 높이 역할을 한다. */}
       <div className="relative min-h-[240px] flex-1 sm:min-h-[300px]">
+        {/* SVG는 preserveAspectRatio="none"으로 늘어나서 그 안의 글자·점도 같이 찌그러진다.
+            선과 면만 SVG로 그리고, 글자와 점은 위에 HTML로 얹어 어떤 폭에서도 모양을 지킨다. */}
+        <div className={`relative ${fullscreen ? "h-[70vh]" : "h-full min-h-[240px] sm:min-h-[300px]"}`}>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           preserveAspectRatio="none"
-          className={fullscreen ? "h-[70vh] w-full" : "h-full min-h-[240px] w-full sm:min-h-[300px]"}
+          className="h-full w-full"
           role="img"
           aria-label={`총 평가금액 추이, ${ranges.find((r) => r.key === range)?.label} 구간, ${percentSigned(stats.changePercent)}`}
           onMouseLeave={() => setHover(null)}
@@ -311,11 +314,7 @@ export function ValueChart({
             const y = PAD.top + t * innerH;
             return (
               <g key={t}>
-                <line x1={PAD.left} y1={y} x2={WIDTH - PAD.right} y2={y} stroke="var(--grid)" strokeWidth="1" />
-                <text x={PAD.left - 8} y={y + 4} textAnchor="end" fill="var(--text-faint)" fontSize="10">
-                  {(valueAtY(t) / axisUnit).toFixed(1)}
-                  {axisSuffix}
-                </text>
+                <line x1={PAD.left} y1={y} x2={WIDTH - PAD.right} y2={y} stroke="var(--grid)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
               </g>
             );
           })}
@@ -342,6 +341,21 @@ export function ValueChart({
           ) : null}
           <polyline points={line} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
 
+          <line x1={active.x} y1={PAD.top} x2={active.x} y2={HEIGHT - PAD.bottom} stroke="var(--border-strong)" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+        </svg>
+
+        <div className="pointer-events-none absolute inset-0 whitespace-nowrap text-[11px]">
+          {[0, 0.25, 0.5, 0.75, 1].map((t) => (
+            <span
+              key={t}
+              className="tnum absolute -translate-x-full -translate-y-1/2 pr-1.5 text-faint"
+              style={{ left: pctX(PAD.left), top: pctY(PAD.top + t * innerH) }}
+            >
+              {(valueAtY(t) / axisUnit).toFixed(1)}
+              {axisSuffix}
+            </span>
+          ))}
+
           {/* 이름만 있으면 결국 호버해서 값을 봐야 해서, 금액·날짜·낙폭을 꼬리표에 같이 적는다. */}
           {peak ? (
             <ChartMarker
@@ -355,37 +369,30 @@ export function ValueChart({
             <ChartMarker point={mddTo} label={`MDD ${percent(stats.maxDrawdown, 1)} · ${monthDay(mddTo.snapshot.at)}`} tone="down" />
           ) : null}
 
-          <line x1={active.x} y1={PAD.top} x2={active.x} y2={HEIGHT - PAD.bottom} stroke="var(--border-strong)" strokeWidth="1" />
-          <circle cx={active.x} cy={active.y} r="4" fill={stroke} stroke="var(--bg)" strokeWidth="2" />
+          <Dot point={active} color={stroke} />
 
           {/* 오른쪽 여백에 각 선의 최근값(또는 축 상하한)을 숫자로 적는다 — 호버해야만
               보이던 걸 항상 보이게 해달라는 요청(2026-09-21). 선끼리 y가 가까우면
               글자가 겹치므로, 위에서 아래로 정렬한 뒤 최소 간격만큼 밀어낸다. */}
           {(() => {
-            const RIGHT_X = WIDTH - PAD.right + 6;
-            const MIN_GAP = 11;
-            const labels: { y: number; fill: string; weight?: string; opacity?: string; text: string }[] = [];
+            const MIN_GAP = 14;
+            const labels: { y: number; color: string; bold?: boolean; text: string }[] = [];
             if (returnPoints.length > 0) {
-              labels.push({ y: PAD.top + 4, fill: "var(--accent)", opacity: "0.85", text: percentSigned(returnMax) });
-              labels.push({ y: HEIGHT - PAD.bottom, fill: "var(--accent)", opacity: "0.85", text: percentSigned(returnMin) });
+              labels.push({ y: PAD.top, color: "var(--accent)", text: percentSigned(returnMax) });
+              labels.push({ y: HEIGHT - PAD.bottom, color: "var(--accent)", text: percentSigned(returnMin) });
             }
             if (points.length > 0) {
               const last = points[points.length - 1];
-              labels.push({
-                y: last.y + 3,
-                fill: stroke,
-                weight: "700",
-                text: `${(last.snapshot.totalKrw / axisUnit).toFixed(2)}${axisSuffix}`,
-              });
+              labels.push({ y: last.y, color: stroke, bold: true, text: `${(last.snapshot.totalKrw / axisUnit).toFixed(2)}${axisSuffix}` });
             }
             if (principalPoints.length > 0) {
               const last = principalPoints[principalPoints.length - 1];
               const basis = series[series.length - 1].principalKrw ?? principalKrw ?? 0;
-              labels.push({ y: last.y + 3, fill: "var(--text-muted)", text: `${(basis / axisUnit).toFixed(2)}${axisSuffix}` });
+              labels.push({ y: last.y, color: "var(--text-muted)", text: `${(basis / axisUnit).toFixed(2)}${axisSuffix}` });
             }
             if (showFx && fxPoints.length > 0) {
               const last = fxPoints[fxPoints.length - 1];
-              labels.push({ y: last.y + 3, fill: "var(--fx)", text: series[series.length - 1].fxRate.toFixed(1) });
+              labels.push({ y: last.y, color: "var(--fx)", text: series[series.length - 1].fxRate.toFixed(1) });
             }
 
             const placed = [...labels].sort((a, b) => a.y - b.y).reduce<typeof labels>((acc, label) => {
@@ -395,12 +402,17 @@ export function ValueChart({
             }, []);
 
             return placed.map((label, i) => (
-              <text key={i} x={RIGHT_X} y={label.y} fill={label.fill} fontSize="10" fontWeight={label.weight} opacity={label.opacity}>
+              <span
+                key={i}
+                className={`tnum absolute -translate-y-1/2 pl-1.5 ${label.bold ? "font-bold" : ""}`}
+                style={{ left: pctX(WIDTH - PAD.right), top: pctY(label.y), color: label.color }}
+              >
                 {label.text}
-              </text>
+              </span>
             ));
           })()}
-        </svg>
+        </div>
+        </div>
 
         {/* 짚은 점의 살짝 왼쪽 위에 띄운다. 예전에는 차트 왼쪽 위 구석에 고정이라
             어느 점을 말하는지 눈으로 이어붙여야 했다. 점이 왼쪽 끝이나 위쪽 끝에
@@ -474,7 +486,9 @@ export function ValueChart({
       </div>
 
       {/* 전부 지금 보고 있는 구간(stats)의 값이다 — 기간 탭을 바꾸면 같이 바뀐다. */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      {/* 칸 수는 화면이 아니라 카드 폭을 따른다 — 대시보드처럼 옆 칸과 나눠 쓰면 화면은
+          넓어도 카드가 좁아서, 6칸이면 금액이 두 줄로 꺾이고 부제가 잘렸다. */}
+      <div className="grid grid-cols-2 gap-2 @lg:grid-cols-3 @4xl:grid-cols-6">
         <MiniStat
           label={`${ranges.find((r) => r.key === range)?.label} 수익률`}
           value={periodPercent === null ? "—" : percentSigned(periodPercent)}
@@ -560,21 +574,41 @@ function monthDay(iso: string) {
   return `${Number(m)}/${Number(d)}`;
 }
 
+/** viewBox 좌표를 겹쳐 얹은 HTML의 % 위치로 바꾼다. */
+const pctX = (x: number) => `${(x / WIDTH) * 100}%`;
+const pctY = (y: number) => `${(y / HEIGHT) * 100}%`;
+
+function Dot({ point, color }: { point: { x: number; y: number }; color: string }) {
+  return (
+    <span
+      className="absolute size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-bg"
+      style={{ left: pctX(point.x), top: pctY(point.y), background: color }}
+    />
+  );
+}
+
 function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; label: string; tone: "up" | "down" }) {
   const color = tone === "up" ? "var(--up)" : "var(--down)";
-  const y = Math.max(point.y - 20, 12);
-  // ponytail: 글자 폭 어림값(한글 9, 나머지 5.5) — 글꼴이 바뀌어 넘치면 계수만 고친다.
-  const width = [...label].reduce((sum, ch) => sum + (/[가-힣]/.test(ch) ? 9 : 5.5), 14);
-  // 고점이 차트 양 끝에 있으면 꼬리표가 잘리므로 그리는 영역 안으로 밀어 넣는다.
-  const cx = Math.min(Math.max(point.x, PAD.left + width / 2), WIDTH - PAD.right - width / 2);
+  // 차트 양 끝에 있으면 꼬리표가 잘리므로 가운데 정렬 대신 안쪽으로 붙인다.
+  const shift = point.x < WIDTH * 0.15 ? "0%" : point.x > WIDTH * 0.85 ? "-100%" : "-50%";
+  // 고점은 늘 맨 위라 위에 달면 차트 밖(범례)으로 나간다 — 위쪽 점은 아래에 단다.
+  const dy = point.y < HEIGHT * 0.25 ? "8px" : "calc(-100% - 8px)";
   return (
-    <g>
-      <circle cx={point.x} cy={point.y} r="4" fill={color} stroke="var(--bg)" strokeWidth="2" />
-      <rect x={cx - width / 2} y={y - 10} width={width} height="16" rx="8" fill="var(--bg-elevated)" stroke={color} strokeOpacity="0.6" />
-      <text x={cx} y={y + 1} textAnchor="middle" fill={color} fontSize="9" fontWeight="700">
+    <>
+      <Dot point={point} color={color} />
+      <span
+        className="absolute whitespace-nowrap rounded-full border bg-bg-elevated px-2 py-0.5 text-[11px] font-bold leading-4"
+        style={{
+          left: pctX(point.x),
+          top: pctY(point.y),
+          transform: `translate(${shift}, ${dy})`,
+          color,
+          borderColor: `color-mix(in srgb, ${color} 60%, transparent)`,
+        }}
+      >
         {label}
-      </text>
-    </g>
+      </span>
+    </>
   );
 }
 
