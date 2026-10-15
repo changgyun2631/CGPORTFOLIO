@@ -115,6 +115,7 @@ body {
 }
 
 .brand-lockup {
+  position: relative;
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
@@ -129,6 +130,16 @@ body {
 @media (min-width: 640px) {
   .brand-lockup svg { height: 44px; }
 }
+
+/* 로고 위 별똥별 캔버스(brand-meteor.tsx). 로고보다 조금 크게 겹쳐 놓는다. */
+.brand-meteor {
+  position: absolute;
+  pointer-events: none;
+  width: calc(100% + 20px);
+  height: calc(100% + 20px);
+}
+
+
 
 /* 320px 화면에서도 로고와 테마·메뉴 버튼 사이 여백을 유지한다. */
 @media (max-width: 359px) {
@@ -194,6 +205,9 @@ body {
     animation: none;
   }
   .ticker-marquee-copy[aria-hidden="true"] {
+    display: none;
+  }
+  .brand-meteor {
     display: none;
   }
 }
