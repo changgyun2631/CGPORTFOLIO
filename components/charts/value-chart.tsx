@@ -265,9 +265,9 @@ export function ValueChart({
         </p>
 
         {returnPoints.length > 0 || principalPoints.length > 0 || showFx || tradeMarkers.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
             <Legend color={stroke} label="총 평가금액" />
-            {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" faded /> : null}
+            {returnPoints.length > 0 ? <Legend color="var(--accent)" label="원금 대비 수익률" /> : null}
             {principalPoints.length > 0 ? <Legend color="var(--text-muted)" label="투입 원금" dashed /> : null}
             {showFx ? <Legend color="var(--fx)" label="환율" dashed /> : null}
             {tradeMarkers.some((marker) => marker.buy > 0) ? <Legend color="var(--up)" label="매수" dashed /> : null}
@@ -342,9 +342,18 @@ export function ValueChart({
           ) : null}
           <polyline points={line} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
 
-          {peak ? <ChartMarker point={peak} label="고점" tone="up" /> : null}
-          {mddFrom && mddFrom !== peak ? <ChartMarker point={mddFrom} label="MDD 시작" tone="down" /> : null}
-          {mddTo && mddTo !== peak && mddTo !== mddFrom ? <ChartMarker point={mddTo} label="MDD 저점" tone="down" /> : null}
+          {/* 이름만 있으면 결국 호버해서 값을 봐야 해서, 금액·날짜·낙폭을 꼬리표에 같이 적는다. */}
+          {peak ? (
+            <ChartMarker
+              point={peak}
+              label={`고점 ${(peak.snapshot.totalKrw / axisUnit).toFixed(2)}${axisSuffix} · ${monthDay(peak.snapshot.at)}`}
+              tone="up"
+            />
+          ) : null}
+          {mddFrom && mddFrom !== peak ? <ChartMarker point={mddFrom} label={`MDD 시작 · ${monthDay(mddFrom.snapshot.at)}`} tone="down" /> : null}
+          {mddTo && mddTo !== peak && mddTo !== mddFrom ? (
+            <ChartMarker point={mddTo} label={`MDD ${percent(stats.maxDrawdown, 1)} · ${monthDay(mddTo.snapshot.at)}`} tone="down" />
+          ) : null}
 
           <line x1={active.x} y1={PAD.top} x2={active.x} y2={HEIGHT - PAD.bottom} stroke="var(--border-strong)" strokeWidth="1" />
           <circle cx={active.x} cy={active.y} r="4" fill={stroke} stroke="var(--bg)" strokeWidth="2" />
@@ -545,14 +554,24 @@ function TradeMarker({
   );
 }
 
+/** "2026-08-12" → "8/12" */
+function monthDay(iso: string) {
+  const [, m, d] = dateLabel(iso).split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
 function ChartMarker({ point, label, tone }: { point: { x: number; y: number }; label: string; tone: "up" | "down" }) {
   const color = tone === "up" ? "var(--up)" : "var(--down)";
   const y = Math.max(point.y - 20, 12);
+  // ponytail: 글자 폭 어림값(한글 9, 나머지 5.5) — 글꼴이 바뀌어 넘치면 계수만 고친다.
+  const width = [...label].reduce((sum, ch) => sum + (/[가-힣]/.test(ch) ? 9 : 5.5), 14);
+  // 고점이 차트 양 끝에 있으면 꼬리표가 잘리므로 그리는 영역 안으로 밀어 넣는다.
+  const cx = Math.min(Math.max(point.x, PAD.left + width / 2), WIDTH - PAD.right - width / 2);
   return (
     <g>
       <circle cx={point.x} cy={point.y} r="4" fill={color} stroke="var(--bg)" strokeWidth="2" />
-      <rect x={point.x - 24} y={y - 10} width="48" height="16" rx="8" fill="var(--bg-elevated)" stroke={color} strokeOpacity="0.6" />
-      <text x={point.x} y={y + 1} textAnchor="middle" fill={color} fontSize="9" fontWeight="700">
+      <rect x={cx - width / 2} y={y - 10} width={width} height="16" rx="8" fill="var(--bg-elevated)" stroke={color} strokeOpacity="0.6" />
+      <text x={cx} y={y + 1} textAnchor="middle" fill={color} fontSize="9" fontWeight="700">
         {label}
       </text>
     </g>
@@ -580,9 +599,9 @@ function TooltipRow({
   );
 }
 
-function Legend({ color, label, dashed = false, faded = false }: { color: string; label: string; dashed?: boolean; faded?: boolean }) {
+function Legend({ color, label, dashed = false }: { color: string; label: string; dashed?: boolean }) {
   return (
-    <span className="flex items-center gap-1" style={{ opacity: faded ? 0.6 : 1 }}>
+    <span className="flex items-center gap-1">
       <span className="h-0.5 w-3.5" style={{ background: dashed ? `repeating-linear-gradient(90deg, ${color} 0 3px, transparent 3px 6px)` : color }} />
       {label}
     </span>
