@@ -5,7 +5,13 @@ import { safeReturnPath } from "@/lib/auth/redirect";
 import { verifySessionToken } from "@/lib/auth/session";
 
 function isPublicPath(pathname: string): boolean {
-  return pathname === "/login" || pathname.startsWith("/api/auth/") || pathname.startsWith("/api/cron/");
+  return (
+    pathname === "/login" ||
+    // 브라우저는 로그인 전에 앱 정보 파일을 읽어 "앱으로 설치"를 판단한다. 사이트 이름·아이콘 주소뿐이라 공개해도 된다.
+    pathname === "/manifest.webmanifest" ||
+    pathname.startsWith("/api/auth/") ||
+    pathname.startsWith("/api/cron/")
+  );
 }
 
 export function proxy(request: NextRequest) {
