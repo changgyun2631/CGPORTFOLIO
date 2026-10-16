@@ -40,6 +40,15 @@ describe("화면 로그인 보호", () => {
     expect(cron.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it("앱 정보 파일(manifest)은 로그인 전에도 열려야 홈 화면 앱으로 설치된다", () => {
+    const manifest = proxy(new NextRequest("https://portfolio.example/manifest.webmanifest"));
+    expect(manifest.headers.get("x-middleware-next")).toBe("1");
+
+    // manifest만 열려 있고, 비슷한 이름의 다른 화면은 계속 막혀 있어야 한다.
+    const other = proxy(new NextRequest("https://portfolio.example/manifest.webmanifest/extra"));
+    expect(other.status).toBe(307);
+  });
+
   it("production에서 인증 설정이 빠져도 공개되지 않는다", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("AUTH_USERNAME", "");

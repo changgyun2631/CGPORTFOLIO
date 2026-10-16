@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 
 import { TopNav } from "@/components/shell/top-nav";
@@ -9,6 +9,12 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: `대시보드 | ${site.name}`, template: `%s | ${site.name}` },
   description: site.description,
+  // 아이폰 "홈 화면에 추가"를 앱 창(주소창 없음)으로 열리게 한다. 이미 켜져 있으면 새 탭을 또 열지 않고 그 앱으로 돌아간다.
+  appleWebApp: { capable: true, title: site.name, statusBarStyle: "black" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#07090e", // 기본 다크 테마의 배경색(globals.css --bg)
 };
 
 /**
