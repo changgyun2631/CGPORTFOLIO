@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { GoalCard } from "@/components/calendar/goal-card";
 import { EventRow, MonthCalendar } from "@/components/calendar/month-calendar";
 import { Card, PageTitle, Section } from "@/components/ui/primitives";
-import { getCalendarEvents, getCalendarResults, getGoal } from "@/lib/data/store";
+import { getCalendarEvents, getCalendarResults, getGoal, getLogoSymbols } from "@/lib/data/store";
 import { loadPortfolio } from "@/lib/data/views";
 import { seoulDate } from "@/lib/domain/calendar-results";
 
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 const RESULT_DAYS = 45;
 
 export default async function CalendarPage() {
-  const [events, data, goal, { totals }] = await Promise.all([getCalendarEvents(), getCalendarResults(), getGoal(), loadPortfolio()]);
+  const [events, data, goal, { totals }, logoList] = await Promise.all([getCalendarEvents(), getCalendarResults(), getGoal(), loadPortfolio(), getLogoSymbols()]);
   const now = new Date();
   const today = seoulDate(now);
   const results = data?.results ?? {};
@@ -32,7 +32,7 @@ export default async function CalendarPage() {
 
       <GoalCard currentKrw={totals.totalKrw} goal={goal} />
 
-      <MonthCalendar events={events} results={results} today={today} nowMs={now.getTime()} />
+      <MonthCalendar events={events} results={results} logos={logoList} today={today} nowMs={now.getTime()} />
 
       <Section title="발표 결과" description={`최근 ${RESULT_DAYS}일 동안 발표된 실적·지표입니다. 공시가 올라오는 대로 6시간마다 채워집니다.`}>
         <Card>
@@ -41,7 +41,7 @@ export default async function CalendarPage() {
           ) : (
             <ul className="divide-y divide-line">
               {released.map((event) => (
-                <EventRow key={event.id} event={event} result={results[event.id]} nowMs={now.getTime()} showDate />
+                <EventRow key={event.id} event={event} result={results[event.id]} nowMs={now.getTime()} showDate logo={event.symbolId ? logoList.includes(event.symbolId) : false} />
               ))}
             </ul>
           )}

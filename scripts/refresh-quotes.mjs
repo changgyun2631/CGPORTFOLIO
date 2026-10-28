@@ -30,6 +30,7 @@ import { trimLogFile } from "./lib/log-rotate.mjs";
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { refreshCalendar } from "./lib/calendar-refresh.mjs";
 import { syncEarningsDaily } from "./lib/earnings-sync.mjs";
+import { syncCalendarLogos, syncEwDaily } from "./lib/ew-sync.mjs";
 import { REFRESH_EXIT, classifyFetchError, classifyJobOutcome, describeRecoveryDecision } from "./lib/refresh-diagnostics.mjs";
 
 loadLocalEnv();
@@ -173,6 +174,19 @@ async function main() {
     if (earnings) log(`실적 발표일: 보유 종목 일정 ${earnings.found}건, 새로 추가 ${earnings.added}건`);
   } catch (error) {
     log(`실적 발표일 확인 실패(계속): ${error.message}`);
+  }
+  try {
+    const ew = await syncEwDaily();
+    if (ew) log(`주요 기업 실적: 읽은 일정 ${ew.found}건, 새로 추가 ${ew.added}건`);
+  } catch (error) {
+    log(`주요 기업 실적 확인 실패(계속): ${error.message}`);
+  }
+  try {
+    // 시세 갱신을 오래 붙잡지 않도록 한 번에 15개(약 2분)씩 — 쌓인 만큼 며칠에 걸쳐 받는다.
+    const logos = await syncCalendarLogos({ limit: 15 });
+    if (logos.saved || logos.none) log(`회사 로고: 새로 저장 ${logos.saved}건, 로고 없음 ${logos.none}건`);
+  } catch (error) {
+    log(`회사 로고 저장 실패(계속): ${error.message}`);
   }
   try {
     const calendar = await refreshCalendar();

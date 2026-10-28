@@ -1,7 +1,7 @@
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { refreshCalendar } from "./lib/calendar-refresh.mjs";
 import { syncEarningsDaily } from "./lib/earnings-sync.mjs";
-import { syncEwDaily } from "./lib/ew-sync.mjs";
+import { syncCalendarLogos, syncEwDaily } from "./lib/ew-sync.mjs";
 
 loadLocalEnv();
 
@@ -19,6 +19,13 @@ try {
   if (result) console.log(`주요 기업 실적: 읽은 일정 ${result.found}건, 새로 추가 ${result.added}건`);
 } catch (error) {
   console.error(`주요 기업 실적 확인 실패: ${error.message}`);
+}
+
+try {
+  const logos = await syncCalendarLogos();
+  if (logos.saved || logos.none) console.log(`회사 로고: 새로 저장 ${logos.saved}건, 로고 없음 ${logos.none}건`);
+} catch (error) {
+  console.error(`회사 로고 저장 실패: ${error.message}`);
 }
 
 try {

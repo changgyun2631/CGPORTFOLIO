@@ -42,16 +42,20 @@ const dayTitle = (date: string) => {
 export function MonthCalendar({
   events,
   results,
+  logos,
   today,
   nowMs,
 }: {
   events: CalendarEvent[];
   results: Record<string, CalendarResult>;
+  /** 로고를 받아 둔 티커 */
+  logos: string[];
   today: string;
   nowMs: number;
 }) {
   const [month, setMonth] = useState(monthOf(today));
   const [selected, setSelected] = useState<string | null>(null);
+  const logoSet = new Set(logos);
 
   const eventsByDate = new Map<string, CalendarEvent[]>();
   for (const event of events) eventsByDate.set(event.date, [...(eventsByDate.get(event.date) ?? []), event]);
@@ -116,6 +120,7 @@ export function MonthCalendar({
                 d={i + 1}
                 events={eventsByDate.get(date) ?? []}
                 results={results}
+                logos={logoSet}
                 isToday={date === today}
                 selected={date === selected}
                 onSelect={() => setSelected(date)}
@@ -126,14 +131,14 @@ export function MonthCalendar({
       </div>
 
       {selected ? (
-        <DayDialog key={selected} date={selected} events={eventsByDate.get(selected) ?? []} results={results} nowMs={nowMs} onClose={() => setSelected(null)} />
+        <DayDialog key={selected} date={selected} events={eventsByDate.get(selected) ?? []} results={results} logos={logoSet} nowMs={nowMs} onClose={() => setSelected(null)} />
       ) : null}
     </div>
   );
 }
 
 /** 날짜를 누르면 뜨는 팝업. 일정 10건쯤 높이까지 보이고 그 위로는 스크롤한다. 바깥·Esc로 닫는다. */
-function DayDialog({ date, events, results, nowMs, onClose }: { date: string; events: CalendarEvent[]; results: Record<string, CalendarResult>; nowMs: number; onClose: () => void }) {
+function DayDialog({ date, events, results, logos, nowMs, onClose }: { date: string; events: CalendarEvent[]; results: Record<string, CalendarResult>; logos: Set<string>; nowMs: number; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => ref.current?.showModal(), []);
   // 보유 종목·지표가 먼저, 사이트 주요 기업이 뒤
@@ -158,7 +163,7 @@ function DayDialog({ date, events, results, nowMs, onClose }: { date: string; ev
       ) : (
         <ul className="max-h-[min(70vh,640px)] divide-y divide-line overflow-y-auto px-5">
           {sorted.map((event) => (
-            <EventRow key={event.id} event={event} result={results[event.id]} nowMs={nowMs} />
+            <EventRow key={event.id} event={event} result={results[event.id]} nowMs={nowMs} logo={logos.has(event.symbolId ?? "")} />
           ))}
         </ul>
       )}
@@ -167,11 +172,12 @@ function DayDialog({ date, events, results, nowMs, onClose }: { date: string; ev
 }
 
 /** 일정 한 줄 + 발표 결과. 날짜 상세와 페이지 아래 "발표 결과" 목록이 같이 쓴다. */
-export function EventRow({ event, result, nowMs, showDate = false }: { event: CalendarEvent; result?: CalendarResult; nowMs: number; showDate?: boolean }) {
+export function EventRow({ event, result, nowMs, showDate = false, logo = false }: { event: CalendarEvent; result?: CalendarResult; nowMs: number; showDate?: boolean; logo?: boolean }) {
   return (
     <li className="py-3">
       <div className="flex items-start gap-3">
         <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-bold ${kindTone[event.kind]}`}>{kindLabel[event.kind]}</span>
+        {logo && event.symbolId ? <CompanyLogo symbol={event.symbolId} size={28} /> : null}
         <div className="min-w-0 flex-1">
           {showDate ? <p className="mb-0.5 text-xs text-muted">{dayTitle(event.date)}</p> : null}
           <p className="text-[15px] font-semibold">{event.title}</p>
@@ -188,6 +194,14 @@ export function EventRow({ event, result, nowMs, showDate = false }: { event: Ca
       </div>
       {isWatch(event) ? null : <EventResults event={event} result={result} nowMs={nowMs} />}
     </li>
+  );
+}
+
+/** 받아 둔 회사 로고. 흰 바탕 로고가 어두운 화면에서도 보이게 흰 틀을 둔다. */
+function CompanyLogo({ symbol, size }: { symbol: string; size: number }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- 우리 서버가 내주는 작은 파일이라 최적화가 필요 없다
+    <img src={`/api/logo/${encodeURIComponent(symbol)}`} alt="" width={size} height={size} loading="lazy" className="shrink-0 rounded-md bg-white object-contain" style={{ width: size, height: size }} />
   );
 }
 
@@ -208,6 +222,7 @@ function DayCell({
   d,
   events,
   results,
+  logos,
   isToday,
   selected,
   onSelect,
@@ -215,6 +230,7 @@ function DayCell({
   d: number;
   events: CalendarEvent[];
   results: Record<string, CalendarResult>;
+  logos: Set<string>;
   isToday: boolean;
   selected: boolean;
   onSelect: () => void;
@@ -242,10 +258,11 @@ function DayCell({
         {[...events].sort((a, b) => Number(isWatch(a)) - Number(isWatch(b))).map((event, i) => (
           <span
             key={event.id}
-            className={`truncate rounded-md px-1 text-[10px] font-medium leading-4 sm:text-[11px] ${
+            className={`inline-flex items-center gap-0.5 truncate rounded-md px-1 text-[10px] font-medium leading-4 sm:text-[11px] ${
               isWatch(event) ? "border border-line text-muted" : kindTone[event.kind]
-            } ${i >= CHIPS_PER_CELL ? "hidden sm:inline" : ""}`}
+            } ${i >= CHIPS_PER_CELL ? "max-sm:hidden" : ""}`}
           >
+            {event.symbolId && logos.has(event.symbolId) ? <CompanyLogo symbol={event.symbolId} size={12} /> : null}
             {/* 결과가 들어온 일정은 ✓로 표시해 칸만 보고도 발표가 끝났는지 안다. */}
             {results[event.id]?.status === "available" ? "✓ " : ""}
             {event.symbolId ?? event.title}

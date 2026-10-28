@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 
 import { writeJsonAtomic, withDataLock } from "./atomic-write.mjs";
+import { syncLogos } from "./logo-sync.mjs";
 
 /**
  * earningswhispers.com "가장 기대되는 실적" 주간 페이지(/calweek/YYYYMMDD)에서 주요 기업의
@@ -85,6 +86,22 @@ export async function syncEw({ dataDir = join(process.cwd(), "data"), now = new 
     writeJsonAtomic(path, `${JSON.stringify(after, null, 2)}\n`);
   });
   return { found: found.length, added };
+}
+
+/** 캘린더에 올라온 앞으로의 실적 종목 로고를 `limit`개까지 받아 둔다. 실패해도 일정에는 영향이 없다. */
+export function syncCalendarLogos({ dataDir = join(process.cwd(), "data"), now = new Date(), limit } = {}) {
+  const events = JSON.parse(readFileSync(join(dataDir, "calendar.json"), "utf8"));
+  return syncLogos(upcomingSymbols(events, now.toISOString().slice(0, 10)), { dataDir, limit });
+}
+
+/** 앞으로 올 실적 일정의 티커를 가까운 날짜 순으로 — 로고를 먼저 받을 순서. */
+export function upcomingSymbols(events, today) {
+  const seen = new Set();
+  return events
+    .filter((e) => e.kind === "earnings" && e.symbolId && e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((e) => e.symbolId)
+    .filter((s) => !seen.has(s) && seen.add(s));
 }
 
 /** 하루 한 번만 돌린다. 마지막 성공 날짜는 `data/.ew-sync-date`. */

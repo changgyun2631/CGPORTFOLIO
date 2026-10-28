@@ -1,6 +1,6 @@
 import "server-only";
 
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { cache } from "react";
@@ -32,6 +32,15 @@ import type { AssetGoal } from "@/lib/domain/goals";
  */
 
 const dataDir = join(process.cwd(), "data");
+
+/** `data/logos/`에 받아 둔 회사 로고의 티커 목록(`scripts/lib/logo-sync.mjs`가 채운다). 없으면 빈 목록. */
+export async function getLogoSymbols(): Promise<string[]> {
+  try {
+    return (await readdir(join(dataDir, "logos"))).filter((f) => f.endsWith(".jpg")).map((f) => f.slice(0, -4));
+  } catch {
+    return [];
+  }
+}
 
 async function readJsonRaw(name: string): Promise<unknown> {
   try {
