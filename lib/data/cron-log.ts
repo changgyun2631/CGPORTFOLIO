@@ -18,7 +18,7 @@ import { trimLogFile } from "../../scripts/lib/log-rotate.mjs";
  */
 const LOG_DIR = join(homedir(), "cgportfolio-logs");
 const LOG_PATH = join(LOG_DIR, "cron-refresh.log");
-const MAX_LOG_LINES = 500;
+const MAX_LOG_LINES = 3000;
 
 export function logCronStage(line: string): void {
   try {

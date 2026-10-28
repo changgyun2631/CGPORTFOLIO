@@ -58,7 +58,7 @@ curl -s -o /dev/null -w "%{http_code}\n" http://localhost:3000/
 | 작업 이름 | 주기 | 하는 일 |
 |---|---|---|
 | `CGPORTFOLIO 서버` | 매일 04:00 + **로그온 시(30초 지연)** | `scripts/start-server.cmd` → `npm start` (포트 3000) |
-| `CGPORTFOLIO 시세 갱신` | 6시간마다 (02/08/14/20시) | `scripts/refresh-quotes.mjs` → `/api/cron/refresh` 접수 후 상태 조회 |
+| `CGPORTFOLIO 시세 갱신` | 17:00~09:00 30분마다 + 13:00 (KST) | `scripts/refresh-quotes.mjs` → `/api/cron/refresh` 접수 후 상태 조회 |
 | `CGPORTFOLIO 데이터 백업` | 매일 03:00 | `scripts/backup-data.mjs` → `~/cgportfolio-backups/` |
 | `CGPORTFOLIO 주간 리포트` | 매주 월 09:00 | `scripts/generate-weekly-report.mjs` → `/api/cron/weekly-report` 호출 |
 | `CGPORTFOLIO 받은CSV 가져오기` | 10분마다 | `scripts/import-inbox.mjs` → `~/cgportfolio-inbox`의 증권사 CSV 자동 반영 |

@@ -110,7 +110,7 @@ const url = flags.url ?? "http://localhost:3000/api/cron/refresh";
 const secret = flags.secret ?? process.env.CRON_SECRET;
 const logDir = join(homedir(), "cgportfolio-logs");
 const logPath = flags.log ?? join(logDir, "refresh.log");
-const MAX_LOG_LINES = 500;
+const MAX_LOG_LINES = 3000;
 
 mkdirSync(dirname(logPath), { recursive: true });
 

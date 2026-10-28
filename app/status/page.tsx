@@ -6,8 +6,11 @@ import { readRefreshLogSummary, readServerLogSummary } from "@/lib/status/read-l
 import { nextScheduledRun } from "@/lib/domain/log-status";
 import { shortDateTime } from "@/lib/format";
 
-/** WORK_ORDER 0-3절에 등록된 고정 스케줄(KST 시각). 실제 작업 스케줄러 등록을 바꾸면 여기도 같이 고칠 것. */
-const REFRESH_SCHEDULE_HOURS_KST = [2, 8, 14, 20];
+/**
+ * 등록된 시세 갱신 스케줄(KST 시각, 소수는 분): 17:00부터 16시간 동안 30분마다 + 13:00.
+ * `scripts/setup-new-pc.ps1`과 같아야 한다. 실제 작업 스케줄러 등록을 바꾸면 여기도 같이 고칠 것.
+ */
+const REFRESH_SCHEDULE_HOURS_KST = [13, ...Array.from({ length: 32 }, (_, i) => (17 + i * 0.5) % 24)];
 
 export const metadata: Metadata = { title: "운영 상태" };
 
@@ -116,7 +119,7 @@ export default function StatusPage() {
           <p className="mt-3 text-[11px] leading-4 text-faint">
             최근 {refresh.recentTotal}회 중 {refresh.recentFailureCount}회 실패. 다음 예정{" "}
             <span className="tnum font-semibold text-muted">{shortDateTime(nextRefreshAt)}</span>
-            (등록된 주기: 6시간마다, 02/08/14/20시)
+            (등록된 주기: 한국시간 17:00~09:00 30분마다, 13:00)
           </p>
         </Card>
       </div>
