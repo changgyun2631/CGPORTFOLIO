@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Amount, AmountsProvider, AmountsToggle, AssetMapTreemap } from "@/components/charts/amounts";
 import { CopyTreemapButton } from "@/components/charts/copy-image-button";
-import { Treemap, TreemapLegend } from "@/components/charts/treemap";
+import { TreemapLegend } from "@/components/charts/treemap";
 import { Card, Delta, PageTitle, Section, WeightBar } from "@/components/ui/primitives";
 import { loadAssetMap, loadPortfolio } from "@/lib/data/views";
-import { percent } from "@/lib/format";
+import { money, percent } from "@/lib/format";
 
 export const metadata: Metadata = { title: "자산맵" };
 export const dynamic = "force-dynamic";
@@ -15,27 +16,31 @@ export default async function AssetMapPage() {
   const symbolNames = new Map(portfolio.symbols.map((s) => [s.id, s.name]));
 
   return (
-    <div className="space-y-8">
+    <AmountsProvider className="space-y-8">
       <PageTitle
         title="자산맵"
-        description="보유 ETF를 구성종목까지 펼쳐서, 실제로 어느 기업에 얼마가 걸려 있는지 봅니다. 면적은 평가금액 비중, 색은 전일 등락률입니다."
+        description="보유 ETF를 구성종목까지 펼쳐서, 실제로 어느 기업에 얼마가 걸려 있는지 봅니다. 면적은 평가금액, 색은 전일 등락률입니다."
       />
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted">
-          <span className="font-semibold text-text">{assetMap.nodes.length}개</span> 종목
+          <span className="font-semibold text-text">{assetMap.nodes.length}개</span> 종목 · 합계{" "}
+          <Amount>
+            <span className="tnum font-semibold text-text">{money(assetMap.totalKrw)}</span>
+          </Amount>
           {assetMap.unresolved > 0 ? (
             <span className="ml-2 text-faint">구성종목 표가 없는 {assetMap.unresolved}개는 펼치지 않았습니다.</span>
           ) : null}
         </p>
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <AmountsToggle />
           <CopyTreemapButton />
           <TreemapLegend />
         </div>
       </div>
 
       <Card>
-        <Treemap
+        <AssetMapTreemap
           data={assetMap.nodes.map((node) => ({
             key: node.ticker,
             label: node.ticker,
@@ -50,7 +55,7 @@ export default async function AssetMapPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Section title="구성종목 상위" description="여러 ETF에 겹쳐 담긴 종목은 합산됩니다.">
           <div className="overflow-x-auto rounded-2xl border border-line">
-            <table className="w-full min-w-[520px] border-collapse text-sm">
+            <table className="w-full min-w-[620px] border-collapse text-sm">
               <thead>
                 <tr className="border-b border-line bg-bg-elevated text-[11px] font-medium text-muted">
                   <th scope="col" className="px-4 py-2.5 text-left">
@@ -59,6 +64,11 @@ export default async function AssetMapPage() {
                   <th scope="col" className="px-3 py-2.5 text-right">
                     비중
                   </th>
+                  <Amount>
+                    <th scope="col" className="px-3 py-2.5 text-right">
+                      평가금액
+                    </th>
+                  </Amount>
                   <th scope="col" className="px-3 py-2.5 text-right">
                     전일
                   </th>
@@ -75,6 +85,9 @@ export default async function AssetMapPage() {
                       <span className="mt-0.5 block max-w-[200px] truncate text-[11px] text-faint">{node.name}</span>
                     </td>
                     <td className="tnum px-3 py-2.5 text-right font-medium">{percent(node.weight)}</td>
+                    <Amount>
+                      <td className="tnum px-3 py-2.5 text-right">{money(node.valueKrw)}</td>
+                    </Amount>
                     <td className="px-3 py-2.5 text-right">
                       <Delta percent={node.dayChangePercent} showAmount={false} />
                     </td>
@@ -115,6 +128,9 @@ export default async function AssetMapPage() {
                     </span>
                     <span className="tnum font-semibold">
                       {percent(sector.weight, 1)}
+                      <Amount>
+                        <span className="ml-2 text-[11px] font-normal text-muted">{money(sector.valueKrw)}</span>
+                      </Amount>
                     </span>
                   </div>
                   <WeightBar weight={sector.weight} />
@@ -124,6 +140,6 @@ export default async function AssetMapPage() {
           </Card>
         </Section>
       </div>
-    </div>
+    </AmountsProvider>
   );
 }
