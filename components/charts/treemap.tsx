@@ -1,5 +1,5 @@
 import { squarify } from "@/lib/domain/treemap";
-import { money, percentSigned } from "@/lib/format";
+import { percentSigned } from "@/lib/format";
 
 /**
  * 자산맵. 면적은 평가금액, 색은 전일 등락률.
@@ -63,6 +63,7 @@ export function Treemap({
       viewBox={`0 0 ${width} ${height}`}
       className={`w-full ${className}`}
       role="img"
+      data-treemap
       aria-label={`자산맵, ${data.length}개 종목`}
       preserveAspectRatio="xMidYMid meet"
     >
@@ -77,7 +78,6 @@ export function Treemap({
         // 칸 폭만 보면 CASH.USD처럼 긴 이름이 칸 밖으로 삐져나와서, 글자 폭(어림)도 같이 본다.
         const showLabel = tile.width > Math.max(34, datum.label.length * labelSize * 0.62 + 6) && tile.height > 20;
         const showChange = showLabel && tile.width > 52 && tile.height > 36;
-        const showValue = tile.width > 96 && tile.height > 62;
 
         const cx = tile.x + tile.width / 2;
         const cy = tile.y + tile.height / 2;
@@ -94,7 +94,7 @@ export function Treemap({
               stroke={tone.border}
               strokeWidth="1"
             />
-            <title>{`${datum.label}${datum.name ? ` · ${datum.name}` : ""}\n${money(datum.value)}\n${percentSigned(datum.changePercent)}`}</title>
+            <title>{`${datum.label}${datum.name ? ` · ${datum.name}` : ""}\n${percentSigned(datum.changePercent)}`}</title>
             {showLabel ? (
               <text
                 x={cx}
@@ -121,20 +121,6 @@ export function Treemap({
                 style={{ pointerEvents: "none" }}
               >
                 {percentSigned(datum.changePercent)}
-              </text>
-            ) : null}
-            {showValue ? (
-              <text
-                x={cx}
-                y={cy + labelSize * 1.95}
-                textAnchor="middle"
-                dominantBaseline="middle"
-                fill={tone.text}
-                fontSize={Math.max(8, labelSize * 0.55)}
-                opacity="0.8"
-                style={{ pointerEvents: "none" }}
-              >
-                {money(datum.value)}
               </text>
             ) : null}
           </g>
