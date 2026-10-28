@@ -1,6 +1,7 @@
 import { loadLocalEnv } from "./lib/load-local-env.mjs";
 import { refreshCalendar } from "./lib/calendar-refresh.mjs";
 import { syncEarningsDaily } from "./lib/earnings-sync.mjs";
+import { syncEwDaily } from "./lib/ew-sync.mjs";
 
 loadLocalEnv();
 
@@ -10,6 +11,14 @@ try {
   if (result) console.log(`실적 발표일 확인: 보유 종목 일정 ${result.found}건, 새로 추가 ${result.added}건`);
 } catch (error) {
   console.error(`실적 발표일 확인 실패: ${error.message}`);
+}
+
+// Earnings Whispers 주요 기업 실적(하루 한 번, 이번 주부터 4주). 실패해도 계속 진행한다.
+try {
+  const result = await syncEwDaily({ force: process.argv.includes("--earnings") });
+  if (result) console.log(`주요 기업 실적: 읽은 일정 ${result.found}건, 새로 추가 ${result.added}건`);
+} catch (error) {
+  console.error(`주요 기업 실적 확인 실패: ${error.message}`);
 }
 
 try {

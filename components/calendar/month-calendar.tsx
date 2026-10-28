@@ -24,6 +24,9 @@ const kindTone: Record<CalendarEvent["kind"], string> = {
   personal: "bg-surface-hover text-muted",
 };
 
+/** Earnings Whispers 주요 기업 일정(보유 종목이 아님). 결과 수집·종목 페이지 링크가 없다. */
+const isWatch = (event: CalendarEvent) => event.id.startsWith("ew-");
+
 const monthOf = (date: string) => date.slice(0, 7);
 function shiftMonth(month: string, by: number) {
   const [y, m] = month.split("-").map(Number);
@@ -151,7 +154,7 @@ export function EventRow({ event, result, nowMs, showDate = false }: { event: Ca
           <p className="text-[15px] font-semibold">{event.title}</p>
           {event.note ? <p className="mt-1 text-sm leading-6 text-muted">{event.note}</p> : null}
         </div>
-        {event.symbolId ? (
+        {event.symbolId && !isWatch(event) ? (
           <Link
             href={`/symbols/${encodeURIComponent(event.symbolId)}`}
             className="shrink-0 rounded border border-line-strong px-2 py-1 text-xs text-muted hover:text-text"
@@ -160,7 +163,7 @@ export function EventRow({ event, result, nowMs, showDate = false }: { event: Ca
           </Link>
         ) : null}
       </div>
-      <EventResults event={event} result={result} nowMs={nowMs} />
+      {isWatch(event) ? null : <EventResults event={event} result={result} nowMs={nowMs} />}
     </li>
   );
 }
@@ -193,6 +196,7 @@ function DayCell({
   selected: boolean;
   onSelect: () => void;
 }) {
+  // 사이트 주요 기업(ew-)이 많은 날은 칸이 내용만큼 커진다. 모바일은 칸이 좁아 3개만 보이고 나머지는 +N건.
   const extra = events.length - CHIPS_PER_CELL;
   return (
     <button
@@ -200,7 +204,7 @@ function DayCell({
       onClick={onSelect}
       aria-pressed={selected}
       aria-label={`${d}일, 일정 ${events.length}건`}
-      className={`flex min-h-[72px] flex-col gap-1 overflow-hidden rounded-lg border p-1.5 text-left transition-colors sm:min-h-[112px] sm:rounded-xl sm:p-2 ${
+      className={`flex min-h-[72px] flex-col gap-1 overflow-hidden rounded-lg border p-1.5 text-left transition-colors sm:min-h-[150px] sm:rounded-xl sm:p-2 ${
         selected ? "border-text ring-1 ring-inset ring-text" : "border-line hover:border-line-strong"
       } ${events.length > 0 ? "bg-surface" : ""}`}
     >
@@ -211,14 +215,21 @@ function DayCell({
       >
         {d}
       </span>
-      {events.slice(0, CHIPS_PER_CELL).map((event) => (
-        <span key={event.id} className={`truncate rounded-md px-1 text-[10px] font-medium leading-4 sm:text-[11px] ${kindTone[event.kind]}`}>
-          {/* 결과가 들어온 일정은 ✓로 표시해 칸만 보고도 발표가 끝났는지 안다. */}
-          {results[event.id]?.status === "available" ? "✓ " : ""}
-          {event.symbolId ?? event.title}
-        </span>
-      ))}
-      {extra > 0 ? <span className="text-[10px] leading-4 text-faint">+{extra}건</span> : null}
+      <div className="flex flex-wrap gap-1">
+        {[...events].sort((a, b) => Number(isWatch(a)) - Number(isWatch(b))).map((event, i) => (
+          <span
+            key={event.id}
+            className={`truncate rounded-md px-1 text-[10px] font-medium leading-4 sm:text-[11px] ${
+              isWatch(event) ? "border border-line text-muted" : kindTone[event.kind]
+            } ${i >= CHIPS_PER_CELL ? "hidden sm:inline" : ""}`}
+          >
+            {/* 결과가 들어온 일정은 ✓로 표시해 칸만 보고도 발표가 끝났는지 안다. */}
+            {results[event.id]?.status === "available" ? "✓ " : ""}
+            {event.symbolId ?? event.title}
+          </span>
+        ))}
+      </div>
+      {extra > 0 ? <span className="text-[10px] leading-4 text-faint sm:hidden">+{extra}건</span> : null}
     </button>
   );
 }
