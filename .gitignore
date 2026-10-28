@@ -53,6 +53,7 @@ yarn-error.log*
 /data/goals.json
 /data/.earnings-sync-date
 /data/.ew-sync-date
+/data/.twelve-quote-at
 /data/logos/
 /data/.calendar-refresh.lock
 # cron 이 적재하는 시세·스냅샷. 여기에도 내 평가금액이 그대로 담긴다.

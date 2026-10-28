@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createTwelveDataFxProvider, createTwelveDataProvider } from "../twelve-data";
+import { createTwelveDataFxProvider, createTwelveDataProvider, parseQuote } from "../twelve-data";
 
 /**
  * 실제 API를 부르지 않는다 — `global.fetch`를 모킹해서 (1) 매 요청에 timeout용
@@ -66,6 +66,32 @@ describe("createTwelveDataProvider", () => {
 
     expect(call).toBe(2);
     expect(quotes.some((q) => q.symbolId === "SYM8")).toBe(true);
+  });
+});
+
+describe("parseQuote 프리·애프터마켓", () => {
+  // 2026-10-27 정규장(동부 09:30~16:00)을 마친 종목. 마지막 정규장 체결 = 16:00 EDT.
+  const session = { close: "208.56", previous_close: "199.78", datetime: "2026-10-27", last_quote_at: 1793131140, is_market_open: false };
+  const at = (iso: string) => Date.parse(iso) / 1000;
+
+  it("다음 거래일 프리마켓이면 프리 가격을 쓰고 직전 정규장 종가를 전일로 본다", () => {
+    const quote = parseQuote("VRT", { ...session, extended_price: "243.73", extended_timestamp: at("2026-10-28T13:18:00Z") });
+    expect(quote).toMatchObject({ price: 243.73, prevClose: 208.56, marketState: "pre" });
+  });
+
+  it("그날 정규장이 끝난 뒤 애프터마켓이면 전일 종가를 그대로 둬 하루 변동에 시간외를 합친다", () => {
+    const quote = parseQuote("VRT", { ...session, extended_price: "210", extended_timestamp: at("2026-10-27T21:30:00Z") });
+    expect(quote).toMatchObject({ price: 210, prevClose: 199.78, marketState: "post" });
+  });
+
+  it("시간외 체결이 정규장 마지막 체결보다 오래됐으면 정규장 가격을 쓴다", () => {
+    const quote = parseQuote("VRT", { ...session, extended_price: "243.73", extended_timestamp: at("2026-10-27T12:00:00Z") });
+    expect(quote).toMatchObject({ price: 208.56, prevClose: 199.78, marketState: "closed" });
+  });
+
+  it("정규장 중이거나 시간외 가격이 없으면 정규장 값 그대로", () => {
+    expect(parseQuote("VRT", { ...session, is_market_open: true, extended_price: "1", extended_timestamp: at("2026-10-28T14:00:00Z") })).toMatchObject({ price: 208.56, marketState: "open" });
+    expect(parseQuote("VRT", session)).toMatchObject({ price: 208.56, prevClose: 199.78 });
   });
 });
 

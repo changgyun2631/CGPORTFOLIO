@@ -58,6 +58,10 @@ export default async function DashboardPage() {
     principalAsOf: snapshots.at(-1)?.at ?? null,
   });
 
+  // 정규장 밖 시세(프리·애프터)가 섞여 있으면 UPDATE 옆에 알린다 — 총액·등락이 그 가격 기준이다.
+  const heldStates = quotes.filter((q) => heldIds.has(q.symbolId)).map((q) => q.marketState);
+  const sessionLabel = heldStates.includes("pre") ? "프리마켓 반영" : heldStates.includes("post") ? "애프터마켓 반영" : null;
+
   const invested = holdings.filter((h) => h.kind !== "cash");
   const winners = invested.filter((h) => h.totalGainKrw > 0);
   const best = [...invested].sort((a, b) => b.totalGainPercent - a.totalGainPercent)[0];
@@ -97,6 +101,7 @@ export default async function DashboardPage() {
                 .join(" · ")}
             >
               UPDATE : {dateTimeLabel(fx.asOf)}
+              {sessionLabel ? <span className="ml-2 font-medium text-muted">· {sessionLabel}</span> : null}
             </p>
             <FreshnessBadges checks={freshness} />
           </div>

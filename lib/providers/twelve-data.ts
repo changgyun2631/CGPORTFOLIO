@@ -43,23 +43,47 @@ type RawQuote = {
   close?: string | number;
   previous_close?: string | number;
   datetime?: string;
+  /** 정규장 마지막 체결 시각(초). 이보다 늦은 extended_timestamp가 있으면 프리·애프터 가격이 더 최신이다. */
+  last_quote_at?: number;
+  /** `prepost=true`로 받는 프리·애프터마켓 가격. 장이 막 열렸거나 거래가 없으면 빠진다. */
+  extended_price?: string | number;
+  extended_timestamp?: number;
   is_market_open?: boolean;
   status?: string;
   code?: number;
   message?: string;
 };
 
-function parseQuote(symbolId: string, raw: RawQuote): Quote {
+const easternDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" });
+
+/**
+ * 정규장 마감 뒤(애프터)나 개장 전(프리)에 정규장보다 새로운 체결이 있으면 그 가격을 쓴다.
+ * - 프리: 새 거래일이 시작된 뒤라 직전 정규장 종가(close)가 전일 기준이다.
+ * - 애프터: 그날 정규장이 끝난 뒤라 전일 종가(previous_close)를 그대로 두어 하루 변동에 시간외까지 합친다.
+ * 새 거래일인지는 시세 날짜(`datetime`, 정규장 거래일)와 시간외 체결의 미국 동부 날짜를 비교해 정한다.
+ */
+function extendedHours(raw: RawQuote, close: number, previousClose: number) {
+  const price = Number(raw.extended_price);
+  const at = raw.extended_timestamp;
+  if (!Number.isFinite(price) || price <= 0 || !at || at <= (raw.last_quote_at ?? 0) || raw.is_market_open) return null;
+  const pre = easternDate.format(at * 1000) > (raw.datetime ?? "");
+  return { price, prevClose: pre ? close : previousClose, marketState: pre ? ("pre" as const) : ("post" as const) };
+}
+
+export function parseQuote(symbolId: string, raw: RawQuote): Quote {
   if (raw.status === "error" || raw.code) {
     throw new ProviderShapeError("twelve-data", raw.message ?? `${symbolId} 조회 실패`);
   }
+  const close = requireNumber(raw.close, "twelve-data", `${symbolId}.close`);
+  const previousClose = requireNumber(raw.previous_close, "twelve-data", `${symbolId}.previous_close`);
+  const extended = extendedHours(raw, close, previousClose);
   return {
     symbolId,
-    price: requireNumber(raw.close, "twelve-data", `${symbolId}.close`),
-    prevClose: requireNumber(raw.previous_close, "twelve-data", `${symbolId}.previous_close`),
+    price: extended?.price ?? close,
+    prevClose: extended?.prevClose ?? previousClose,
     currency: "USD",
     asOf: new Date().toISOString(),
-    marketState: raw.is_market_open ? "open" : "closed",
+    marketState: extended?.marketState ?? (raw.is_market_open ? "open" : "closed"),
   };
 }
 
@@ -80,6 +104,7 @@ export function createTwelveDataProvider(apiKey: string): QuoteProvider {
         try {
           const url = new URL(`${BASE}/quote`);
           url.searchParams.set("symbol", group.join(","));
+          url.searchParams.set("prepost", "true"); // 프리·애프터 가격(extended_price)도 같이 — 추가 크레딧 없음
           url.searchParams.set("apikey", apiKey);
 
           const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
