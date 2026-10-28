@@ -35,6 +35,14 @@ export default async function AssetMapPage() {
         <div className="flex flex-wrap items-center gap-3">
           <AmountsToggle />
           <CopyTreemapButton />
+          <a
+            href="https://www.saveticker.com/watchlist"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:border-line-strong hover:text-text"
+          >
+            시장 마켓맵 ↗
+          </a>
           <TreemapLegend />
         </div>
       </div>
