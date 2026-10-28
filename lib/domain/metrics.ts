@@ -77,13 +77,49 @@ const RANGE_COVERAGE_MIN = 0.7;
  */
 const INTRADAY_RANGES = new Set<RangeKey>(["1d", "7d"]);
 
-/** KST 달력 날짜. 스냅샷의 `at`은 `+09:00`과 `Z`가 섞여 있어 앞 10자를 자르면 하루 어긋난다. */
-function kstDate(iso: string) {
-  return new Date(iso).toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
+const newYork = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/New_York",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+});
+
+function newYorkParts(ms: number) {
+  const p = Object.fromEntries(newYork.formatToParts(new Date(ms)).map((part) => [part.type, part.value]));
+  return { date: `${p.year}-${p.month}-${p.day}`, hour: Number(p.hour) };
+}
+
+/** 계좌수익률 CSV에서 온 점의 시각 표기(scripts/lib/import-account-history.mjs). 시각이 아니라 일자 라벨이다. */
+export const CSV_LABEL = /^(\d{4}-\d{2}-\d{2})T15:30:00\+09:00$/;
+
+/** 미국 장 하루가 시작하는 뉴욕 시각. 프리마켓(04:00 ET) 직전이라, 이보다 이른 점은 전날 장의 뒷부분으로 본다. */
+const SESSION_START_SHIFT_MS = 3 * 3_600_000;
+
+/**
+ * 그 점이 속한 미국 거래 세션의 날짜(YYYY-MM-DD, 뉴욕 기준).
+ * 세션은 뉴욕 03:00에 시작해 다음날 03:00에 끝난다 — 프리마켓·정규장·애프터마켓이 한 날이 되고,
+ * KST 새벽에 찍히는 마감 직후 점이 전날 세션에 붙는다. CSV 점은 라벨 날짜가 곧 그날의 종가다.
+ */
+export function sessionDate(iso: string): string {
+  const label = CSV_LABEL.exec(iso);
+  if (label) return label[1];
+  return newYorkParts(Date.parse(iso) - SESSION_START_SHIFT_MS).date;
+}
+
+/** 정규장 마감(뉴욕 16:00) 이후의 점인가. CSV 점은 종가 라벨이므로 항상 그렇다. */
+function isAfterClose(iso: string): boolean {
+  if (CSV_LABEL.test(iso)) return true;
+  const { hour } = newYorkParts(Date.parse(iso));
+  return hour >= 16 || hour < 3;
 }
 
 /**
- * 같은 날짜의 점을 **그날 마지막 값** 하나로 접는다.
+ * 같은 미국 거래 세션(`sessionDate`)의 점을 **마감 기준 값** 하나로 접는다.
+ * 정규장 마감 이후 첫 점을 쓰고, 마감 이후 점이 없는(아직 진행 중인) 세션은 마지막 점을 쓴다.
+ * 마감 이후 점을 고르는 이유는 종목별 기여가 종가로 계산되기 때문이다 — 애프터마켓 가격이
+ * 섞이면 일 손익과 기여 합이 어긋난다.
  *
  * x축이 날짜가 아니라 점 순서라, 하루에 찍히는 점 수가 구간마다 다르면 그만큼
  * 가로로 늘어난다. 지난 기록은 증권사 CSV에서 와서 하루 1개인데 예약 갱신은
@@ -94,13 +130,20 @@ function kstDate(iso: string) {
  * 움직임을 그대로 볼 수 있고, 나중에 다른 방식이 필요해도 되돌릴 수 있다.
  */
 export function collapseDaily(snapshots: Snapshot[]): Snapshot[] {
-  const byDate = new Map<string, Snapshot>();
+  const bySession = new Map<string, { snapshot: Snapshot; afterClose: boolean }>();
   for (const snapshot of snapshots) {
-    const key = kstDate(snapshot.at);
-    const kept = byDate.get(key);
-    if (!kept || Date.parse(kept.at) <= Date.parse(snapshot.at)) byDate.set(key, snapshot);
+    const key = sessionDate(snapshot.at);
+    const afterClose = isAfterClose(snapshot.at);
+    const kept = bySession.get(key);
+    const t = Date.parse(snapshot.at);
+    const keptT = kept ? Date.parse(kept.snapshot.at) : 0;
+    const better =
+      !kept ||
+      (afterClose && !kept.afterClose) ||
+      (afterClose === kept.afterClose && (afterClose ? t < keptT : t >= keptT));
+    if (better) bySession.set(key, { snapshot, afterClose });
   }
-  return [...byDate.values()].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+  return [...bySession.values()].map((v) => v.snapshot).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
 
 export function filterSnapshots(input: Snapshot[], range: RangeKey): FilteredSnapshots {

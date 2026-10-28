@@ -29,7 +29,8 @@ describe("buildDailyGains", () => {
       transactions: [buy("2026-01-02T00:00:00Z", 10, 10)],
       priceHistory: { AAA: [{ d: "2026-01-05", c: 10 }, { d: "2026-01-06", c: 11 }] },
     });
-    expect(rows[0]).toMatchObject({ date: "2026-01-06", dayGainKrw: null, contributions: [] });
+    // 01-06 07:00Z는 뉴욕 01-06 02:00 — 01-05 세션(종가 01-05)에 속한다.
+    expect(rows[0]).toMatchObject({ date: "2026-01-05", dayGainKrw: null, contributions: [] });
     expect(rows[1]).toMatchObject({ dayGainKrw: 10_000, dayPercent: 10, contributions: [{ symbolId: "AAA", krw: 10_000 }], otherKrw: 0 });
   });
 
@@ -68,12 +69,12 @@ describe("buildDailyGains", () => {
   });
 
   it("주말 점은 행을 만들지 않고 다음 거래일에 합친다(그 사이 매매도 이어진다)", () => {
-    // 01-09 금, 01-10 토, 01-12 월. 토요일 점 직전에 10주를 더 샀다.
+    // 01-09 금 마감 직후, 01-10 토 장외, 01-12 월 마감 직후. 금요일 점 뒤에 10주를 더 샀다.
     const rows = buildDailyGains({
       ...base,
-      snapshots: [snap("2026-01-09T07:00:00Z", 205_000, 205_000), snap("2026-01-10T07:00:00Z", 230_000, 205_000), snap("2026-01-12T07:00:00Z", 220_000, 205_000)],
-      transactions: [buy("2026-01-02T00:00:00Z", 10, 10), buy("2026-01-09T12:00:00Z", 10, 10.5)],
-      priceHistory: { AAA: [{ d: "2026-01-08", c: 10 }, { d: "2026-01-09", c: 11 }] },
+      snapshots: [snap("2026-01-09T21:30:00Z", 205_000, 205_000), snap("2026-01-10T15:00:00Z", 230_000, 205_000), snap("2026-01-12T21:30:00Z", 220_000, 205_000)],
+      transactions: [buy("2026-01-02T00:00:00Z", 10, 10), buy("2026-01-09T23:00:00Z", 10, 10.5)],
+      priceHistory: { AAA: [{ d: "2026-01-09", c: 10 }, { d: "2026-01-12", c: 11 }] },
     });
     expect(rows.map((r) => r.date)).toEqual(["2026-01-09", "2026-01-12"]);
     // 평가액 220,000 − 금요일 100,000 − 매수 105,000 = 15,000

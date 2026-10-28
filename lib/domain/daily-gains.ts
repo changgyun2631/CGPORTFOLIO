@@ -1,5 +1,5 @@
 import { valueOnOrBefore } from "./exposure";
-import { collapseDaily } from "./metrics";
+import { collapseDaily, CSV_LABEL, sessionDate } from "./metrics";
 import type { Currency, Snapshot, Transaction } from "./types";
 
 /**
@@ -24,7 +24,7 @@ export type DailyGainInput = {
 };
 
 export type DailyGainRow = {
-  /** KST 달력 날짜 */
+  /** 미국 거래일(뉴욕 기준). 마감 직후 점은 KST로 다음날 새벽이어도 그 거래일로 적는다. */
   date: string;
   totalKrw: number;
   /** 원금 대비 누적 이익(평가금액 − 원금). 원금을 모르면 null */
@@ -50,9 +50,6 @@ const newYork = new Intl.DateTimeFormat("en-CA", {
   day: "2-digit",
   hour: "2-digit",
 });
-
-/** 계좌수익률 CSV에서 온 점의 시각 표기(scripts/lib/import-account-history.mjs). 시각이 아니라 일자 라벨이다. */
-const CSV_LABEL = /^(\d{4}-\d{2}-\d{2})T15:30:00\+09:00$/;
 
 /**
  * 그 점이 가리키는 미국장 종가 날짜.
@@ -135,14 +132,15 @@ export function buildDailyGains({
     const shares = advance(Date.parse(snap.at), snap.fxRate);
     // 주말은 장이 쉬어 그날 값은 기록 출처 차이뿐이다 — 행을 따로 두지 않고 다음 거래일에
     // 합친다. prev와 쌓인 매매 흐름을 그대로 두면 다음 행이 금요일과 바로 비교된다.
-    if (isWeekend(kstDate(snap.at))) continue;
+    const date = sessionDate(snap.at);
+    if (isWeekend(date)) continue;
     const tradeFlow = flow;
     flow = new Map();
 
     const basis = snap.principalKrw ?? principalKrw;
     const gainKrw = basis && basis > 0 ? snap.totalKrw - basis : null;
     const row: DailyGainRow = {
-      date: kstDate(snap.at),
+      date,
       totalKrw: snap.totalKrw,
       gainKrw,
       dayGainKrw: null,
