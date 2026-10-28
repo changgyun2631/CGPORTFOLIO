@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { EventResults } from "@/components/calendar/event-results";
 import type { CalendarResult } from "@/lib/domain/calendar-results";
 import type { CalendarEvent } from "@/lib/domain/types";
 
 /**
- * 월간 캘린더. 한 칸에 그날 일정을 적고, 날짜를 누르면 아래에 그날 일정과 발표
+ * 월간 캘린더. 한 칸에 그날 일정을 적고, 날짜를 누르면 팝업으로 그날 일정과 발표
  * 결과가 뜬다. 월 이동은 클라이언트에서만 한다.
  */
 
@@ -51,7 +51,7 @@ export function MonthCalendar({
   nowMs: number;
 }) {
   const [month, setMonth] = useState(monthOf(today));
-  const [selected, setSelected] = useState(today);
+  const [selected, setSelected] = useState<string | null>(null);
 
   const eventsByDate = new Map<string, CalendarEvent[]>();
   for (const event of events) eventsByDate.set(event.date, [...(eventsByDate.get(event.date) ?? []), event]);
@@ -61,7 +61,6 @@ export function MonthCalendar({
   const lead = (new Date(Date.UTC(year, mon - 1, 1)).getUTCDay() + 6) % 7;
   const monthEvents = events.filter((event) => event.date.startsWith(month));
   const countOf = (kind: CalendarEvent["kind"]) => monthEvents.filter((event) => event.kind === kind).length;
-  const selectedEvents = eventsByDate.get(selected) ?? [];
 
   return (
     <div className="space-y-5">
@@ -81,7 +80,6 @@ export function MonthCalendar({
               type="button"
               onClick={() => {
                 setMonth(monthOf(today));
-                setSelected(today);
               }}
               className="ml-1 rounded-lg border border-line px-2.5 py-1 text-xs text-muted transition-colors hover:border-line-strong hover:text-text"
             >
@@ -127,19 +125,44 @@ export function MonthCalendar({
         </div>
       </div>
 
-      <section aria-live="polite" className="rounded-2xl border border-line bg-bg-elevated p-5 sm:p-6">
-        <h3 className="text-lg font-bold tracking-tight">{dayTitle(selected)}</h3>
-        {selectedEvents.length === 0 ? (
-          <p className="mt-2 text-sm text-faint">이날 등록된 일정이 없습니다.</p>
-        ) : (
-          <ul className="mt-1 divide-y divide-line">
-            {selectedEvents.map((event) => (
-              <EventRow key={event.id} event={event} result={results[event.id]} nowMs={nowMs} />
-            ))}
-          </ul>
-        )}
-      </section>
+      {selected ? (
+        <DayDialog key={selected} date={selected} events={eventsByDate.get(selected) ?? []} results={results} nowMs={nowMs} onClose={() => setSelected(null)} />
+      ) : null}
     </div>
+  );
+}
+
+/** 날짜를 누르면 뜨는 팝업. 일정 10건쯤 높이까지 보이고 그 위로는 스크롤한다. 바깥·Esc로 닫는다. */
+function DayDialog({ date, events, results, nowMs, onClose }: { date: string; events: CalendarEvent[]; results: Record<string, CalendarResult>; nowMs: number; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => ref.current?.showModal(), []);
+  // 보유 종목·지표가 먼저, 사이트 주요 기업이 뒤
+  const sorted = [...events].sort((a, b) => Number(isWatch(a)) - Number(isWatch(b)));
+  return (
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => e.target === ref.current && ref.current?.close()}
+      className="m-auto w-[min(94vw,560px)] rounded-2xl border border-line bg-bg-elevated p-0 text-text backdrop:bg-black/50"
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
+        <h3 className="text-lg font-bold tracking-tight">
+          {dayTitle(date)} <span className="text-sm font-medium text-muted">· 일정 {events.length}건</span>
+        </h3>
+        <button type="button" onClick={() => ref.current?.close()} className="rounded-lg border border-line px-2.5 py-1 text-xs text-muted hover:border-line-strong hover:text-text">
+          닫기
+        </button>
+      </div>
+      {sorted.length === 0 ? (
+        <p className="px-5 py-4 text-sm text-faint">이날 등록된 일정이 없습니다.</p>
+      ) : (
+        <ul className="max-h-[min(70vh,640px)] divide-y divide-line overflow-y-auto px-5">
+          {sorted.map((event) => (
+            <EventRow key={event.id} event={event} result={results[event.id]} nowMs={nowMs} />
+          ))}
+        </ul>
+      )}
+    </dialog>
   );
 }
 
